@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Eye, Upload, X } from 'lucide-react';
-import { mockApplications, statusLabels, statusColors, Application } from '../data/mockData';
+import React, { useState } from 'react';
+import { Search, Eye, Upload, X, Loader2, RefreshCw } from 'lucide-react';
+import { statusLabels, statusColors } from '../data/mockData';
+import {
+  useAdminApplications,
+  updateApplicationStatus,
+  uploadVisaFile,
+  type AdminApplication as Application,
+} from '../hooks/useAdminData';
 
 interface ApplicationsProps {
   filter?: {
@@ -189,22 +195,15 @@ const ApplicationModal: React.FC<{
 
 export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>(filter?.filter === 'in_progress' ? 'in_progress' : 'all');
   const [countryFilter, setCountryFilter] = useState<string>('all');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
-  // Применяем фильтр из Dashboard при первой загрузке
-  useEffect(() => {
-    if (filter?.filter === 'in_progress') {
-      setStatusFilter('in_progress');
-    } else if (filter?.filter === 'all') {
-      setStatusFilter('all');
-    }
-  }, [filter]);
+  const { applications, loading, refetch } = useAdminApplications();
 
-  const countries = Array.from(new Set(mockApplications.map(app => app.country)));
+  const countries = Array.from(new Set(applications.map(app => app.country)));
 
-  const filteredApplications = mockApplications.filter(app => {
+  const filteredApplications = applications.filter(app => {
     const matchesSearch = app.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          app.phone.includes(searchQuery) ||
                          app.id.toLowerCase().includes(searchQuery.toLowerCase());
@@ -217,8 +216,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <h1>Заявки</h1>
-        <div className="text-sm text-gray-600">
-          Всего: {filteredApplications.length} из {mockApplications.length}
+        <div className="flex items-center gap-3">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button onClick={refetch} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Обновить">
+            <RefreshCw size={16} className="text-gray-500" />
+          </button>
+          <div className="text-sm text-gray-600">
+            Всего: {filteredApplications.length} из {applications.length}
+          </div>
         </div>
       </div>
 

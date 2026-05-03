@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { FileText, Users, Globe, TrendingUp } from 'lucide-react';
-import { mockApplications, mockUsers, statusLabels } from '../data/mockData';
+import { statusLabels } from '../data/mockData';
+import { useAdminApplications, useAdminUsers } from '../hooks/useAdminData';
 
 const StatCard: React.FC<{
   icon: React.ReactNode;
@@ -34,11 +35,14 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [revenueFilter, setRevenueFilter] = useState<'1h' | '1d' | '1w' | '30d' | '3m' | '6m' | '1y'>('30d');
 
+  const { applications: mockApplications } = useAdminApplications();
+  const { users: mockUsers } = useAdminUsers();
+
   const totalApplications = mockApplications.length;
   const inProgressApplications = mockApplications.filter(app => app.status === 'in_progress').length;
   const totalUsers = mockUsers.filter(user => user.status === 'regular').length;
   const partnersCount = mockUsers.filter(user => user.status === 'partner').length;
-  
+
   const totalRevenue = mockApplications
     .filter(app => app.status !== 'draft')
     .reduce((sum, app) => sum + app.cost, 0);

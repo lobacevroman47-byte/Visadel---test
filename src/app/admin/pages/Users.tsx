@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Search, Plus, Minus, Ban, CheckCircle } from 'lucide-react';
-import { mockUsers, User } from '../data/mockData';
+import React, { useState } from 'react';
+import { Search, Plus, Minus, Ban, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
+import type { User } from '../data/mockData';
+import { useAdminUsers, updateUserBonuses, updateUserStatus, type AdminUser } from '../hooks/useAdminData';
 
 interface UsersProps {
   filter?: {
@@ -155,23 +156,16 @@ const UserModal: React.FC<{
 
 export const Users: React.FC<UsersProps> = ({ filter }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>(
+    filter?.filter === 'regular' ? 'regular' : filter?.filter === 'partners' ? 'partner' : 'all'
+  );
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
 
-  // Применяем фильтр из Dashboard при первой загрузке
-  useEffect(() => {
-    if (filter?.filter === 'regular') {
-      setStatusFilter('regular');
-    } else if (filter?.filter === 'partners') {
-      setStatusFilter('partner');
-    } else if (filter?.filter === 'all') {
-      setStatusFilter('all');
-    }
-  }, [filter]);
+  const { users, loading, refetch } = useAdminUsers();
 
-  const filteredUsers = mockUsers.filter(user => {
+  const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.telegram.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          user.phone.includes(searchQuery) ||
                          user.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchQuery.toLowerCase());
@@ -183,8 +177,12 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <h1>Пользователи</h1>
-        <div className="text-sm text-gray-600">
-          Всего: {filteredUsers.length} из {mockUsers.length}
+        <div className="flex items-center gap-3">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button onClick={refetch} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Обновить">
+            <RefreshCw size={16} className="text-gray-500" />
+          </button>
+          <div className="text-sm text-gray-600">Всего: {filteredUsers.length} из {users.length}</div>
         </div>
       </div>
 

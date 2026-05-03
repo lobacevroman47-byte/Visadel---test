@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
@@ -74,6 +74,20 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
     },
   });
   const [draftId, setDraftId] = useState<string>('');
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const headerRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard detection — shrink header when keyboard opens
+  useEffect(() => {
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const handler = () => {
+      const ratio = vv.height / window.innerHeight;
+      setKeyboardOpen(ratio < 0.75);
+    };
+    vv.addEventListener('resize', handler);
+    return () => vv.removeEventListener('resize', handler);
+  }, []);
 
   // Load draft if exists
   useEffect(() => {
@@ -157,46 +171,32 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-4 sticky top-0 z-10 shadow-lg">
+      {/* Compact Header */}
+      <div
+        ref={headerRef}
+        className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white sticky top-0 z-10 shadow-md transition-all duration-200"
+        style={{ padding: keyboardOpen ? '6px 12px' : '8px 16px' }}
+      >
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={onBack}
-              className="p-2 hover:bg-white/20 rounded-full transition"
-            >
-              <ChevronLeft className="w-6 h-6" />
+          {/* Top row: back / title / save */}
+          <div className="flex items-center justify-between">
+            <button onClick={onBack} className="p-1.5 hover:bg-white/20 rounded-full transition">
+              <ChevronLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-xl">Оформление визы</h1>
-            <button
-              onClick={saveDraft}
-              className="p-2 hover:bg-white/20 rounded-full transition"
-              title="Сохранить черновик"
-            >
-              <Save className="w-6 h-6" />
-            </button>
-          </div>
-
-          {/* Visa Info */}
-          <div className="bg-white/10 rounded-lg p-3 mb-4">
-            <p className="text-sm text-[#E3F2FD]">
-              {visa.country} - {visa.type}
-            </p>
-            <p className="text-lg">
-              {calculateTotal()}₽
-              {urgent && visa.country !== 'Вьетнам' && (
-                <span className="text-sm ml-2 text-[#FFC400]">(+1000₽ срочно)</span>
+            <div className="text-center leading-tight">
+              <span className="text-sm font-semibold">{visa.country} · {STEPS[currentStep]}</span>
+              {!keyboardOpen && (
+                <span className="block text-xs text-blue-200">{calculateTotal()}₽{urgent && visa.country !== 'Вьетнам' ? ' (срочно)' : ''}</span>
               )}
-            </p>
+            </div>
+            <button onClick={saveDraft} className="p-1.5 hover:bg-white/20 rounded-full transition" title="Сохранить черновик">
+              <Save className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Progress bar */}
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs text-blue-100">
-              <span>Шаг {currentStep + 1} из {STEPS.length}</span>
-              <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
-            </div>
-            <div className="h-2 bg-white/20 rounded-full overflow-hidden">
+          {/* Progress bar — always visible but thinner */}
+          <div className="mt-1.5">
+            <div className="h-1 bg-white/25 rounded-full overflow-hidden">
               <motion.div
                 className="h-full bg-white"
                 initial={{ width: 0 }}
@@ -204,7 +204,12 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
                 transition={{ duration: 0.3 }}
               />
             </div>
-            <p className="text-sm text-center text-white">{STEPS[currentStep]}</p>
+            {!keyboardOpen && (
+              <div className="flex justify-between text-[10px] text-blue-200 mt-0.5">
+                <span>Шаг {currentStep + 1}/{STEPS.length}</span>
+                <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
