@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.users (
 -- Таблица заявок на визы
 CREATE TABLE IF NOT EXISTS public.applications (
   id                  UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_telegram_id    BIGINT NOT NULL REFERENCES public.users(telegram_id) ON DELETE CASCADE,
+  user_telegram_id    BIGINT NOT NULL,
   country             TEXT NOT NULL,
   visa_type           TEXT NOT NULL,
   visa_id             TEXT NOT NULL,

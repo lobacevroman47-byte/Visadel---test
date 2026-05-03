@@ -251,11 +251,25 @@ export async function saveApplication(app: Application): Promise<Application> {
         urgent: app.urgent,
         status: app.status,
         form_data: app.form_data,
+        payment_proof_url: app.payment_proof_url ?? null,
         bonuses_used: app.bonuses_used,
       })
       .select()
       .single();
-    if (error) throw error;
+
+    if (error) {
+      console.error('saveApplication Supabase error:', JSON.stringify(error));
+      // FK violation — user not yet in DB, fall through to localStorage
+      if (error.code === '23503') {
+        console.warn('FK violation — saving to localStorage instead');
+        const apps = lsGet<Application[]>(LS_APPS, []);
+        const newApp = { ...app, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+        apps.push(newApp);
+        lsSet(LS_APPS, apps);
+        return newApp;
+      }
+      throw new Error(`Supabase error ${error.code}: ${error.message}`);
+    }
     return data as Application;
   }
 

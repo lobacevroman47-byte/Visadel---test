@@ -93,7 +93,8 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
     } catch (err) {
       console.error('Submit error:', err);
       haptic('error');
-      alert('Ошибка при отправке. Попробуйте ещё раз.');
+      const msg = err instanceof Error ? err.message : String(err);
+      alert(`Ошибка при отправке:\n${msg}\n\nПопробуйте ещё раз или сохраните черновик.`);
     } finally {
       setSubmitting(false);
     }
