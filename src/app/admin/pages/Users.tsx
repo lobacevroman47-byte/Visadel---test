@@ -1,174 +1,166 @@
 import React, { useState } from 'react';
-import { Search, Plus, Minus, Ban, CheckCircle, Loader2, RefreshCw } from 'lucide-react';
-import type { User } from '../data/mockData';
+import { Search, Plus, Minus, Loader2, RefreshCw, X, ExternalLink } from 'lucide-react';
 import { useAdminUsers, updateUserBonuses, updateUserStatus, type AdminUser } from '../hooks/useAdminData';
 
 interface UsersProps {
-  filter?: {
-    filter?: 'all' | 'partners' | 'regular';
-  };
+  filter?: { filter?: 'all' | 'partners' | 'regular' };
 }
 
-const UserModal: React.FC<{
-  user: User;
-  onClose: () => void;
-}> = ({ user, onClose }) => {
+// ── User Modal ────────────────────────────────────────────────────────────────
+const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () => void }> = ({ user, onClose, onSaved }) => {
   const [bonusBalance, setBonusBalance] = useState(user.bonusBalance);
+  const [bonusInput, setBonusInput] = useState('');
   const [status, setStatus] = useState(user.status);
-  const [bonusChange, setBonusChange] = useState(0);
+  const [saving, setSaving] = useState(false);
 
-  const handleAddBonus = () => {
-    if (bonusChange > 0) {
-      setBonusBalance(bonusBalance + bonusChange);
-      alert(`Добавлено ${bonusChange} бонусов`);
-      setBonusChange(0);
+  const amount = parseInt(bonusInput, 10) || 0;
+
+  const handleBonus = async (add: boolean) => {
+    if (amount <= 0) { alert('Введите сумму'); return; }
+    if (!add && bonusBalance < amount) { alert('Недостаточно бонусов'); return; }
+    setSaving(true);
+    try {
+      await updateUserBonuses(user.telegramId, amount, add);
+      setBonusBalance(prev => add ? prev + amount : prev - amount);
+      setBonusInput('');
+    } catch {
+      alert('Ошибка при изменении бонусов');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleRemoveBonus = () => {
-    if (bonusChange > 0 && bonusBalance >= bonusChange) {
-      setBonusBalance(bonusBalance - bonusChange);
-      alert(`Снято ${bonusChange} бонусов`);
-      setBonusChange(0);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateUserStatus(user.telegramId, status === 'partner');
+      onSaved();
+      onClose();
+    } catch {
+      alert('Ошибка при сохранении');
+    } finally {
+      setSaving(false);
     }
   };
+
+  const tgUsername = user.username?.replace('@', '') ?? '';
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-2xl w-full">
-        <div className="p-6 border-b border-gray-200">
-          <h2>Пользователь {user.name}</h2>
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
+
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center shrink-0">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-800">{user.name}</h2>
+            {tgUsername ? (
+              <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
+                className="text-sm text-blue-500 hover:underline flex items-center gap-1">
+                @{tgUsername} <ExternalLink className="w-3 h-3" />
+              </a>
+            ) : null}
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
+            <X size={20} />
+          </button>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* User Info */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">ФИО</p>
-              <p>{user.name}</p>
+        {/* Content */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-5">
+
+          {/* Info */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-0.5">Телефон</p>
+              <p className="text-sm font-medium">{user.phone || '—'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Telegram</p>
-              <p>{user.telegram}</p>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-0.5">Email</p>
+              <p className="text-sm font-medium truncate">{user.email || '—'}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Телефон</p>
-              <p>{user.phone}</p>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-0.5">Зарегистрирован</p>
+              <p className="text-sm font-medium">{new Date(user.registeredAt).toLocaleDateString('ru-RU')}</p>
             </div>
-            <div>
-              <p className="text-sm text-gray-600">Email</p>
-              <p>{user.email}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Дата регистрации</p>
-              <p>{new Date(user.registrationDate).toLocaleDateString('ru-RU')}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Заявок оформлено</p>
-              <p>{user.applicationsCount}</p>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs text-gray-500 mb-0.5">Заявок</p>
+              <p className="text-sm font-medium">{user.applicationsCount}</p>
             </div>
           </div>
 
           {/* Bonus Balance */}
-          <div className="p-4 bg-[#F5F7FA] rounded-lg">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <div className="flex justify-between items-center mb-4">
-              <span className="text-sm text-gray-600">Баланс бонусов</span>
-              <span className="text-2xl text-[#2196F3]">{bonusBalance} ₽</span>
+              <p className="text-sm font-medium text-gray-700">Баланс бонусов</p>
+              <span className="text-2xl font-bold text-amber-600">{bonusBalance} ₽</span>
             </div>
-            
             <div className="flex gap-2">
               <input
                 type="number"
-                value={bonusChange || ''}
-                onChange={(e) => setBonusChange(Number(e.target.value))}
+                value={bonusInput}
+                onChange={e => setBonusInput(e.target.value)}
                 placeholder="Сумма"
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+                min={1}
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
               />
-              <button
-                onClick={handleAddBonus}
-                className="px-4 py-2 bg-[#00C853] hover:bg-[#00A344] text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Plus size={18} />
-                Добавить
+              <button onClick={() => handleBonus(true)} disabled={saving}
+                className="px-3 py-2.5 bg-green-500 hover:bg-green-600 disabled:opacity-60 text-white rounded-xl transition flex items-center gap-1 text-sm">
+                <Plus size={16} /> Начислить
               </button>
-              <button
-                onClick={handleRemoveBonus}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                <Minus size={18} />
-                Снять
+              <button onClick={() => handleBonus(false)} disabled={saving}
+                className="px-3 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-60 text-white rounded-xl transition flex items-center gap-1 text-sm">
+                <Minus size={16} /> Снять
               </button>
             </div>
+            <p className="text-xs text-gray-400 mt-2">
+              Обычный пользователь может списать до 500 ₽ за заявку
+            </p>
           </div>
 
           {/* Status */}
           <div>
-            <label className="block text-sm text-gray-700 mb-2">Статус пользователя</label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as User['status'])}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-            >
-              <option value="regular">Обычный</option>
-              <option value="partner">Партнёр</option>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Статус</label>
+            <select value={status} onChange={e => setStatus(e.target.value as 'regular' | 'partner')}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="regular">Обычный пользователь</option>
+              <option value="partner">Партнёр (может списывать до 100% бонусами)</option>
             </select>
           </div>
+        </div>
 
-          {/* Actions */}
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              onClick={() => {
-                alert('Изменения сохранены');
-                onClose();
-              }}
-              className="flex-1 px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-            >
-              Сохранить изменения
-            </button>
-            <button
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Отмена
-            </button>
-          </div>
-
-          {/* Danger Zone */}
-          <div className="pt-4 border-t border-gray-200">
-            <button
-              onClick={() => {
-                if (confirm('Вы уверены, что хотите заблокировать этого пользователя?')) {
-                  alert('Пользователь заблокирован');
-                  onClose();
-                }
-              }}
-              className="w-full px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center justify-center gap-2"
-            >
-              <Ban size={18} />
-              Заблокировать пользователя
-            </button>
-          </div>
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex gap-3 shrink-0">
+          <button onClick={handleSave} disabled={saving}
+            className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl transition font-medium flex items-center justify-center gap-2">
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+            {saving ? 'Сохранение...' : 'Сохранить'}
+          </button>
+          <button onClick={onClose}
+            className="px-5 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition text-sm">
+            Отмена
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
+// ── Users List ────────────────────────────────────────────────────────────────
 export const Users: React.FC<UsersProps> = ({ filter }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(
     filter?.filter === 'regular' ? 'regular' : filter?.filter === 'partners' ? 'partner' : 'all'
   );
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-
   const { users, loading, refetch } = useAdminUsers();
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.phone.includes(searchQuery) ||
-                         user.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch =
+      user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.phone.includes(searchQuery) ||
+      user.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -187,34 +179,20 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 mb-6">
+      <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Search */}
-          <div className="md:col-span-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Поиск по имени, Telegram, телефону, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              />
-            </div>
+          <div className="md:col-span-2 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input type="text" placeholder="Поиск по имени, Telegram, телефону..."
+              value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400" />
           </div>
-
-          {/* Status Filter */}
-          <div>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-            >
-              <option value="all">Все статусы</option>
-              <option value="regular">Обычный</option>
-              <option value="partner">Партнёр</option>
-            </select>
-          </div>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400">
+            <option value="all">Все</option>
+            <option value="regular">Обычные</option>
+            <option value="partner">Партнёры</option>
+          </select>
         </div>
       </div>
 
@@ -222,43 +200,41 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-[#F5F7FA]">
+            <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Имя</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Telegram</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Телефон</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Email</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Баланс бонусов</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Статус</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Заявок</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Действия</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Имя / Telegram</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Телефон</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Бонусы</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Статус</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Заявок</th>
+                <th className="px-6 py-3 text-left text-xs text-gray-500 font-medium">Действия</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className="hover:bg-[#F5F7FA]">
-                  <td className="px-6 py-4 text-sm">{user.name}</td>
-                  <td className="px-6 py-4 text-sm">{user.telegram}</td>
-                  <td className="px-6 py-4 text-sm">{user.phone}</td>
-                  <td className="px-6 py-4 text-sm">{user.email}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className="text-[#2196F3]">{user.bonusBalance} ₽</span>
+            <tbody className="divide-y divide-gray-100">
+              {filteredUsers.map(user => (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <p className="text-sm font-medium text-gray-800">{user.name}</p>
+                    {user.username && (
+                      <a href={`https://t.me/${user.username.replace('@', '')}`} target="_blank" rel="noreferrer"
+                        className="text-xs text-blue-500 hover:underline">@{user.username.replace('@', '')}</a>
+                    )}
                   </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      user.status === 'partner' 
-                        ? 'bg-[#00C853] bg-opacity-10 text-[#00C853]'
-                        : 'bg-[#F5F7FA] text-gray-600'
+                  <td className="px-6 py-4 text-sm text-gray-600">{user.phone || '—'}</td>
+                  <td className="px-6 py-4">
+                    <span className="text-sm font-medium text-amber-600">{user.bonusBalance} ₽</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      user.status === 'partner' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                     }`}>
                       {user.status === 'partner' ? 'Партнёр' : 'Обычный'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm">{user.applicationsCount}</td>
-                  <td className="px-6 py-4 text-sm">
-                    <button
-                      onClick={() => setSelectedUser(user)}
-                      className="px-4 py-2 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg text-sm transition-colors"
-                    >
+                  <td className="px-6 py-4 text-sm text-gray-600">{user.applicationsCount}</td>
+                  <td className="px-6 py-4">
+                    <button onClick={() => setSelectedUser(user)}
+                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition">
                       Управление
                     </button>
                   </td>
@@ -269,11 +245,11 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
         </div>
       </div>
 
-      {/* Modal */}
       {selectedUser && (
         <UserModal
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
+          onSaved={refetch}
         />
       )}
     </div>

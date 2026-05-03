@@ -30,7 +30,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
     if (useBonuses && availableBonuses > 0) {
       const max = isPartner
         ? Math.min(availableBonuses, totalPrice)
-        : Math.min(availableBonuses, 1000, totalPrice);
+        : Math.min(availableBonuses, 500, totalPrice);
       setBonusAmount(max);
       setFinalPrice(totalPrice - max);
     } else {
@@ -156,7 +156,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
             <div>
               <h3 className="text-[#212121] text-sm mb-0.5">Использовать бонусы</h3>
               <p className="text-xs text-[#616161]">Доступно: <span className="text-[#FFC400] font-semibold">{availableBonuses}₽</span>
-                {!isPartner && ' · макс. 1000₽'}{isPartner && ' · 🌟 до 100%'}
+                {!isPartner && ' · макс. 500₽'}{isPartner && ' · 🌟 до 100%'}
               </p>
             </div>
           </div>
