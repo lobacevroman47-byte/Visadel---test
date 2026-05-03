@@ -99,7 +99,7 @@ function getRequiredFields(country: string): string[] {
   const commonFields: Record<string, string[]> = {
     'Индия': ['citizenship', 'airport', 'arrivalDate', 'birthCity', 'internalPassport', 'residedTwoYears',
               'registrationAddress', 'residenceAddress', 'fatherData', 'motherData', 'maritalStatus',
-              'workplace', 'citiesInIndia', 'countriesVisited', 'visitedIndiaBefore',
+              'workplace', 'citiesInIndia', 'visitedIndiaBefore',
               'hotelInfo', 'emergencyContact'],
     'Вьетнам': ['citizenship', 'birthCountry', 'plannedDates', 'registrationAddress', 'emergencyContact', 
                 'workOrStudy', 'visitPurpose', 'contactsInVietnam', 'arrivalAirport', 'departureAirport', 
@@ -433,7 +433,7 @@ function IndiaForm({ formData, updateField, errors }: any) {
         />
       </FormField>
 
-      <FormField label="Какие страны посещали за последние 10 лет?" required error={errors.countriesVisited}>
+      <FormField label="Какие страны посещали за последние 10 лет?" hint="необязательно">
         <CountriesMultiSelect
           value={formData.countriesVisited || []}
           onChange={(v) => updateField('countriesVisited', v)}
@@ -455,6 +455,57 @@ function IndiaForm({ formData, updateField, errors }: any) {
           <option value="no">Нет</option>
         </select>
       </FormField>
+
+      {formData.visitedIndiaBefore === 'yes' && (
+        <div className="bg-blue-50 rounded-xl p-4 space-y-4 border border-blue-100">
+          <p className="text-xs text-blue-600 font-medium">Данные предыдущего посещения (необязательно)</p>
+
+          <FormField label="Тип предыдущей визы">
+            <select
+              value={formData.prevVisaType || ''}
+              onChange={(e) => updateField('prevVisaType', e.target.value)}
+              className="form-input"
+            >
+              <option value="">Выберите тип визы...</option>
+              <option value="e_tourist">e-Tourist Visa (электронная туристическая)</option>
+              <option value="e_business">e-Business Visa (электронная бизнес)</option>
+              <option value="e_medical">e-Medical Visa (электронная медицинская)</option>
+              <option value="e_conference">e-Conference Visa (электронная конференция)</option>
+              <option value="sticker">Обычная стикерная виза</option>
+              <option value="other">Другой тип</option>
+            </select>
+          </FormField>
+
+          <FormField label="Номер предыдущей визы">
+            <input
+              type="text"
+              value={formData.prevVisaNumber || ''}
+              onChange={(e) => updateField('prevVisaNumber', e.target.value)}
+              className="form-input"
+              placeholder="Введите номер визы"
+            />
+          </FormField>
+
+          <FormField label="Аэропорт въезда в Индию">
+            <input
+              type="text"
+              value={formData.prevEntryAirport || ''}
+              onChange={(e) => updateField('prevEntryAirport', e.target.value)}
+              className="form-input"
+              placeholder="Например: DEL, BOM, MAA"
+            />
+          </FormField>
+
+          <FormField label="Дата посещения Индии">
+            <input
+              type="date"
+              value={formData.prevVisitDate || ''}
+              onChange={(e) => updateField('prevVisitDate', e.target.value)}
+              className="form-input"
+            />
+          </FormField>
+        </div>
+      )}
 
       <FormField label="Посещали ли Вы Бангладеш, Бутан, Мальдивы, Непал, Пакистан, Шри-Ланку, Афганистан за последние 3 года?">
         <SouthAsiaVisitsSelect
