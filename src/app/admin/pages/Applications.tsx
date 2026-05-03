@@ -172,28 +172,24 @@ function FilePreview({ url, label }: { url: string; label: string }) {
   );
 }
 
-// ── Full Form Data Renderer ───────────────────────────────────────────────────
+// ── Form Data (Анкета tab) ────────────────────────────────────────────────────
 const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
   const fd = app.formData as {
     basicData?: Record<string, unknown>;
     contactInfo?: Record<string, string>;
     additionalDocs?: Record<string, boolean>;
     howHeard?: string[];
-    photoUrls?: Record<string, string | null>;
   };
 
   const basicData = fd.basicData ?? {};
   const contactInfo = fd.contactInfo ?? {};
   const additionalDocs = fd.additionalDocs ?? {};
   const howHeard = fd.howHeard ?? [];
-  const photoUrls = fd.photoUrls ?? {};
 
-  const extras = [];
+  const extras: string[] = [];
   if (additionalDocs.urgentProcessing) extras.push('Срочное оформление');
   if (additionalDocs.hotelBooking) extras.push('Подтверждение бронирования');
   if (additionalDocs.returnTicket) extras.push('Бронирование авиабилета');
-
-  const photoEntries = Object.entries(photoUrls).filter(([, url]) => !!url);
 
   return (
     <div className="space-y-6">
@@ -239,37 +235,80 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
         </section>
       )}
 
-      {/* Extras */}
       {extras.length > 0 && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Дополнительные услуги</h4>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Доп. услуги</h4>
           <div className="flex flex-wrap gap-2">
-            {extras.map(e => (
-              <span key={e} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">{e}</span>
-            ))}
+            {extras.map(e => <span key={e} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">{e}</span>)}
           </div>
         </section>
       )}
 
-      {/* How heard */}
       {howHeard.length > 0 && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Откуда узнали</h4>
           <p className="text-sm text-gray-700">{howHeard.map(v => HOW_HEARD_LABELS[v] ?? v).join(', ')}</p>
         </section>
       )}
+    </div>
+  );
+};
 
-      {/* Uploaded files / photos */}
-      {photoEntries.length > 0 && (
-        <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Загруженные файлы</h4>
-          <div className="space-y-3">
-            {photoEntries.map(([key, url]) => (
-              <FilePreview key={key} url={url!} label={PHOTO_LABELS[key] ?? key} />
-            ))}
+// ── Files tab (Файлы) ────────────────────────────────────────────────────────
+const FilesView: React.FC<{ app: Application }> = ({ app }) => {
+  const fd = app.formData as { photoUrls?: Record<string, string | null> };
+  const photoUrls = fd.photoUrls ?? {};
+  const entries = Object.entries(photoUrls).filter(([, url]) => !!url);
+
+  if (entries.length === 0) {
+    return (
+      <div className="py-16 text-center">
+        <p className="text-gray-400 text-sm">Файлы не загружены</p>
+        <p className="text-gray-300 text-xs mt-1">Фотографии появятся после отправки анкеты</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {entries.map(([key, url]) => {
+        const label = PHOTO_LABELS[key] ?? key;
+        const isPdf = url!.toLowerCase().includes('.pdf');
+        return (
+          <div key={key} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
+            {/* Header */}
+            <div className="px-4 py-3 bg-gray-50 flex items-center justify-between border-b border-gray-100">
+              <p className="text-sm font-medium text-gray-700">{label}</p>
+              <a href={url!} target="_blank" rel="noreferrer"
+                className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700">
+                {isPdf ? 'Открыть PDF' : 'Открыть'} <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+            {/* Preview */}
+            {!isPdf ? (
+              <div className="p-3">
+                <img
+                  src={url!}
+                  alt={label}
+                  className="w-full max-h-64 object-contain rounded-lg bg-gray-50"
+                  onError={(e) => {
+                    const t = e.target as HTMLImageElement;
+                    t.style.display = 'none';
+                    const p = document.createElement('p');
+                    p.className = 'text-xs text-gray-400 p-4 text-center';
+                    p.textContent = 'Не удалось загрузить превью';
+                    t.parentNode?.appendChild(p);
+                  }}
+                />
+              </div>
+            ) : (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                PDF-файл — нажмите «Открыть PDF» для просмотра
+              </div>
+            )}
           </div>
-        </section>
-      )}
+        );
+      })}
     </div>
   );
 };
@@ -279,7 +318,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const [status, setStatus] = useState(application.status);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'form' | 'payment'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
 
   const tgUsername = (application.telegram ?? '').replace('@', '') ||
     ((application.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? '').replace('@', '');
@@ -333,7 +372,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 shrink-0">
-          {(['info', 'form', 'payment'] as const).map(tab => (
+          {(['info', 'form', 'files', 'payment'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -341,7 +380,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 activeTab === tab ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'info' ? 'Основное' : tab === 'form' ? 'Анкета' : 'Оплата'}
+              {tab === 'info' ? 'Основное' : tab === 'form' ? 'Анкета' : tab === 'files' ? 'Файлы' : 'Оплата'}
             </button>
           ))}
         </div>
@@ -447,6 +486,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               ? <FormDataView app={application} />
               : <p className="text-center text-gray-400 py-12 text-sm">Данные анкеты не сохранены</p>
           )}
+
+          {/* ── Tab: Файлы ── */}
+          {activeTab === 'files' && <FilesView app={application} />}
 
           {/* ── Tab: Оплата ── */}
           {activeTab === 'payment' && (
