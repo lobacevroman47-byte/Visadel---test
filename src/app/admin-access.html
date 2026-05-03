@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Доступ к админ-панели - Visadel Agency</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+          sans-serif;
+        background: linear-gradient(135deg, #2196F3 0%, #1565C0 100%);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+      .container {
+        max-width: 600px;
+        width: 100%;
+        background: white;
+        border-radius: 24px;
+        padding: 48px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        text-align: center;
+      }
+      .icon {
+        font-size: 64px;
+        margin-bottom: 24px;
+      }
+      h1 {
+        font-size: 32px;
+        color: #2196F3;
+        margin-bottom: 16px;
+      }
+      p {
+        color: #666;
+        font-size: 16px;
+        line-height: 1.6;
+        margin-bottom: 32px;
+      }
+      .btn {
+        display: inline-block;
+        background: #2196F3;
+        color: white;
+        padding: 16px 48px;
+        border-radius: 12px;
+        text-decoration: none;
+        font-size: 18px;
+        transition: all 0.3s ease;
+        margin-bottom: 16px;
+      }
+      .btn:hover {
+        background: #1E88E5;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(33, 150, 243, 0.3);
+      }
+      .credentials {
+        background: #F5F7FA;
+        border-radius: 12px;
+        padding: 24px;
+        margin-top: 32px;
+        text-align: left;
+      }
+      .credentials h3 {
+        color: #2196F3;
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+      .credential-item {
+        margin-bottom: 12px;
+        padding: 12px;
+        background: white;
+        border-radius: 8px;
+      }
+      .credential-item strong {
+        color: #2196F3;
+      }
+      .credential-item code {
+        background: #E3F2FD;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+      }
+      .back-link {
+        display: inline-block;
+        margin-top: 24px;
+        color: #2196F3;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .back-link:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="icon">🔐</div>
+      <h1>Админ-панель Visadel Agency</h1>
+      <p>Управление заявками, пользователями и настройками системы</p>
+      
+      <a href="/?admin=true" class="btn">Войти в админ-панель</a>
+      
+      <div class="credentials">
+        <h3>Демо-доступы для входа:</h3>
+        
+        <div class="credential-item">
+          <strong>👑 Владелец (полный доступ)</strong><br>
+          Email: <code>owner@visadel.agency</code><br>
+          Пароль: <code>owner123</code>
+        </div>
+        
+        <div class="credential-item">
+          <strong>👨‍💼 Администратор</strong><br>
+          Email: <code>admin@visadel.agency</code><br>
+          Пароль: <code>admin123</code>
+        </div>
+        
+        <div class="credential-item">
+          <strong>👤 Менеджер (только заявки)</strong><br>
+          Email: <code>manager@visadel.agency</code><br>
+          Пароль: <code>manager123</code>
+        </div>
+      </div>
+      
+      <a href="/" class="back-link">← Вернуться к Mini App</a>
+    </div>
+  </body>
+</html>
