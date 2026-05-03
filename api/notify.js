@@ -1,7 +1,7 @@
 // Vercel Serverless Function — sends Telegram message when visa is ready
 // Required env vars (no VITE_ prefix):
-//   TELEGRAM_BOT_TOKEN     — bot token from @BotFather
-//   TELEGRAM_MINI_APP_URL  — mini app link, e.g. https://t.me/YourBot/YourApp
+//   TELEGRAM_BOT_TOKEN  — bot token from @BotFather
+//   TELEGRAM_APP_URL    — your Vercel app URL, e.g. https://visadel.vercel.app
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,17 +15,17 @@ export default async function handler(req, res) {
   if (!telegram_id) { res.status(400).json({ error: 'telegram_id required' }); return; }
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL;
+  const appUrl = process.env.TELEGRAM_APP_URL;
 
   if (!token) { res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN not configured' }); return; }
-  if (!miniAppUrl) { res.status(500).json({ error: 'TELEGRAM_MINI_APP_URL not configured' }); return; }
+  if (!appUrl) { res.status(500).json({ error: 'TELEGRAM_APP_URL not configured' }); return; }
 
   const text =
-    `🎉 *Ваша виза готова!*\n\n` +
-    `🌍 Страна: *${country ?? ''}*\n` +
+    `🎉 Ваша виза готова!\n\n` +
+    `🌍 Страна: ${country ?? ''}\n` +
     `📄 Тип: ${visa_type ?? ''}\n\n` +
-    `Чтобы скачать визу — откройте приложение и оставьте короткий отзыв 🙏\n` +
-    `_После отзыва виза сразу станет доступна для скачивания\\._`;
+    `Чтобы скачать визу — откройте приложение и оставьте отзыв 🙏\n` +
+    `После отзыва виза сразу станет доступна для скачивания.`;
 
   try {
     const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -34,10 +34,12 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         chat_id: telegram_id,
         text,
-        parse_mode: 'MarkdownV2',
         reply_markup: {
           inline_keyboard: [[
-            { text: '📥 Открыть в приложении', url: miniAppUrl }
+            {
+              text: '📥 Открыть в приложении',
+              web_app: { url: appUrl }
+            }
           ]]
         }
       })
