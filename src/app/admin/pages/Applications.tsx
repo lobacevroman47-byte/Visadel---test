@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink } from 'lucide-react';
+import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download } from 'lucide-react';
 import { statusLabels, statusColors } from '../data/mockData';
 import {
   useAdminApplications,
@@ -255,16 +255,34 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
 };
 
 // ── Files tab (Файлы) ────────────────────────────────────────────────────────
+
+async function downloadFile(url: string, filename: string) {
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  } catch {
+    window.open(url, '_blank');
+  }
+}
+
 const FilesView: React.FC<{ app: Application }> = ({ app }) => {
   const fd = app.formData as { photoUrls?: Record<string, string | null> };
   const photoUrls = fd.photoUrls ?? {};
-  const entries = Object.entries(photoUrls).filter(([, url]) => !!url);
+  const entries = Object.entries(photoUrls).filter(([, url]) => !!url) as [string, string][];
 
   if (entries.length === 0) {
     return (
-      <div className="py-16 text-center">
+      <div className="py-16 text-center space-y-2">
         <p className="text-gray-400 text-sm">Файлы не загружены</p>
-        <p className="text-gray-300 text-xs mt-1">Фотографии появятся после отправки анкеты</p>
+        <p className="text-gray-300 text-xs">
+          Фотографии сохраняются начиная с новых заявок.
+          Старые заявки не содержат прикреплённых фото.
+        </p>
       </div>
     );
   }
@@ -273,32 +291,36 @@ const FilesView: React.FC<{ app: Application }> = ({ app }) => {
     <div className="space-y-4">
       {entries.map(([key, url]) => {
         const label = PHOTO_LABELS[key] ?? key;
-        const isPdf = url!.toLowerCase().includes('.pdf');
+        const isPdf = /\.pdf$/i.test(url);
+        const ext = url.split('.').pop() ?? 'file';
+        const filename = `${label.replace(/\s+/g, '_')}.${ext}`;
         return (
           <div key={key} className="border border-gray-200 rounded-xl overflow-hidden bg-white">
             {/* Header */}
             <div className="px-4 py-3 bg-gray-50 flex items-center justify-between border-b border-gray-100">
               <p className="text-sm font-medium text-gray-700">{label}</p>
-              <a href={url!} target="_blank" rel="noreferrer"
-                className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700">
-                {isPdf ? 'Открыть PDF' : 'Открыть'} <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => downloadFile(url, filename)}
+                  className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 transition"
+                  title="Скачать"
+                >
+                  <Download className="w-3.5 h-3.5" /> Скачать
+                </button>
+                <a href={url} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700">
+                  {isPdf ? 'Открыть PDF' : 'Открыть'} <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
             {/* Preview */}
             {!isPdf ? (
-              <div className="p-3">
+              <div className="p-2 bg-white">
                 <img
-                  src={url!}
+                  src={url}
                   alt={label}
-                  className="w-full max-h-64 object-contain rounded-lg bg-gray-50"
-                  onError={(e) => {
-                    const t = e.target as HTMLImageElement;
-                    t.style.display = 'none';
-                    const p = document.createElement('p');
-                    p.className = 'text-xs text-gray-400 p-4 text-center';
-                    p.textContent = 'Не удалось загрузить превью';
-                    t.parentNode?.appendChild(p);
-                  }}
+                  className="w-full max-h-72 object-contain rounded-lg"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
                 />
               </div>
             ) : (
@@ -500,10 +522,18 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                   <div className="border border-gray-200 rounded-xl overflow-hidden">
                     <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
                       <p className="text-xs font-medium text-gray-600">Чек / скриншот перевода</p>
-                      <a href={application.paymentProofUrl} target="_blank" rel="noreferrer"
-                        className="text-xs text-blue-500 hover:underline flex items-center gap-1">
-                        Открыть <ExternalLink className="w-3 h-3" />
-                      </a>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => downloadFile(application.paymentProofUrl!, 'payment_proof.jpg')}
+                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 transition"
+                        >
+                          <Download className="w-3.5 h-3.5" /> Скачать
+                        </button>
+                        <a href={application.paymentProofUrl} target="_blank" rel="noreferrer"
+                          className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                          Открыть <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
                     </div>
                     <div className="p-2 bg-white">
                       <img
