@@ -34,9 +34,11 @@ function ReviewModal({ app, onClose, onSubmitted }: {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const telegramId = (() => {
-    try { return JSON.parse(localStorage.getItem('userData') ?? '{}').telegramId ?? 0; } catch { return 0; }
+  const userData = (() => {
+    try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
   })();
+  const telegramId: number = userData.telegramId ?? 0;
+  const username: string = userData.username ?? '';
 
   const handleSubmit = async () => {
     if (rating === 0) { alert('Поставьте оценку'); return; }
@@ -49,6 +51,7 @@ function ReviewModal({ app, onClose, onSubmitted }: {
         country: app.country,
         rating,
         text: comment.trim(),
+        username,
       });
       // sync bonus locally
       try {
@@ -280,25 +283,31 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                     {/* Ready — visa download section */}
                     {isReady && hasVisa && (
                       <div className="space-y-2 mt-3">
+                        {/* Visa preview — always visible */}
+                        <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                          <img
+                            src={app.visa_file_url}
+                            alt="Виза"
+                            className="w-full object-contain max-h-64"
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        </div>
+
                         {!hasReview ? (
-                          /* Locked — must review first */
-                          <div className="rounded-xl border-2 border-dashed border-amber-300 bg-amber-50 p-4 text-center space-y-3">
-                            <div className="flex items-center justify-center gap-2 text-amber-700">
-                              <Lock className="w-5 h-5" />
-                              <p className="text-sm font-medium">Виза готова — оставьте отзыв чтобы скачать</p>
+                          /* Locked download — must review first */
+                          <div className="space-y-2">
+                            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2">
+                              <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+                              <p className="text-sm text-amber-700">Оставьте отзыв чтобы скачать визу</p>
                             </div>
-                            {/* Blurred preview */}
-                            <div className="relative overflow-hidden rounded-lg bg-gray-100" style={{ height: 80 }}>
-                              <img src={app.visa_file_url} alt="Виза"
-                                className="w-full h-full object-cover blur-sm opacity-60"
-                                onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <Lock className="w-8 h-8 text-gray-500 opacity-60" />
-                              </div>
-                            </div>
+                            {/* Disabled download button */}
+                            <button disabled
+                              className="w-full flex items-center justify-center gap-2 py-3 bg-gray-200 text-gray-400 rounded-xl text-sm font-medium cursor-not-allowed">
+                              <Lock className="w-4 h-4" /> Скачать визу (недоступно)
+                            </button>
                             <button onClick={() => setReviewApp(app)}
-                              className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium">
-                              <Star className="w-4 h-4" /> Оставить отзыв и скачать
+                              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium">
+                              <Star className="w-4 h-4" /> Оставить отзыв (+100 ₽)
                             </button>
                           </div>
                         ) : (

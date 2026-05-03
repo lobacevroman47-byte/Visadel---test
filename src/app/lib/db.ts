@@ -418,6 +418,7 @@ export async function submitReview(params: {
   country: string;
   rating: number;
   text: string;
+  username?: string;
 }): Promise<void> {
   if (isSupabaseConfigured()) {
     await supabase.from('reviews').insert({
@@ -428,7 +429,6 @@ export async function submitReview(params: {
       text: params.text,
       status: 'pending',
     });
-    // Give 100 bonus for review
     await addBonuses(params.telegramId, 100);
   } else {
     const reviews = lsGet<unknown[]>('vd_reviews', []);
@@ -436,6 +436,22 @@ export async function submitReview(params: {
     lsSet('vd_reviews', reviews);
     const user = lsGet<AppUser | null>(LS_KEY, null);
     if (user) { user.bonus_balance = (user.bonus_balance ?? 0) + 100; lsSet(LS_KEY, user); }
+  }
+
+  // Post to Telegram channel @visadel_recall
+  try {
+    await fetch('/api/post-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        rating: params.rating,
+        text: params.text,
+        country: params.country,
+        username: params.username ?? '',
+      }),
+    });
+  } catch (e) {
+    console.warn('Failed to post review to channel:', e);
   }
 }
 
