@@ -55,10 +55,33 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
     haptic('medium');
 
     try {
-      // 1. Upload screenshot
+      // 1. Upload payment screenshot
       const proofUrl = await uploadFile(paymentScreenshot, 'payments');
 
-      // 2. Save application to Supabase (or localStorage fallback)
+      // 2. Upload all photos in parallel
+      const photoUrls: Record<string, string | null> = {};
+      const photoUploads: Promise<void>[] = [];
+
+      if (formData.photos.facePhoto) {
+        photoUploads.push(
+          uploadFile(formData.photos.facePhoto, 'photos').then(url => { photoUrls.facePhoto = url; })
+        );
+      }
+      if (formData.photos.passportPhoto) {
+        photoUploads.push(
+          uploadFile(formData.photos.passportPhoto, 'photos').then(url => { photoUrls.passportPhoto = url; })
+        );
+      }
+      for (const [key, file] of Object.entries(formData.photos.additionalPhotos)) {
+        if (file) {
+          photoUploads.push(
+            uploadFile(file, 'photos').then(url => { photoUrls[key] = url; })
+          );
+        }
+      }
+      await Promise.all(photoUploads);
+
+      // 3. Save application to Supabase (or localStorage fallback)
       await saveApplication({
         user_telegram_id: telegramId,
         country: visa.country,
@@ -72,6 +95,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
           additionalDocs: formData.additionalDocs,
           howHeard: formData.howHeard,
           contactInfo: formData.contactInfo,
+          photoUrls,
         },
         payment_proof_url: proofUrl ?? undefined,
         bonuses_used: bonusAmount,

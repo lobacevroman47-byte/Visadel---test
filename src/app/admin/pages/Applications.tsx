@@ -142,6 +142,36 @@ function formatValue(key: string, value: unknown): string {
   return String(value);
 }
 
+const PHOTO_LABELS: Record<string, string> = {
+  facePhoto: 'Фото лица',
+  passportPhoto: 'Фото загранпаспорта',
+  previousVisa: 'Предыдущая виза (Индия)',
+  indiaStamps: 'Штампы Индии',
+  secondPassport: 'Второй паспорт (Корея)',
+  hotelFile: 'Бронирование отеля',
+  ticketFile: 'Авиабилет',
+};
+
+function FilePreview({ url, label }: { url: string; label: string }) {
+  const isImage = /\.(jpg|jpeg|png|webp)$/i.test(url) || url.includes('photos/') || url.includes('payments/');
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
+        <p className="text-xs font-medium text-gray-600">{label}</p>
+        <a href={url} target="_blank" rel="noreferrer"
+          className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+          Открыть <ExternalLink className="w-3 h-3" />
+        </a>
+      </div>
+      {isImage && (
+        <div className="p-2 bg-white">
+          <img src={url} alt={label} className="w-full max-h-48 object-contain rounded-lg" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Full Form Data Renderer ───────────────────────────────────────────────────
 const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
   const fd = app.formData as {
@@ -149,17 +179,21 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
     contactInfo?: Record<string, string>;
     additionalDocs?: Record<string, boolean>;
     howHeard?: string[];
+    photoUrls?: Record<string, string | null>;
   };
 
   const basicData = fd.basicData ?? {};
   const contactInfo = fd.contactInfo ?? {};
   const additionalDocs = fd.additionalDocs ?? {};
   const howHeard = fd.howHeard ?? [];
+  const photoUrls = fd.photoUrls ?? {};
 
   const extras = [];
   if (additionalDocs.urgentProcessing) extras.push('Срочное оформление');
   if (additionalDocs.hotelBooking) extras.push('Подтверждение бронирования');
   if (additionalDocs.returnTicket) extras.push('Бронирование авиабилета');
+
+  const photoEntries = Object.entries(photoUrls).filter(([, url]) => !!url);
 
   return (
     <div className="space-y-6">
@@ -170,27 +204,17 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
           {contactInfo.telegram && (
             <div className="col-span-2">
               <p className="text-xs text-gray-500">Telegram</p>
-              <a
-                href={`https://t.me/${contactInfo.telegram.replace('@', '')}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
-              >
+              <a href={`https://t.me/${contactInfo.telegram.replace('@', '')}`} target="_blank" rel="noreferrer"
+                className="text-sm text-blue-600 hover:underline flex items-center gap-1">
                 @{contactInfo.telegram.replace('@', '')} <ExternalLink className="w-3 h-3" />
               </a>
             </div>
           )}
           {contactInfo.phone && (
-            <div>
-              <p className="text-xs text-gray-500">Телефон</p>
-              <p className="text-sm">{contactInfo.phone}</p>
-            </div>
+            <div><p className="text-xs text-gray-500">Телефон</p><p className="text-sm">{contactInfo.phone}</p></div>
           )}
           {contactInfo.email && (
-            <div>
-              <p className="text-xs text-gray-500">Email</p>
-              <p className="text-sm">{contactInfo.email}</p>
-            </div>
+            <div><p className="text-xs text-gray-500">Email</p><p className="text-sm">{contactInfo.email}</p></div>
           )}
         </div>
       </section>
@@ -218,7 +242,7 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
       {/* Extras */}
       {extras.length > 0 && (
         <section>
-          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Дополнительно</h4>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Дополнительные услуги</h4>
           <div className="flex flex-wrap gap-2">
             {extras.map(e => (
               <span key={e} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">{e}</span>
@@ -234,6 +258,18 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
           <p className="text-sm text-gray-700">{howHeard.map(v => HOW_HEARD_LABELS[v] ?? v).join(', ')}</p>
         </section>
       )}
+
+      {/* Uploaded files / photos */}
+      {photoEntries.length > 0 && (
+        <section>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Загруженные файлы</h4>
+          <div className="space-y-3">
+            {photoEntries.map(([key, url]) => (
+              <FilePreview key={key} url={url!} label={PHOTO_LABELS[key] ?? key} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 };
@@ -243,7 +279,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const [status, setStatus] = useState(application.status);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'form' | 'payment'>('info');
 
   const tgUsername = (application.telegram ?? '').replace('@', '') ||
     ((application.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? '').replace('@', '');
@@ -297,7 +333,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
 
         {/* Tabs */}
         <div className="flex border-b border-gray-200 shrink-0">
-          {(['info', 'form', 'files'] as const).map(tab => (
+          {(['info', 'form', 'payment'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -305,7 +341,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 activeTab === tab ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
-              {tab === 'info' ? 'Основное' : tab === 'form' ? 'Анкета' : 'Файлы'}
+              {tab === 'info' ? 'Основное' : tab === 'form' ? 'Анкета' : 'Оплата'}
             </button>
           ))}
         </div>
@@ -342,10 +378,6 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 <div>
                   <p className="text-xs text-gray-500">Дата подачи</p>
                   <p className="text-sm">{new Date(application.date).toLocaleDateString('ru-RU')}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-500">Срочно</p>
-                  <p className="text-sm">{application.urgent ? 'Да' : 'Нет'}</p>
                 </div>
               </div>
 
@@ -416,31 +448,64 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               : <p className="text-center text-gray-400 py-12 text-sm">Данные анкеты не сохранены</p>
           )}
 
-          {/* ── Tab: Файлы ── */}
-          {activeTab === 'files' && (
-            <div className="space-y-3">
-              {application.paymentProofUrl ? (
-                <div>
-                  <p className="text-xs text-gray-500 mb-1">Скриншот оплаты</p>
-                  <a href={application.paymentProofUrl} target="_blank" rel="noreferrer"
-                    className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl text-blue-700 text-sm hover:bg-blue-100 transition">
-                    <ExternalLink className="w-4 h-4" /> Открыть скриншот
-                  </a>
-                </div>
-              ) : (
-                <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-3">Скриншот оплаты не загружен</p>
-              )}
+          {/* ── Tab: Оплата ── */}
+          {activeTab === 'payment' && (
+            <div className="space-y-5">
+              {/* Payment screenshot */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Скриншот оплаты</h4>
+                {application.paymentProofUrl ? (
+                  <div className="border border-gray-200 rounded-xl overflow-hidden">
+                    <div className="px-3 py-2 bg-gray-50 flex items-center justify-between">
+                      <p className="text-xs font-medium text-gray-600">Чек / скриншот перевода</p>
+                      <a href={application.paymentProofUrl} target="_blank" rel="noreferrer"
+                        className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                        Открыть <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                    <div className="p-2 bg-white">
+                      <img
+                        src={application.paymentProofUrl}
+                        alt="Скриншот оплаты"
+                        className="w-full max-h-72 object-contain rounded-lg"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-400 text-center">
+                    Скриншот оплаты не загружен
+                  </div>
+                )}
+              </div>
 
-              {application.visaFileUrl ? (
+              {/* Summary */}
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">Стоимость</span>
+                  <span className="font-semibold text-blue-600">{application.cost.toLocaleString('ru-RU')} ₽</span>
+                </div>
+                {application.bonusesUsed > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-500">Списано бонусов</span>
+                    <span className="text-green-600">−{application.bonusesUsed} ₽</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm pt-2 border-t border-gray-200">
+                  <span className="text-gray-500">Итого к оплате</span>
+                  <span className="font-bold text-gray-800">{(application.cost - application.bonusesUsed).toLocaleString('ru-RU')} ₽</span>
+                </div>
+              </div>
+
+              {/* Ready visa */}
+              {application.visaFileUrl && (
                 <div>
-                  <p className="text-xs text-gray-500 mb-1">Готовая виза</p>
+                  <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Готовая виза</h4>
                   <a href={application.visaFileUrl} target="_blank" rel="noreferrer"
                     className="flex items-center gap-2 p-3 bg-green-50 rounded-xl text-green-700 text-sm hover:bg-green-100 transition">
-                    <ExternalLink className="w-4 h-4" /> Открыть визу
+                    <ExternalLink className="w-4 h-4" /> Скачать / открыть визу
                   </a>
                 </div>
-              ) : (
-                <p className="text-sm text-gray-400 bg-gray-50 rounded-xl p-3">Виза ещё не загружена</p>
               )}
             </div>
           )}
