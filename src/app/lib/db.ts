@@ -409,3 +409,44 @@ export async function updateAdminRole(telegramId: number, role: AdminRole): Prom
   if (!isSupabaseConfigured()) return;
   await supabase.from('admin_users').update({ role }).eq('telegram_id', telegramId);
 }
+
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+
+export async function submitReview(params: {
+  telegramId: number;
+  applicationId: string;
+  country: string;
+  rating: number;
+  text: string;
+}): Promise<void> {
+  if (isSupabaseConfigured()) {
+    await supabase.from('reviews').insert({
+      user_telegram_id: params.telegramId,
+      application_id: params.applicationId,
+      country: params.country,
+      rating: params.rating,
+      text: params.text,
+      status: 'pending',
+    });
+    // Give 100 bonus for review
+    await addBonuses(params.telegramId, 100);
+  } else {
+    const reviews = lsGet<unknown[]>('vd_reviews', []);
+    reviews.push({ ...params, id: crypto.randomUUID(), created_at: new Date().toISOString() });
+    lsSet('vd_reviews', reviews);
+    const user = lsGet<AppUser | null>(LS_KEY, null);
+    if (user) { user.bonus_balance = (user.bonus_balance ?? 0) + 100; lsSet(LS_KEY, user); }
+  }
+}
+
+export async function getReviewedAppIds(telegramId: number): Promise<Set<string>> {
+  if (isSupabaseConfigured()) {
+    const { data } = await supabase
+      .from('reviews')
+      .select('application_id')
+      .eq('user_telegram_id', telegramId);
+    return new Set((data ?? []).map((r: { application_id: string }) => r.application_id));
+  }
+  const reviews = lsGet<{ applicationId: string }[]>('vd_reviews', []);
+  return new Set(reviews.map(r => r.applicationId));
+}

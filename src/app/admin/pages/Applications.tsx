@@ -352,9 +352,26 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
       if (visaFile && status === 'completed') {
         const url = await uploadVisaFile(visaFile);
         visaUrl = url ?? undefined;
+
+        // Send Telegram notification
+        const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+        try {
+          await fetch('/api/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: application.telegramId,
+              country: application.country,
+              visa_type: application.visaType,
+              app_url: appUrl,
+            }),
+          });
+        } catch (notifyErr) {
+          console.warn('Telegram notify failed:', notifyErr);
+        }
       }
       await updateApplicationStatus(application.id, status, visaUrl);
-      alert('Изменения сохранены');
+      alert(status === 'completed' && visaUrl ? 'Виза загружена! Пользователю отправлено уведомление.' : 'Изменения сохранены');
       onClose();
     } catch {
       alert('Ошибка сохранения');
