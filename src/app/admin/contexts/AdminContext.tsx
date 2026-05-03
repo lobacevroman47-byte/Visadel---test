@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 
 export type UserRole = 'owner' | 'admin' | 'manager';
 
@@ -12,7 +12,8 @@ export interface AdminUser {
 
 interface AdminContextType {
   currentUser: AdminUser | null;
-  login: (email: string, password: string) => boolean;
+  login: (password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithTelegram: () => Promise<boolean>;
   logout: () => void;
   hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
   onBackToApp?: () => void;
@@ -20,85 +21,156 @@ interface AdminContextType {
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const MOCK_USERS: Array<AdminUser & { password: string }> = [
-  {
-    id: '1',
-    name: 'Владелец',
-    email: 'owner@visadel.agency',
-    telegram: '@owner',
-    role: 'owner',
-    password: 'owner123'
-  },
-  {
-    id: '2',
-    name: 'Администратор',
-    email: 'admin@visadel.agency',
-    telegram: '@admin',
-    role: 'admin',
-    password: 'admin123'
-  },
-  {
-    id: '3',
-    name: 'Менеджер',
-    email: 'manager@visadel.agency',
-    telegram: '@manager',
-    role: 'manager',
-    password: 'manager123'
-  }
-];
+// ─── Config from Vercel environment variables ────────────────────────────────
+// VITE_ADMIN_PASSWORD_HASH — SHA-256 hash of your password (see README)
+// VITE_ADMIN_TELEGRAM_IDS  — comma-separated allowed Telegram IDs, e.g. "123456789,987654321"
 
-const ROLE_HIERARCHY: Record<UserRole, number> = {
-  owner: 3,
-  admin: 2,
-  manager: 1
-};
+const PASSWORD_HASH = import.meta.env.VITE_ADMIN_PASSWORD_HASH ?? '';
+const ALLOWED_TG_IDS: string[] = (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
+  .split(',')
+  .map((s: string) => s.trim())
+  .filter(Boolean);
+
+// ─── Session ──────────────────────────────────────────────────────────────────
+
+const SESSION_KEY = 'vd_admin_session';
+const SESSION_TTL = 8 * 60 * 60 * 1000; // 8 hours
+
+interface Session {
+  user: AdminUser;
+  expires: number;
+}
+
+function readSession(): AdminUser | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s: Session = JSON.parse(raw);
+    if (Date.now() > s.expires) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s.user;
+  } catch {
+    return null;
+  }
+}
+
+function writeSession(user: AdminUser) {
+  const s: Session = { user, expires: Date.now() + SESSION_TTL };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// ─── Brute-force protection ───────────────────────────────────────────────────
+
+const ATTEMPT_KEY = 'vd_admin_attempts';
+const MAX_ATTEMPTS = 5;
+const LOCKOUT_MS = 30 * 60 * 1000;
+
+interface Attempts { count: number; lockedUntil: number }
+
+function getAttempts(): Attempts {
+  try { return JSON.parse(localStorage.getItem(ATTEMPT_KEY) ?? '{"count":0,"lockedUntil":0}'); }
+  catch { return { count: 0, lockedUntil: 0 }; }
+}
+
+function recordAttempt(success: boolean) {
+  if (success) { localStorage.removeItem(ATTEMPT_KEY); return; }
+  const a = getAttempts();
+  const count = a.count + 1;
+  const lockedUntil = count >= MAX_ATTEMPTS ? Date.now() + LOCKOUT_MS : a.lockedUntil;
+  localStorage.setItem(ATTEMPT_KEY, JSON.stringify({ count, lockedUntil }));
+}
+
+// ─── Crypto ───────────────────────────────────────────────────────────────────
+
+async function sha256(text: string): Promise<string> {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function getTelegramUserId(): string | null {
+  try {
+    const id = (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id;
+    return id ? String(id) : null;
+  } catch { return null; }
+}
+
+function getTelegramUsername(): string {
+  try {
+    const u = (window as any).Telegram?.WebApp?.initDataUnsafe?.user;
+    return u?.username ? `@${u.username}` : u?.first_name ?? 'Администратор';
+  } catch { return 'Администратор'; }
+}
+
+// ─── Provider ─────────────────────────────────────────────────────────────────
 
 export const AdminProvider: React.FC<{ children: ReactNode; onBackToApp?: () => void }> = ({ children, onBackToApp }) => {
-  const [currentUser, setCurrentUser] = useState<AdminUser | null>(() => {
-    const saved = localStorage.getItem('adminUser');
-    return saved ? JSON.parse(saved) : null;
+  const [currentUser, setCurrentUser] = useState<AdminUser | null>(readSession);
+
+  const makeUser = (telegram = ''): AdminUser => ({
+    id: '1',
+    name: 'Администратор',
+    email: '',
+    telegram,
+    role: 'owner',
   });
 
-  const login = (email: string, password: string): boolean => {
-    const user = MOCK_USERS.find(u => u.email === email && u.password === password);
-    if (user) {
-      const { password: _, ...userWithoutPassword } = user;
-      setCurrentUser(userWithoutPassword);
-      localStorage.setItem('adminUser', JSON.stringify(userWithoutPassword));
-      return true;
-    }
-    return false;
-  };
+  const loginWithTelegram = useCallback(async (): Promise<boolean> => {
+    const tgId = getTelegramUserId();
+    if (!tgId || !ALLOWED_TG_IDS.includes(tgId)) return false;
+    const user = makeUser(getTelegramUsername());
+    writeSession(user);
+    setCurrentUser(user);
+    return true;
+  }, []);
 
-  const logout = () => {
+  const login = useCallback(async (password: string): Promise<{ success: boolean; error?: string }> => {
+    const a = getAttempts();
+    if (a.lockedUntil > Date.now()) {
+      const mins = Math.ceil((a.lockedUntil - Date.now()) / 60000);
+      return { success: false, error: `Слишком много попыток. Подождите ${mins} мин.` };
+    }
+
+    if (!PASSWORD_HASH) {
+      return { success: false, error: 'Пароль не настроен. Добавьте VITE_ADMIN_PASSWORD_HASH в Vercel.' };
+    }
+
+    const hash = await sha256(password);
+    if (hash !== PASSWORD_HASH) {
+      recordAttempt(false);
+      const remaining = MAX_ATTEMPTS - (getAttempts().count);
+      return { success: false, error: `Неверный пароль. Осталось попыток: ${remaining}` };
+    }
+
+    recordAttempt(true);
+    const tgName = getTelegramUsername();
+    const user = makeUser(tgName !== 'Администратор' ? tgName : '');
+    writeSession(user);
+    setCurrentUser(user);
+    return { success: true };
+  }, []);
+
+  const logout = useCallback(() => {
+    clearSession();
     setCurrentUser(null);
-    localStorage.removeItem('adminUser');
-    if (onBackToApp) {
-      onBackToApp();
-    }
-  };
+    onBackToApp?.();
+  }, [onBackToApp]);
 
-  const hasPermission = (requiredRole: UserRole | UserRole[]): boolean => {
-    if (!currentUser) return false;
-    
-    const requiredRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    const userLevel = ROLE_HIERARCHY[currentUser.role];
-    
-    return requiredRoles.some(role => userLevel >= ROLE_HIERARCHY[role]);
-  };
+  const hasPermission = useCallback((_role: UserRole | UserRole[]): boolean => {
+    return currentUser !== null;
+  }, [currentUser]);
 
   return (
-    <AdminContext.Provider value={{ currentUser, login, logout, hasPermission, onBackToApp }}>
+    <AdminContext.Provider value={{ currentUser, login, loginWithTelegram, logout, hasPermission, onBackToApp }}>
       {children}
     </AdminContext.Provider>
   );
 };
 
 export const useAdmin = () => {
-  const context = useContext(AdminContext);
-  if (context === undefined) {
-    throw new Error('useAdmin must be used within an AdminProvider');
-  }
-  return context;
+  const ctx = useContext(AdminContext);
+  if (!ctx) throw new Error('useAdmin must be used within AdminProvider');
+  return ctx;
 };

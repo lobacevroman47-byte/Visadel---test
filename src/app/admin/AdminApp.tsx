@@ -9,11 +9,7 @@ interface AdminAppProps {
 
 const AdminAppContent: React.FC<AdminAppProps> = ({ onBackToApp }) => {
   const { currentUser } = useAdmin();
-
-  if (!currentUser) {
-    return <AdminLogin />;
-  }
-
+  if (!currentUser) return <AdminLogin />;
   return <AdminLayout onBackToApp={onBackToApp} />;
 };
 
