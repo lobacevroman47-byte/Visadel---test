@@ -15,7 +15,7 @@ import {
   getMockUser,
   type TelegramUser,
 } from './lib/telegram';
-import { upsertUser, type AppUser } from './lib/db';
+import { upsertUser, getAdminRole, type AppUser, type AdminRole } from './lib/db';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
 
@@ -69,6 +69,7 @@ function App() {
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [adminRole, setAdminRole] = useState<AdminRole | null>(null);
 
   const refreshUser = async () => {
     const user = tgUser ?? getMockUser();
@@ -116,7 +117,7 @@ function App() {
     // Upsert user in Supabase / localStorage
     if (tg) {
       upsertUser(tg)
-        .then(u => {
+        .then(async u => {
           setAppUser(u);
           localStorage.setItem('vd_user', JSON.stringify(u));
           localStorage.setItem('userData', JSON.stringify({
@@ -132,6 +133,8 @@ function App() {
             bonusStreak: u.bonus_streak,
             lastBonusDate: u.last_bonus_date,
           }));
+          const role = await getAdminRole(u.telegram_id);
+          setAdminRole(role);
         })
         .catch(console.error)
         .finally(() => setIsLoading(false));
@@ -173,7 +176,7 @@ function App() {
             onOpenProfile={() => setCurrentScreen('profile')}
             onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
-            onOpenAdmin={() => setCurrentScreen('admin')}
+            onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
           />
         )}
         {currentScreen === 'application' && selectedVisa && (
@@ -190,7 +193,7 @@ function App() {
             onOpenInfluencerDashboard={() => setCurrentScreen('influencer')}
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
             onContinueDraft={handleContinueDraft}
-            onOpenAdmin={() => setCurrentScreen('admin')}
+            onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
           />
         )}
         {currentScreen === 'influencer' && (

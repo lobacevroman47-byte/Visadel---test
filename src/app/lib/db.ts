@@ -357,3 +357,55 @@ export async function submitTask(telegramId: number, taskType: string, proofUrl:
   if (idx >= 0) { tasks[idx].status = 'submitted'; tasks[idx].proof_url = proofUrl; }
   lsSet(LS_TASKS, tasks);
 }
+
+// ─── Admin Users ──────────────────────────────────────────────────────────────
+
+export type AdminRole = 'founder' | 'admin' | 'moderator';
+
+export interface AdminUserRow {
+  id?: string;
+  telegram_id: number;
+  telegram_username?: string;
+  name: string;
+  role: AdminRole;
+  added_by?: number;
+  created_at?: string;
+}
+
+const FOUNDER_IDS: string[] = (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
+  .split(',').map((s: string) => s.trim()).filter(Boolean);
+
+export async function getAdminRole(telegramId: number): Promise<AdminRole | null> {
+  if (FOUNDER_IDS.includes(String(telegramId))) return 'founder';
+  if (!isSupabaseConfigured()) return null;
+  const { data } = await supabase
+    .from('admin_users')
+    .select('role')
+    .eq('telegram_id', telegramId)
+    .single();
+  return (data as { role: AdminRole } | null)?.role ?? null;
+}
+
+export async function getAdminUsers(): Promise<AdminUserRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data } = await supabase
+    .from('admin_users')
+    .select('*')
+    .order('created_at', { ascending: true });
+  return (data as AdminUserRow[]) ?? [];
+}
+
+export async function addAdminUser(row: Omit<AdminUserRow, 'id' | 'created_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('admin_users').upsert(row, { onConflict: 'telegram_id' });
+}
+
+export async function removeAdminUser(telegramId: number): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('admin_users').delete().eq('telegram_id', telegramId);
+}
+
+export async function updateAdminRole(telegramId: number, role: AdminRole): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('admin_users').update({ role }).eq('telegram_id', telegramId);
+}

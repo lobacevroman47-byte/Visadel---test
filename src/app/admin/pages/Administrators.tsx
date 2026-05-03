@@ -1,94 +1,93 @@
-import React, { useState } from 'react';
-import { Plus, Ban, Trash2, X } from 'lucide-react';
-import { mockAdministrators, Administrator, roleLabels } from '../data/mockData';
-import { useAdmin } from '../contexts/AdminContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Plus, Trash2, X, RefreshCw, Loader2, ShieldCheck, Shield, User } from 'lucide-react';
+import { getAdminUsers, addAdminUser, removeAdminUser, updateAdminRole, type AdminUserRow, type AdminRole } from '../../lib/db';
 
+const ROLE_LABELS: Record<AdminRole, string> = {
+  founder: 'Основатель',
+  admin: 'Администратор',
+  moderator: 'Модератор',
+};
+
+const ROLE_COLORS: Record<AdminRole, string> = {
+  founder: 'bg-purple-100 text-purple-700',
+  admin: 'bg-blue-100 text-blue-700',
+  moderator: 'bg-green-100 text-green-700',
+};
+
+const ROLE_ICON: Record<AdminRole, React.ReactNode> = {
+  founder: <ShieldCheck className="w-4 h-4" />,
+  admin: <Shield className="w-4 h-4" />,
+  moderator: <User className="w-4 h-4" />,
+};
+
+// ── Founder IDs from env (cannot be deleted) ──────────────────────────────────
+const FOUNDER_IDS: string[] = (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
+  .split(',').map((s: string) => s.trim()).filter(Boolean);
+
+// ── Add Modal ─────────────────────────────────────────────────────────────────
 const AddAdminModal: React.FC<{
   onClose: () => void;
-  onAdd: (admin: Omit<Administrator, 'id' | 'addedDate'>) => void;
+  onAdd: (row: Omit<AdminUserRow, 'id' | 'created_at'>) => Promise<void>;
 }> = ({ onClose, onAdd }) => {
-  const [telegram, setTelegram] = useState('');
+  const [telegramId, setTelegramId] = useState('');
+  const [username, setUsername] = useState('');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<'admin' | 'manager'>('manager');
+  const [role, setRole] = useState<AdminRole>('moderator');
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onAdd({
-      name,
-      telegram,
-      role,
-      status: 'active'
-    });
+    const id = parseInt(telegramId.trim(), 10);
+    if (isNaN(id)) { alert('Telegram ID должен быть числом'); return; }
+    setSaving(true);
+    await onAdd({ telegram_id: id, telegram_username: username.replace('@', '') || undefined, name, role });
+    setSaving(false);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-md w-full">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2>Добавить администратора</h2>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <X size={24} />
-          </button>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
+        <div className="p-5 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-lg font-semibold">Добавить сотрудника</h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition"><X size={20} /></button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-sm text-gray-700 mb-2">Имя</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Иван Иванов"
-              required
-            />
+            <label className="block text-sm text-gray-700 mb-1 font-medium">Telegram ID <span className="text-red-500">*</span></label>
+            <input type="number" value={telegramId} onChange={e => setTelegramId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="123456789" required />
+            <p className="text-xs text-gray-400 mt-1">Узнать ID можно у бота @userinfobot</p>
           </div>
-
           <div>
-            <label className="block text-sm text-gray-700 mb-2">Telegram @username</label>
-            <input
-              type="text"
-              value={telegram}
-              onChange={(e) => setTelegram(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="@username"
-              required
-            />
+            <label className="block text-sm text-gray-700 mb-1 font-medium">Имя <span className="text-red-500">*</span></label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Иван Иванов" required />
           </div>
-
           <div>
-            <label className="block text-sm text-gray-700 mb-2">Роль</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value as 'admin' | 'manager')}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-            >
-              <option value="admin">Администратор</option>
-              <option value="manager">Менеджер</option>
+            <label className="block text-sm text-gray-700 mb-1 font-medium">Username (необязательно)</label>
+            <input type="text" value={username} onChange={e => setUsername(e.target.value)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="@username" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1 font-medium">Роль</label>
+            <select value={role} onChange={e => setRole(e.target.value as AdminRole)}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
+              <option value="admin">Администратор — полный доступ</option>
+              <option value="moderator">Модератор — доступ к заявкам</option>
             </select>
-            <p className="text-xs text-gray-500 mt-2">
-              {role === 'admin' 
-                ? 'Полный доступ к заявкам, пользователям, странам и анкетам'
-                : 'Доступ только к заявкам и их обработке'}
-            </p>
           </div>
-
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-            >
-              Добавить
+          <div className="flex gap-3 pt-2">
+            <button type="submit" disabled={saving}
+              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+              {saving ? 'Сохраняем...' : 'Добавить'}
             </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
+            <button type="button" onClick={onClose}
+              className="px-5 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition">
               Отмена
             </button>
           </div>
@@ -98,239 +97,163 @@ const AddAdminModal: React.FC<{
   );
 };
 
+// ── Main Page ─────────────────────────────────────────────────────────────────
 export const Administrators: React.FC = () => {
-  const { currentUser, hasPermission } = useAdmin();
-  const [administrators, setAdministrators] = useState(mockAdministrators);
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [admins, setAdmins] = useState<AdminUserRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAdd, setShowAdd] = useState(false);
 
-  const isOwner = currentUser?.role === 'owner';
+  const load = useCallback(async () => {
+    setLoading(true);
+    const rows = await getAdminUsers();
+    setAdmins(rows);
+    setLoading(false);
+  }, []);
 
-  const handleAddAdmin = (admin: Omit<Administrator, 'id' | 'addedDate'>) => {
-    const newAdmin: Administrator = {
-      ...admin,
-      id: `ADM${Date.now()}`,
-      addedDate: new Date().toISOString().split('T')[0]
-    };
-    setAdministrators([...administrators, newAdmin]);
-    alert(`Администратор ${admin.name} успешно добавлен`);
+  useEffect(() => { load(); }, [load]);
+
+  const handleAdd = async (row: Omit<AdminUserRow, 'id' | 'created_at'>) => {
+    await addAdminUser(row);
+    await load();
   };
 
-  const handleChangeRole = (id: string, newRole: 'owner' | 'admin' | 'manager') => {
-    if (!isOwner) {
-      alert('Только владелец может менять роли');
+  const handleDelete = async (row: AdminUserRow) => {
+    if (FOUNDER_IDS.includes(String(row.telegram_id))) {
+      alert('Нельзя удалить основателя');
       return;
     }
-    setAdministrators(administrators.map(admin =>
-      admin.id === id ? { ...admin, role: newRole } : admin
-    ));
-    alert('Роль изменена');
+    if (!confirm(`Удалить ${row.name}?`)) return;
+    await removeAdminUser(row.telegram_id);
+    setAdmins(prev => prev.filter(a => a.telegram_id !== row.telegram_id));
   };
 
-  const handleToggleStatus = (id: string) => {
-    setAdministrators(administrators.map(admin =>
-      admin.id === id 
-        ? { ...admin, status: admin.status === 'active' ? 'blocked' : 'active' }
-        : admin
-    ));
+  const handleRoleChange = async (row: AdminUserRow, role: AdminRole) => {
+    if (FOUNDER_IDS.includes(String(row.telegram_id))) {
+      alert('Нельзя изменить роль основателя');
+      return;
+    }
+    await updateAdminRole(row.telegram_id, role);
+    setAdmins(prev => prev.map(a => a.telegram_id === row.telegram_id ? { ...a, role } : a));
   };
 
-  const handleDelete = (id: string) => {
-    const admin = administrators.find(a => a.id === id);
-    if (admin?.role === 'owner') {
-      alert('Нельзя удалить владельца');
-      return;
-    }
-    if (!isOwner) {
-      alert('Только владелец может удалять администраторов');
-      return;
-    }
-    if (confirm(`Удалить администратора ${admin?.name}?`)) {
-      setAdministrators(administrators.filter(a => a.id !== id));
-      alert('Администратор удалён');
-    }
-  };
+  const counts = { founder: 0, admin: 0, moderator: 0 };
+  admins.forEach(a => counts[a.role]++);
+  FOUNDER_IDS.forEach(() => counts.founder++);
 
   return (
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="mb-2">Администраторы и роли</h1>
-          <p className="text-sm text-gray-600">
-            Управление доступом к админ-панели
-          </p>
+          <h1 className="mb-1">Сотрудники</h1>
+          <p className="text-sm text-gray-500">Управление доступом к админ-панели</p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Добавить администратора
-        </button>
-      </div>
-
-      {/* Info Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-gradient-to-br from-[#2196F3] to-[#1565C0] p-6 rounded-xl text-white">
-          <p className="text-sm opacity-90 mb-1">Владельцев</p>
-          <p className="text-3xl">
-            {administrators.filter(a => a.role === 'owner').length}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-600 mb-1">Администраторов</p>
-          <p className="text-3xl text-[#2196F3]">
-            {administrators.filter(a => a.role === 'admin').length}
-          </p>
-        </div>
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
-          <p className="text-sm text-gray-600 mb-1">Менеджеров</p>
-          <p className="text-3xl text-[#00C853]">
-            {administrators.filter(a => a.role === 'manager').length}
-          </p>
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Обновить">
+            <RefreshCw size={16} className="text-gray-500" />
+          </button>
+          <button onClick={() => setShowAdd(true)}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition flex items-center gap-2 text-sm">
+            <Plus size={18} /> Добавить
+          </button>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        {(['founder', 'admin', 'moderator'] as AdminRole[]).map(role => (
+          <div key={role} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ROLE_COLORS[role]}`}>
+              {ROLE_ICON[role]}
+            </div>
+            <div>
+              <p className="text-xs text-gray-500">{ROLE_LABELS[role]}ов</p>
+              <p className="text-2xl font-semibold text-gray-800">{counts[role]}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Founders row (from env var) */}
+      {FOUNDER_IDS.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div className="px-5 py-3 bg-purple-50 border-b border-purple-100">
+            <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Основатели (защищены)</p>
+          </div>
+          {FOUNDER_IDS.map(id => (
+            <div key={id} className="px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-800">Telegram ID: {id}</p>
+                <p className="text-xs text-gray-400">Настроен через Vercel ENV</p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${ROLE_COLORS.founder}`}>
+                {ROLE_ICON.founder} {ROLE_LABELS.founder}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Admins table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
+        {admins.length === 0 && !loading ? (
+          <div className="py-16 text-center">
+            <p className="text-gray-400 text-sm">Сотрудники не добавлены</p>
+            <p className="text-gray-300 text-xs mt-1">Нажмите «Добавить» чтобы выдать доступ</p>
+          </div>
+        ) : (
           <table className="w-full">
-            <thead className="bg-[#F5F7FA]">
+            <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Имя</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Telegram</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Роль</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Дата добавления</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Статус</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Действия</th>
+                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Имя</th>
+                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Telegram ID</th>
+                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Роль</th>
+                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Добавлен</th>
+                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {administrators.map((admin) => (
-                <tr key={admin.id} className="hover:bg-[#F5F7FA]">
-                  <td className="px-6 py-4 text-sm">
-                    {admin.name}
-                    {admin.id === currentUser?.id && (
-                      <span className="ml-2 text-xs text-[#2196F3]">(Вы)</span>
+            <tbody className="divide-y divide-gray-100">
+              {admins.map(row => (
+                <tr key={row.telegram_id} className="hover:bg-gray-50">
+                  <td className="px-5 py-4">
+                    <p className="text-sm font-medium text-gray-800">{row.name}</p>
+                    {row.telegram_username && (
+                      <p className="text-xs text-gray-400">@{row.telegram_username}</p>
                     )}
                   </td>
-                  <td className="px-6 py-4 text-sm">{admin.telegram}</td>
-                  <td className="px-6 py-4 text-sm">
-                    {isOwner && admin.role !== 'owner' ? (
-                      <select
-                        value={admin.role}
-                        onChange={(e) => handleChangeRole(admin.id, e.target.value as any)}
-                        className="px-3 py-1 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                      >
-                        <option value="admin">Администратор</option>
-                        <option value="manager">Менеджер</option>
-                      </select>
-                    ) : (
-                      <span className={`px-3 py-1 rounded text-xs ${
-                        admin.role === 'owner' 
-                          ? 'bg-purple-100 text-purple-700'
-                          : admin.role === 'admin'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
-                      }`}>
-                        {roleLabels[admin.role]}
-                      </span>
-                    )}
+                  <td className="px-5 py-4 text-sm text-gray-600">{row.telegram_id}</td>
+                  <td className="px-5 py-4">
+                    <select
+                      value={row.role}
+                      onChange={e => handleRoleChange(row, e.target.value as AdminRole)}
+                      disabled={FOUNDER_IDS.includes(String(row.telegram_id))}
+                      className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+                    >
+                      <option value="admin">Администратор</option>
+                      <option value="moderator">Модератор</option>
+                    </select>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">
-                    {new Date(admin.addedDate).toLocaleDateString('ru-RU')}
+                  <td className="px-5 py-4 text-sm text-gray-400">
+                    {row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : '—'}
                   </td>
-                  <td className="px-6 py-4 text-sm">
-                    <span className={`px-3 py-1 rounded text-xs ${
-                      admin.status === 'active'
-                        ? 'bg-[#00C853] bg-opacity-10 text-[#00C853]'
-                        : 'bg-red-100 text-red-700'
-                    }`}>
-                      {admin.status === 'active' ? 'Активен' : 'Заблокирован'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm">
-                    {admin.role !== 'owner' && (
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleToggleStatus(admin.id)}
-                          className={`p-2 rounded-lg transition-colors ${
-                            admin.status === 'active'
-                              ? 'hover:bg-red-50 text-red-600'
-                              : 'hover:bg-green-50 text-green-600'
-                          }`}
-                          title={admin.status === 'active' ? 'Заблокировать' : 'Разблокировать'}
-                        >
-                          <Ban size={18} />
-                        </button>
-                        {isOwner && (
-                          <button
-                            onClick={() => handleDelete(admin.id)}
-                            className="p-2 hover:bg-red-50 rounded-lg transition-colors text-red-600"
-                            title="Удалить"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    )}
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => handleDelete(row)}
+                      disabled={FOUNDER_IDS.includes(String(row.telegram_id))}
+                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="Удалить"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        )}
       </div>
 
-      {/* Permissions Info */}
-      <div className="mt-6 bg-white p-6 rounded-xl border border-gray-200">
-        <h3 className="mb-4">Права доступа</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-              <p className="text-sm">Владелец</p>
-            </div>
-            <ul className="text-xs text-gray-600 space-y-1 ml-5">
-              <li>• Полный доступ ко всем разделам</li>
-              <li>• Управление администраторами</li>
-              <li>• Изменение ролей</li>
-              <li>• Настройки системы</li>
-            </ul>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-              <p className="text-sm">Администратор</p>
-            </div>
-            <ul className="text-xs text-gray-600 space-y-1 ml-5">
-              <li>• Заявки, пользователи</li>
-              <li>• Страны и анкеты</li>
-              <li>• Бонусная система</li>
-              <li>• Без доступа к настройкам</li>
-            </ul>
-          </div>
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-green-500"></div>
-              <p className="text-sm">Менеджер</p>
-            </div>
-            <ul className="text-xs text-gray-600 space-y-1 ml-5">
-              <li>• Только заявки</li>
-              <li>• Изменение статусов</li>
-              <li>• Загрузка виз</li>
-              <li>• Отправка клиентам</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-
-      {/* Add Modal */}
-      {showAddModal && (
-        <AddAdminModal
-          onClose={() => setShowAddModal(false)}
-          onAdd={handleAddAdmin}
-        />
-      )}
+      {showAdd && <AddAdminModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
     </div>
   );
 };
