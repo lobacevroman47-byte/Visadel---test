@@ -77,16 +77,38 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
 
-  // Keyboard detection — shrink header when keyboard opens
+  // Keyboard detection — shrink header when keyboard opens + scroll focused input into view
   useEffect(() => {
     const vv = (window as any).visualViewport;
     if (!vv) return;
+
     const handler = () => {
       const ratio = vv.height / window.innerHeight;
       setKeyboardOpen(ratio < 0.75);
     };
     vv.addEventListener('resize', handler);
-    return () => vv.removeEventListener('resize', handler);
+
+    // Scroll focused input above the keyboard on Android
+    const onFocusIn = (e: FocusEvent) => {
+      const target = e.target as HTMLElement;
+      if (!['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)) return;
+      // Wait for keyboard to finish animating (~300ms), then scroll
+      setTimeout(() => {
+        const headerHeight = headerRef.current?.offsetHeight ?? 56;
+        const rect = target.getBoundingClientRect();
+        const viewportHeight = (window as any).visualViewport?.height ?? window.innerHeight;
+        // If input is behind the header or below the keyboard viewport
+        if (rect.top < headerHeight + 8 || rect.bottom > viewportHeight - 8) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 350);
+    };
+
+    document.addEventListener('focusin', onFocusIn);
+    return () => {
+      vv.removeEventListener('resize', handler);
+      document.removeEventListener('focusin', onFocusIn);
+    };
   }, []);
 
   // Load draft if exists

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, Plus, X } from 'lucide-react';
+import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
 
 interface Step1Props {
   country: string;
@@ -96,10 +97,10 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
 
 function getRequiredFields(country: string): string[] {
   const commonFields: Record<string, string[]> = {
-    'Индия': ['citizenship', 'airport', 'arrivalDate', 'birthCity', 'internalPassport', 'residedTwoYears', 
-              'registrationAddress', 'residenceAddress', 'fatherData', 'motherData', 'maritalStatus', 
-              'workplace', 'militaryService', 'citiesInIndia', 'countriesVisited', 'visitedIndiaBefore', 
-              'hotelInfo', 'contactInIndia', 'emergencyContact'],
+    'Индия': ['citizenship', 'airport', 'arrivalDate', 'birthCity', 'internalPassport', 'residedTwoYears',
+              'registrationAddress', 'residenceAddress', 'fatherData', 'motherData', 'maritalStatus',
+              'workplace', 'citiesInIndia', 'countriesVisited', 'visitedIndiaBefore',
+              'hotelInfo', 'emergencyContact'],
     'Вьетнам': ['citizenship', 'birthCountry', 'plannedDates', 'registrationAddress', 'emergencyContact', 
                 'workOrStudy', 'visitPurpose', 'contactsInVietnam', 'arrivalAirport', 'departureAirport', 
                 'addressInVietnam', 'expectedExpenses'],
@@ -120,25 +121,124 @@ function getRequiredFields(country: string): string[] {
   return commonFields[country] || [];
 }
 
-// India Form Component
+// ─── Reusable Select Components ────────────────────────────────────────────
+
+function CitizenshipSelect({ value, onChange, error }: { value: string; onChange: (v: string) => void; error?: string }) {
+  return (
+    <select
+      value={value || ''}
+      onChange={(e) => onChange(e.target.value)}
+      className={`form-input ${error ? 'border-red-500' : ''}`}
+    >
+      <option value="">Выберите страну...</option>
+      {CITIZENSHIP_OPTIONS.map(c => (
+        <option key={c} value={c}>{c}</option>
+      ))}
+    </select>
+  );
+}
+
+function CountriesMultiSelect({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+  const selected: string[] = Array.isArray(value) ? value : [];
+  const [search, setSearch] = useState('');
+
+  const filtered = WORLD_COUNTRIES.filter(c =>
+    c.toLowerCase().includes(search.toLowerCase()) && !selected.includes(c)
+  );
+
+  const add = (country: string) => { onChange([...selected, country]); setSearch(''); };
+  const remove = (country: string) => onChange(selected.filter(c => c !== country));
+
+  return (
+    <div className="space-y-2">
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map(c => (
+            <span key={c} className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+              {c}
+              <button type="button" onClick={() => remove(c)}><X className="w-3 h-3" /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <input
+        type="text"
+        placeholder="Начните вводить страну..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="form-input text-sm"
+      />
+      {search.length > 0 && filtered.length > 0 && (
+        <div className="border border-gray-200 rounded-lg max-h-40 overflow-y-auto bg-white shadow-sm">
+          {filtered.slice(0, 20).map(c => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => add(c)}
+              className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 flex items-center gap-2"
+            >
+              <Plus className="w-3 h-3 text-blue-500" />{c}
+            </button>
+          ))}
+        </div>
+      )}
+      {selected.length === 0 && <p className="text-xs text-gray-400">Не выбрано ни одной страны</p>}
+    </div>
+  );
+}
+
+interface SouthAsiaVisit { country: string; year: string; count: string }
+
+function SouthAsiaVisitsSelect({ value, onChange }: { value: SouthAsiaVisit[]; onChange: (v: SouthAsiaVisit[]) => void }) {
+  const visits: SouthAsiaVisit[] = Array.isArray(value) ? value : [];
+
+  const addVisit = () => onChange([...visits, { country: '', year: '', count: '' }]);
+  const removeVisit = (i: number) => onChange(visits.filter((_, idx) => idx !== i));
+  const updateVisit = (i: number, field: keyof SouthAsiaVisit, val: string) => {
+    const updated = visits.map((v, idx) => idx === i ? { ...v, [field]: val } : v);
+    onChange(updated);
+  };
+
+  return (
+    <div className="space-y-3">
+      {visits.map((visit, i) => (
+        <div key={i} className="bg-gray-50 rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500">Посещение {i + 1}</span>
+            <button type="button" onClick={() => removeVisit(i)} className="text-red-400 hover:text-red-600">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <select value={visit.country} onChange={(e) => updateVisit(i, 'country', e.target.value)} className="form-input text-sm">
+            <option value="">Выберите страну...</option>
+            {SOUTH_ASIA_COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="number" placeholder="Год (напр. 2023)" value={visit.year}
+              onChange={(e) => updateVisit(i, 'year', e.target.value)} className="form-input text-sm" min="2000" max="2025" />
+            <input type="number" placeholder="Кол-во раз" value={visit.count}
+              onChange={(e) => updateVisit(i, 'count', e.target.value)} className="form-input text-sm" min="1" />
+          </div>
+        </div>
+      ))}
+      <button type="button" onClick={addVisit}
+        className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 flex items-center justify-center gap-2">
+        <Plus className="w-4 h-4" /> Добавить страну
+      </button>
+    </div>
+  );
+}
+
+// ─── India Form ─────────────────────────────────────────────────────────────
+
 function IndiaForm({ formData, updateField, errors }: any) {
   return (
     <div className="space-y-4">
-      <FormField
-        label="Гражданство"
-        required
-        error={errors.citizenship}
-      >
-        <input
-          type="text"
-          value={formData.citizenship || ''}
-          onChange={(e) => updateField('citizenship', e.target.value)}
-          className="form-input"
-        />
+      <FormField label="Гражданство" required error={errors.citizenship}>
+        <CitizenshipSelect value={formData.citizenship || ''} onChange={(v) => updateField('citizenship', v)} error={errors.citizenship} />
       </FormField>
 
-      <FormField
-        label="Аэропорт прилёта"
+      <FormField label="Аэропорт прилёта"
         required
         hint="если не знаете точно, укажите примерный"
         error={errors.airport}
@@ -190,29 +290,14 @@ function IndiaForm({ formData, updateField, errors }: any) {
         />
       </FormField>
 
-      <FormField
-        label="Предыдущее гражданство"
-        hint="пропустить, если не менялось"
-      >
-        <input
-          type="text"
-          value={formData.previousCitizenship || ''}
-          onChange={(e) => updateField('previousCitizenship', e.target.value)}
-          className="form-input"
-        />
+      <FormField label="Предыдущее гражданство" hint="пропустить, если не менялось">
+        <CitizenshipSelect value={formData.previousCitizenship || ''} onChange={(v) => updateField('previousCitizenship', v)} />
       </FormField>
 
-      <FormField
-        label="Серия и номер внутреннего паспорта"
-        required
-        error={errors.internalPassport}
-      >
-        <input
-          type="text"
-          value={formData.internalPassport || ''}
-          onChange={(e) => updateField('internalPassport', e.target.value)}
-          className="form-input"
-        />
+      <FormField label="Серия и номер внутреннего паспорта" required error={errors.internalPassport}>
+        <input type="text" value={formData.internalPassport || ''}
+          onChange={(e) => updateField('internalPassport', e.target.value)} className="form-input" />
+        <p className="text-xs text-gray-400 mt-1">для других стран — ID</p>
       </FormField>
 
       <FormField
@@ -326,19 +411,6 @@ function IndiaForm({ formData, updateField, errors }: any) {
       </FormField>
 
       <FormField
-        label="Служили в армии/полиции?"
-        required
-        hint='Пишите "нет", если не служили. название организации, номер в/ч / должность / звание / местонахождение'
-        error={errors.militaryService}
-      >
-        <textarea
-          value={formData.militaryService || ''}
-          onChange={(e) => updateField('militaryService', e.target.value)}
-          className="form-input min-h-20"
-        />
-      </FormField>
-
-      <FormField
         label="Если Вам когда-нибудь отказывали в оформлении или в продлении индийской визы, укажите детали"
         hint="пропустите, если нет. когда, кем выдан отказ, уточните номер и дату"
       >
@@ -361,15 +433,10 @@ function IndiaForm({ formData, updateField, errors }: any) {
         />
       </FormField>
 
-      <FormField
-        label="Какие страны посещали за последние 10 лет?"
-        required
-        error={errors.countriesVisited}
-      >
-        <textarea
-          value={formData.countriesVisited || ''}
-          onChange={(e) => updateField('countriesVisited', e.target.value)}
-          className="form-input min-h-20"
+      <FormField label="Какие страны посещали за последние 10 лет?" required error={errors.countriesVisited}>
+        <CountriesMultiSelect
+          value={formData.countriesVisited || []}
+          onChange={(v) => updateField('countriesVisited', v)}
         />
       </FormField>
 
@@ -389,14 +456,10 @@ function IndiaForm({ formData, updateField, errors }: any) {
         </select>
       </FormField>
 
-      <FormField
-        label="Посещали ли Вы Бангладеш, Бутан, Мальдивы, Непал, Пакистан, Шри-Ланку, Афганистан за последние 3 года?"
-        hint="Если были, укажите страну, год посещения и количество посещений"
-      >
-        <textarea
-          value={formData.southAsiaVisits || ''}
-          onChange={(e) => updateField('southAsiaVisits', e.target.value)}
-          className="form-input min-h-20"
+      <FormField label="Посещали ли Вы Бангладеш, Бутан, Мальдивы, Непал, Пакистан, Шри-Ланку, Афганистан за последние 3 года?">
+        <SouthAsiaVisitsSelect
+          value={formData.southAsiaVisits || []}
+          onChange={(v) => updateField('southAsiaVisits', v)}
         />
       </FormField>
 
@@ -408,19 +471,6 @@ function IndiaForm({ formData, updateField, errors }: any) {
         <textarea
           value={formData.hotelInfo || ''}
           onChange={(e) => updateField('hotelInfo', e.target.value)}
-          className="form-input min-h-20"
-        />
-      </FormField>
-
-      <FormField
-        label="Контактное лицо в Индии"
-        required
-        hint="ИМЯ / ПОЛНЫЙ АДРЕС/ ТЕЛЕФОН"
-        error={errors.contactInIndia}
-      >
-        <textarea
-          value={formData.contactInIndia || ''}
-          onChange={(e) => updateField('contactInIndia', e.target.value)}
           className="form-input min-h-20"
         />
       </FormField>
@@ -446,33 +496,18 @@ function VietnamForm({ formData, updateField, errors }: any) {
   return (
     <div className="space-y-4">
       <FormField label="Гражданство" required error={errors.citizenship}>
-        <input
-          type="text"
-          value={formData.citizenship || ''}
-          onChange={(e) => updateField('citizenship', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.citizenship || ''} onChange={(v) => updateField('citizenship', v)} error={errors.citizenship} />
       </FormField>
 
       <FormField label="Страна рождения" required error={errors.birthCountry}>
-        <input
-          type="text"
-          value={formData.birthCountry || ''}
-          onChange={(e) => updateField('birthCountry', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.birthCountry || ''} onChange={(v) => updateField('birthCountry', v)} error={errors.birthCountry} />
       </FormField>
 
       <FormField
         label="Если имеете второе гражданство, укажите его"
         hint="если нет, пропустите"
       >
-        <input
-          type="text"
-          value={formData.secondCitizenship || ''}
-          onChange={(e) => updateField('secondCitizenship', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.secondCitizenship || ''} onChange={(v) => updateField('secondCitizenship', v)} />
       </FormField>
 
       <FormField
@@ -693,12 +728,7 @@ function SriLankaForm({ formData, updateField, errors }: any) {
   return (
     <div className="space-y-4">
       <FormField label="Гражданство" required error={errors.citizenship}>
-        <input
-          type="text"
-          value={formData.citizenship || ''}
-          onChange={(e) => updateField('citizenship', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.citizenship || ''} onChange={(v) => updateField('citizenship', v)} error={errors.citizenship} />
       </FormField>
 
       <FormField
@@ -707,12 +737,7 @@ function SriLankaForm({ formData, updateField, errors }: any) {
         hint="если СССР, пишите - Россия"
         error={errors.birthCountry}
       >
-        <input
-          type="text"
-          value={formData.birthCountry || ''}
-          onChange={(e) => updateField('birthCountry', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.birthCountry || ''} onChange={(v) => updateField('birthCountry', v)} error={errors.birthCountry} />
       </FormField>
 
       <FormField
@@ -720,12 +745,7 @@ function SriLankaForm({ formData, updateField, errors }: any) {
         required
         error={errors.lastCountry}
       >
-        <input
-          type="text"
-          value={formData.lastCountry || ''}
-          onChange={(e) => updateField('lastCountry', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.lastCountry || ''} onChange={(v) => updateField('lastCountry', v)} error={errors.lastCountry} />
       </FormField>
 
       <FormField
@@ -1009,12 +1029,7 @@ function IsraelForm({ formData, updateField, errors }: any) {
   return (
     <div className="space-y-4">
       <FormField label="Гражданство" required error={errors.citizenship}>
-        <input
-          type="text"
-          value={formData.citizenship || ''}
-          onChange={(e) => updateField('citizenship', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.citizenship || ''} onChange={(v) => updateField('citizenship', v)} error={errors.citizenship} />
       </FormField>
 
       <FormField label="Дата прилёта" required error={errors.arrivalDate}>
@@ -1434,12 +1449,7 @@ function KenyaForm({ formData, updateField, errors }: any) {
       </FormField>
 
       <FormField label="Страна рождения" required error={errors.birthCountry}>
-        <input
-          type="text"
-          value={formData.birthCountry || ''}
-          onChange={(e) => updateField('birthCountry', e.target.value)}
-          className="form-input"
-        />
+        <CitizenshipSelect value={formData.birthCountry || ''} onChange={(v) => updateField('birthCountry', v)} error={errors.birthCountry} />
       </FormField>
 
       <FormField
