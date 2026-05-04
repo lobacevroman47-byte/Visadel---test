@@ -102,7 +102,7 @@ export default async function handler(req, res) {
     author_name: parsed.displayName,
     avatar: parsed.avatar,
     channel_message_id: post.message_id,
-    status: 'approved',
+    status: 'pending',
     source: 'channel',
   });
 
