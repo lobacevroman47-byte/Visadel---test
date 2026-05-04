@@ -364,11 +364,6 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                             </div>
                           </div>
                         )}
-                        <button
-                          onClick={() => { localStorage.setItem('copiedFormData', JSON.stringify(app.form_data)); alert('Данные скопированы! Будут предложены при следующем оформлении.'); }}
-                          className="w-full bg-gray-100 text-gray-600 py-2 rounded-xl hover:bg-gray-200 transition text-sm flex items-center justify-center gap-2">
-                          <Copy className="w-4 h-4" /> Использовать данные снова
-                        </button>
                       </div>
                     )}
 
