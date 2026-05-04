@@ -141,6 +141,46 @@ function VisaCard({ visa, onSelect, isUrgent = false }: VisaCardProps) {
   );
 }
 
+function ReferralBanner() {
+  const userData = JSON.parse(localStorage.getItem('userData') || '{}');
+  const referralCode = userData.referralCode ?? '';
+  const botUsername = 'Visadel_test_bot';
+
+  const handleShare = () => {
+    const url = `https://t.me/${botUsername}?start=${referralCode}`;
+    const text = `🌍 Оформляю визы через Visadel Agency — быстро и удобно! Получи бонус при первом заказе:`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    window.Telegram?.WebApp?.openTelegramLink(shareUrl);
+  };
+
+  if (!referralCode) return null;
+
+  return (
+    <div
+      onClick={handleShare}
+      className="mx-4 mb-4 rounded-2xl p-4 cursor-pointer active:scale-95 transition-transform"
+      style={{ background: 'linear-gradient(135deg, #1565C0 0%, #0288D1 50%, #00ACC1 100%)' }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">🎁</span>
+            <p className="text-white font-bold text-base">Приведи друга — получи 500₽</p>
+          </div>
+          <p className="text-blue-100 text-xs mb-2">Поделись ссылкой и зарабатывай бонусы с каждого друга</p>
+          <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
+            <span className="text-white text-xs font-mono">{referralCode}</span>
+            <span className="text-blue-200 text-xs">· твой код</span>
+          </div>
+        </div>
+        <div className="ml-3 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+          <span className="text-lg">→</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onOpenPartnerApplication, onOpenAdmin }: HomeProps) {
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [showUrgentVietnam, setShowUrgentVietnam] = useState(false);
@@ -180,6 +220,8 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
           </button>
         </div>
       </div>
+
+      {!selectedCountry && <ReferralBanner />}
 
       <div className="max-w-2xl mx-auto p-4">
         {/* Country Selection */}
