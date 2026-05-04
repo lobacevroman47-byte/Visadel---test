@@ -8,9 +8,9 @@ export default function SplashScreen() {
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="overflow-hidden w-full flex justify-center"
+        className="w-full flex justify-center px-2"
       >
-        <img src={logo} alt="Visadel Agency" className="h-72 w-auto max-w-none" />
+        <img src={logo} alt="Visadel Agency" className="w-full object-contain" />
       </motion.div>
 
       <motion.div
