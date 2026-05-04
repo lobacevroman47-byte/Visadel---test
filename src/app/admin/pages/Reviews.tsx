@@ -126,16 +126,18 @@ export const Reviews: React.FC = () => {
     if (!confirmReview) return;
     setDeleting(true);
     try {
-      const res = await fetch('/api/delete-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: confirmReview.id }),
-      });
-      if (!res.ok) throw new Error('Delete failed');
+      if (isSupabaseConfigured()) {
+        const { error } = await supabase
+          .from('reviews')
+          .delete()
+          .eq('id', confirmReview.id);
+        if (error) throw error;
+      }
       setReviews(prev => prev.filter(r => r.id !== confirmReview.id));
       showToast('Отзыв удалён', 'success');
-    } catch {
-      showToast('Ошибка при удалении', 'error');
+    } catch (e) {
+      console.error('Delete error:', e);
+      showToast('Ошибка при удалении — проверь политики Supabase', 'error');
     } finally {
       setDeleting(false);
       setConfirmReview(null);
