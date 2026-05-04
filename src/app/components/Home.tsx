@@ -166,18 +166,17 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-md border-b border-gray-100">
-        <div className="relative px-3 py-1">
+        <div className="relative px-3" style={{ paddingTop: '4px', paddingBottom: '4px' }}>
           <img
             src={logo}
             alt="Visadel Agency"
-            style={{ width: '100%', height: 'auto', maxHeight: '52px', display: 'block', objectFit: 'contain' }}
+            style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
           />
           <button
             onClick={onOpenProfile}
-            className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow transition"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md transition"
           >
-            <User className="w-3.5 h-3.5" />
-            Войти
+            <User className="w-5 h-5" />
           </button>
         </div>
       </div>
