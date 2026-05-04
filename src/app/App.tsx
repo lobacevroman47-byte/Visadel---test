@@ -126,18 +126,23 @@ function App() {
         .then(async u => {
           setAppUser(u);
           localStorage.setItem('vd_user', JSON.stringify(u));
+          // Merge with existing localStorage — preserve streak/checkin data
+          const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
           localStorage.setItem('userData', JSON.stringify({
+            ...existing,
             bonusBalance: u.bonus_balance,
             isInfluencer: u.is_influencer,
-            name: `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}`,
-            phone: u.phone ?? '',
-            email: u.email ?? '',
+            name: existing.name || `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}`,
+            phone: existing.phone || u.phone || '',
+            email: existing.email || u.email || '',
             telegramId: u.telegram_id,
             username: u.username,
+            telegramHandle: existing.telegramHandle || u.username || u.first_name || '',
             photoUrl: u.photo_url,
             referralCode: u.referral_code,
-            bonusStreak: u.bonus_streak,
-            lastBonusDate: u.last_bonus_date,
+            // Supabase is source of truth for streak; only overwrite if newer
+            consecutiveDays: u.bonus_streak ?? existing.consecutiveDays ?? 0,
+            lastCheckIn: u.last_bonus_date ?? existing.lastCheckIn ?? '',
           }));
           const role = await getAdminRole(u.telegram_id);
           setAdminRole(role);
@@ -185,7 +190,7 @@ function App() {
         {currentScreen === 'home' && (
           <Home
             onVisaSelect={handleVisaSelect}
-            onOpenProfile={() => setCurrentScreen('profile')}
+            onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
             onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
             onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
