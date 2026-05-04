@@ -7,8 +7,8 @@ interface Review {
   country: string;
   rating: number;
   text: string;
-  username?: string;
   author_name?: string;
+  avatar?: string;
   source?: string;
   created_at: string;
   status: string;
@@ -110,28 +110,24 @@ export default function ReviewsTab() {
         <div className="space-y-3">
           {reviews.map(review => (
             <div key={review.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="font-medium text-gray-800 text-sm">
-                    {review.author_name ?? (review.username ? `@${review.username}` : 'Пользователь')}
-                  </p>
+              <div className="flex items-start gap-3">
+                <span className="text-3xl leading-none mt-0.5">{review.avatar ?? '🧑'}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <p className="font-medium text-gray-800 text-sm truncate">
+                      {review.author_name ?? 'Клиент'}
+                    </p>
+                    <p className="text-xs text-gray-400 shrink-0">
+                      {new Date(review.created_at).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
                   {review.country && (
-                    <p className="text-xs text-gray-400">{review.country}</p>
+                    <p className="text-xs text-gray-400 mb-1">{review.country}</p>
                   )}
-                </div>
-                <div className="flex flex-col items-end gap-1">
                   <StarRow rating={review.rating} />
-                  <p className="text-xs text-gray-400">
-                    {new Date(review.created_at).toLocaleDateString('ru-RU')}
-                  </p>
+                  <p className="text-sm text-gray-700 leading-relaxed mt-2">"{review.text}"</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-700 leading-relaxed">"{review.text}"</p>
-              {review.source === 'channel' && (
-                <p className="text-xs text-blue-400 mt-2 flex items-center gap-1">
-                  <span>📢</span> из канала @visadel_recall
-                </p>
-              )}
             </div>
           ))}
         </div>

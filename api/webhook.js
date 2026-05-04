@@ -1,77 +1,110 @@
-// Telegram Webhook — saves channel posts from @visadel_recall to Supabase reviews table
-// Env vars: TELEGRAM_BOT_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_KEY
+// Telegram Webhook — syncs @visadel_recall channel posts/deletions with Supabase
+// Env vars: TELEGRAM_BOT_TOKEN, VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 
-const CHANNEL = '@visadel_recall';
+const CHANNEL = 'visadel_recall';
+
+// Gender detection from Russian first name
+function getAvatar(name) {
+  if (!name) return '🧑';
+  const first = name.trim().split(/\s+/)[0].toLowerCase();
+  // Female Russian names typically end in а, я, ь, ия, ья
+  if (/[аяь]$/i.test(first)) return '👩';
+  return '👨';
+}
+
+// Extract display name from text (— @username or — Имя)
+function parseAuthor(text) {
+  const match = text.match(/—\s*(.+)$/m);
+  if (!match) return { displayName: 'Клиент', avatar: '🧑' };
+  const raw = match[1].trim().replace(/^@/, '');
+  // If it looks like a username (no spaces, latin/cyrillic mixed), show generic
+  const isUsername = /^[a-zA-Z0-9_]+$/.test(raw);
+  if (isUsername) return { displayName: 'Клиент', avatar: '🧑' };
+  const avatar = getAvatar(raw);
+  return { displayName: raw, avatar };
+}
 
 function parseReviewPost(text) {
   if (!text) return null;
   try {
-    // Count stars from emoji
     const starMatch = text.match(/⭐/g);
-    const rating = starMatch ? starMatch.length : 5;
+    const rating = starMatch ? Math.min(starMatch.length, 5) : 5;
 
-    // Extract country
-    const countryMatch = text.match(/Страна:\s*[*_]?([^*_\n]+)[*_]?/);
+    const countryMatch = text.match(/Страна:\s*[*_\\]*([\p{L}\s\-]+)[*_\\]*/u);
     const country = countryMatch ? countryMatch[1].trim() : '';
 
-    // Extract review text between quotes
     const textMatch = text.match(/"([^"]+)"/);
-    const reviewText = textMatch ? textMatch[1].trim() : text.slice(0, 200).trim();
+    const reviewText = textMatch ? textMatch[1].trim() : '';
+    if (!reviewText) return null;
 
-    // Extract username
-    const usernameMatch = text.match(/—\s*@([^\s\n]+)/);
-    const username = usernameMatch ? usernameMatch[1] : '';
-    const authorName = username ? `@${username}` : 'Пользователь';
+    const { displayName, avatar } = parseAuthor(text);
 
-    return { rating, country, text: reviewText, username, authorName };
+    return { rating, country, text: reviewText, displayName, avatar };
   } catch {
     return null;
   }
+}
+
+async function supabaseFetch(url, key, method, path, body) {
+  return fetch(`${url}/rest/v1/${path}`, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': key,
+      'Authorization': `Bearer ${key}`,
+      'Prefer': method === 'POST' ? 'resolution=ignore-duplicates' : '',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') { res.status(200).end(); return; }
 
   const update = req.body;
-  const post = update?.channel_post;
+  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseKey) { res.status(200).end(); return; }
 
-  // Only handle posts from our channel
-  if (!post || post.chat?.username !== CHANNEL.replace('@', '')) {
+  // ── Handle deleted messages ──────────────────────────────────────────────────
+  const deleted = update?.deleted_messages ?? update?.channel_post_deleted;
+  if (deleted) {
+    const ids = Array.isArray(deleted.message_ids) ? deleted.message_ids
+      : deleted.message_id ? [deleted.message_id] : [];
+    for (const msgId of ids) {
+      await supabaseFetch(supabaseUrl, supabaseKey, 'DELETE',
+        `reviews?channel_message_id=eq.${msgId}`, null);
+    }
     res.status(200).end();
     return;
   }
 
-  const parsed = parseReviewPost(post.text);
-  if (!parsed || !parsed.text) { res.status(200).end(); return; }
-
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) { res.status(200).end(); return; }
-
-  try {
-    await fetch(`${supabaseUrl}/rest/v1/reviews`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': supabaseKey,
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Prefer': 'resolution=ignore-duplicates',
-      },
-      body: JSON.stringify({
-        country: parsed.country || 'Не указана',
-        rating: parsed.rating,
-        text: parsed.text,
-        username: parsed.username || null,
-        author_name: parsed.authorName || 'Пользователь',
-        channel_message_id: post.message_id,
-        status: 'approved',
-        source: 'channel',
-      }),
-    });
-  } catch (e) {
-    console.error('Webhook save error:', e);
+  // ── Handle new channel post ──────────────────────────────────────────────────
+  const post = update?.channel_post;
+  if (!post || post.chat?.username !== CHANNEL) {
+    res.status(200).end();
+    return;
   }
+
+  // Handle edited posts — delete old, re-insert
+  if (update?.edited_channel_post) {
+    await supabaseFetch(supabaseUrl, supabaseKey, 'DELETE',
+      `reviews?channel_message_id=eq.${post.message_id}`, null);
+  }
+
+  const parsed = parseReviewPost(post.text);
+  if (!parsed) { res.status(200).end(); return; }
+
+  await supabaseFetch(supabaseUrl, supabaseKey, 'POST', 'reviews', {
+    country: parsed.country || 'Не указана',
+    rating: parsed.rating,
+    text: parsed.text,
+    author_name: parsed.displayName,
+    avatar: parsed.avatar,
+    channel_message_id: post.message_id,
+    status: 'approved',
+    source: 'channel',
+  });
 
   res.status(200).end();
 }
