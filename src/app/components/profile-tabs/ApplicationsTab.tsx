@@ -126,6 +126,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewApp, setReviewApp] = useState<Application | null>(null);
+  const [submittingReviewId, setSubmittingReviewId] = useState<string | null>(null);
 
   const telegramId: number = (() => {
     try { return JSON.parse(localStorage.getItem('userData') ?? '{}').telegramId ?? 0; } catch { return 0; }
@@ -176,6 +177,40 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
   const handleReviewSubmitted = () => {
     setReviewApp(null);
     load();
+  };
+
+  // One-click: submit review + open Telegram + unlock visa
+  const handleQuickReview = async (app: Application) => {
+    if (submittingReviewId) return;
+    setSubmittingReviewId(app.id!);
+    try {
+      await submitReview({
+        telegramId,
+        applicationId: app.id!,
+        country: app.country,
+        rating: 5,
+        text: 'Отзыв оставлен в Telegram-канале',
+        username: (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}').username ?? ''; } catch { return ''; } })(),
+      });
+      // Add bonus to localStorage
+      try {
+        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+        ud.bonusBalance = (ud.bonusBalance ?? 0) + 100;
+        localStorage.setItem('userData', JSON.stringify(ud));
+      } catch {}
+      setReviewedIds(prev => new Set([...prev, app.id!]));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSubmittingReviewId(null);
+    }
+    // Open Telegram channel
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink('https://t.me/visadel_recall');
+    } else {
+      window.open('https://t.me/visadel_recall', '_blank');
+    }
   };
 
   if (loading) {
@@ -307,9 +342,14 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                               className="w-full flex items-center justify-center gap-2 py-3 bg-gray-200 text-gray-400 rounded-xl text-sm font-medium cursor-not-allowed">
                               <Lock className="w-4 h-4" /> Скачать визу (недоступно)
                             </button>
-                            <button onClick={() => setReviewApp(app)}
-                              className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium">
-                              <Star className="w-4 h-4" /> Оставить отзыв (+100 ₽)
+                            <button
+                              onClick={() => handleQuickReview(app)}
+                              disabled={submittingReviewId === app.id}
+                              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium">
+                              {submittingReviewId === app.id
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Star className="w-4 h-4" />}
+                              Оставить отзыв (+100 ₽)
                             </button>
                           </div>
                         ) : (
