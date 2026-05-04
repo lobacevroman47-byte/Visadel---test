@@ -159,8 +159,10 @@ function ReferralBanner() {
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Бонус дают новым пользователям 🎁`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
+    // Text param contains full message + referral link at the end (shows text-first)
+    // url param is just the bot without start= so it doesn't hijack the compose field order
+    const message = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Бонус дают новым пользователям 🎁\n\n${referralUrl}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/${botUsername}`)}&text=${encodeURIComponent(message)}`;
     window.Telegram?.WebApp?.openTelegramLink(shareUrl);
   };
 

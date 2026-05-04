@@ -161,7 +161,7 @@ function App() {
       } else {
         setCurrentScreen('home');
       }
-    }, 2500);
+    }, 1500);
     return () => clearTimeout(timer);
   }, []);
 
