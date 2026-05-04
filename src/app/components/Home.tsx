@@ -28,7 +28,8 @@ const COUNTRIES: Country[] = [
     visaOptions: [
       { id: 'india-30', country: 'Индия', type: 'E-VISA на 30 дней', duration: '30 дней', price: 5490, readinessTime: '1-3 дня (Возможны задержки до 10 дней)' },
       { id: 'india-1y', country: 'Индия', type: 'E-VISA на 1 год', duration: '1 год', price: 7490, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
-      { id: 'india-5y', country: 'Индия', type: 'E-VISA на 5 лет', duration: '5 лет', price: 11490, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
+      { id: 'india-5y-rf', country: 'Индия', type: 'E-VISA на 5 лет (граждане РФ)', duration: '5 лет', price: 14990, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
+      { id: 'india-5y-other', country: 'Индия', type: 'E-VISA на 5 лет (остальные страны)', duration: '5 лет', price: 19990, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
     ]
   },
   {
@@ -82,7 +83,7 @@ const COUNTRIES: Country[] = [
     name: 'Пакистан',
     flag: '🇵🇰',
     visaOptions: [
-      { id: 'pakistan', country: 'Пакистан', type: 'E-VISA до 90 дней', duration: '90 дней', price: 2490, readinessTime: '1-3 дня' },
+      { id: 'pakistan', country: 'Пакистан', type: 'E-VISA до 90 дней', duration: '90 дней', price: 6490, readinessTime: '1-3 дня', description: '⚠️ Подача онлайн, получение в посольстве' },
     ]
   },
   {
@@ -97,6 +98,13 @@ const COUNTRIES: Country[] = [
     flag: '🇰🇪',
     visaOptions: [
       { id: 'kenya', country: 'Кения', type: 'ETA на 90 дней', duration: '90 дней', price: 6490, readinessTime: '1-3 дня' },
+    ]
+  },
+  {
+    name: 'Филиппины',
+    flag: '🇵🇭',
+    visaOptions: [
+      { id: 'philippines-etravel', country: 'Филиппины', type: 'E-Travel на 30 дней', duration: '30 дней', price: 1990, readinessTime: '1-3 дня', description: 'Электронная регистрация для въезда' },
     ]
   },
 ];

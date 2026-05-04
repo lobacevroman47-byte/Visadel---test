@@ -83,6 +83,7 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
       {country === 'Пакистан' && <PakistanForm formData={formData} updateField={updateField} errors={errors} />}
       {country === 'Камбоджа' && <CambodiaForm formData={formData} updateField={updateField} errors={errors} />}
       {country === 'Кения' && <KenyaForm formData={formData} updateField={updateField} errors={errors} />}
+      {country === 'Филиппины' && <PhilippinesForm formData={formData} updateField={updateField} errors={errors} />}
 
       <div className="mt-6">
         <label className="block mb-2 text-gray-700">
@@ -134,9 +135,12 @@ function getRequiredFields(country: string): string[] {
     'Пакистан': ['daysInPakistan', 'entryPort', 'exitPort', 'stayDates', 'maritalStatus', 'parentsData', 
                  'workInfo', 'plannedAddress'],
     'Камбоджа': ['expectedEntryDate', 'residenceAddress', 'addressInCambodia', 'entryPort'],
-    'Кения': ['profession', 'emergencyContact', 'travelDates', 'entryPort', 'airline', 'fromCountry', 
-              'exitPort', 'exitAirline', 'toCountry', 'addressInKenya', 'birthCountry', 'convicted', 
+    'Кения': ['profession', 'emergencyContact', 'travelDates', 'entryPort', 'airline', 'fromCountry',
+              'exitPort', 'exitAirline', 'toCountry', 'addressInKenya', 'birthCountry', 'convicted',
               'deniedEntry', 'beenToKenya', 'bringCurrency'],
+    'Филиппины': ['citizenship', 'birthCountry', 'working', 'residenceAddress', 'visitPurpose',
+                  'flightNumber', 'departureAirport', 'stayDates', 'hotelAddress', 'companions',
+                  'firstTimePhilippines'],
   };
 
   return commonFields[country] || [];
@@ -1614,6 +1618,166 @@ function KenyaForm({ formData, updateField, errors }: any) {
           onChange={(e) => updateField('bringCurrency', e.target.value)}
           className="form-input min-h-20"
         />
+      </FormField>
+    </div>
+  );
+}
+
+// Philippines Form Component
+function PhilippinesForm({ formData, updateField, errors }: any) {
+  return (
+    <div className="space-y-4">
+      <FormField label="Гражданство" required error={errors.citizenship}>
+        <CitizenshipSelect value={formData.citizenship || ''} onChange={(v) => updateField('citizenship', v)} error={errors.citizenship} />
+      </FormField>
+
+      <FormField label="Страна рождения" required error={errors.birthCountry}>
+        <CitizenshipSelect value={formData.birthCountry || ''} onChange={(v) => updateField('birthCountry', v)} error={errors.birthCountry} />
+      </FormField>
+
+      <FormField
+        label="Вы работаете?"
+        required
+        hint="если да, укажите название компании и должность"
+        error={errors.working}
+      >
+        <textarea
+          value={formData.working || ''}
+          onChange={(e) => updateField('working', e.target.value)}
+          className="form-input min-h-20"
+          placeholder="Нет / ООО «Компания», менеджер"
+        />
+      </FormField>
+
+      <FormField
+        label="Адрес проживания"
+        required
+        hint="индекс / область / город / улица / дом"
+        error={errors.residenceAddress}
+      >
+        <textarea
+          value={formData.residenceAddress || ''}
+          onChange={(e) => updateField('residenceAddress', e.target.value)}
+          className="form-input min-h-20"
+        />
+      </FormField>
+
+      <FormField
+        label="Цель приезда на Филиппины"
+        required
+        error={errors.visitPurpose}
+      >
+        <input
+          type="text"
+          value={formData.visitPurpose || ''}
+          onChange={(e) => updateField('visitPurpose', e.target.value)}
+          className="form-input"
+          placeholder="Туризм"
+        />
+      </FormField>
+
+      <FormField
+        label="Номер рейса и название авиакомпании"
+        required
+        error={errors.flightNumber}
+      >
+        <input
+          type="text"
+          value={formData.flightNumber || ''}
+          onChange={(e) => updateField('flightNumber', e.target.value)}
+          className="form-input"
+          placeholder="SU 270 / Aeroflot"
+        />
+      </FormField>
+
+      <FormField
+        label="Аэропорт вылета"
+        required
+        error={errors.departureAirport}
+      >
+        <input
+          type="text"
+          value={formData.departureAirport || ''}
+          onChange={(e) => updateField('departureAirport', e.target.value)}
+          className="form-input"
+          placeholder="SVO / Москва Шереметьево"
+        />
+      </FormField>
+
+      <FormField
+        label="Даты пребывания на Филиппинах"
+        required
+        hint="с какого по какое число"
+        error={errors.stayDates}
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <DateInput
+            value={formData.stayDateFrom || ''}
+            onChange={(v) => updateField('stayDateFrom', v)}
+            placeholder="С дд.мм.гггг"
+          />
+          <DateInput
+            value={formData.stayDateTo || ''}
+            onChange={(v) => updateField('stayDateTo', v)}
+            placeholder="По дд.мм.гггг"
+          />
+        </div>
+      </FormField>
+
+      <FormField
+        label="Если будет транзит, укажите страну и аэропорт"
+        hint="пропустите, если нет"
+      >
+        <input
+          type="text"
+          value={formData.transit || ''}
+          onChange={(e) => updateField('transit', e.target.value)}
+          className="form-input"
+          placeholder="Нет / Сингапур, Changi Airport"
+        />
+      </FormField>
+
+      <FormField
+        label="Адрес отеля на Филиппинах"
+        required
+        hint="наименование / адрес / телефон"
+        error={errors.hotelAddress}
+      >
+        <textarea
+          value={formData.hotelAddress || ''}
+          onChange={(e) => updateField('hotelAddress', e.target.value)}
+          className="form-input min-h-20"
+        />
+      </FormField>
+
+      <FormField
+        label="Сопровождает ли кто-то?"
+        required
+        hint="если да — укажите ФИО и данные"
+        error={errors.companions}
+      >
+        <textarea
+          value={formData.companions || ''}
+          onChange={(e) => updateField('companions', e.target.value)}
+          className="form-input min-h-20"
+          placeholder="Нет"
+        />
+      </FormField>
+
+      <FormField
+        label="Первый раз на Филиппинах?"
+        required
+        error={errors.firstTimePhilippines}
+      >
+        <select
+          value={formData.firstTimePhilippines || ''}
+          onChange={(e) => updateField('firstTimePhilippines', e.target.value)}
+          className="form-input"
+        >
+          <option value="">Выберите...</option>
+          <option value="yes">Да, первый раз</option>
+          <option value="no">Нет, был(а) раньше</option>
+        </select>
       </FormField>
     </div>
   );
