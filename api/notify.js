@@ -15,7 +15,7 @@ export default async function handler(req, res) {
   if (!telegram_id) { res.status(400).json({ error: 'telegram_id required' }); return; }
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
-  const appUrl = process.env.TELEGRAM_APP_URL;
+  const appUrl = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL;
 
   if (!token) { res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN not configured' }); return; }
   if (!appUrl) { res.status(500).json({ error: 'TELEGRAM_APP_URL not configured' }); return; }

@@ -340,38 +340,47 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const [status, setStatus] = useState(application.status);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [notifying, setNotifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
 
   const tgUsername = (application.telegram ?? '').replace('@', '') ||
     ((application.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? '').replace('@', '');
 
+  const sendNotify = async () => {
+    const res = await fetch('/api/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: application.telegramId,
+        country: application.country,
+        visa_type: application.visaType,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
       let visaUrl: string | undefined;
-      if (visaFile && status === 'completed') {
+      if (visaFile) {
         const url = await uploadVisaFile(visaFile);
         visaUrl = url ?? undefined;
-
-        // Send Telegram notification
-        const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
-        try {
-          await fetch('/api/notify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: application.telegramId,
-              country: application.country,
-              visa_type: application.visaType,
-              app_url: appUrl,
-            }),
-          });
-        } catch (notifyErr) {
-          console.warn('Telegram notify failed:', notifyErr);
-        }
       }
       await updateApplicationStatus(application.id, status, visaUrl);
-      alert(status === 'completed' && visaUrl ? 'Виза загружена! Пользователю отправлено уведомление.' : 'Изменения сохранены');
+
+      // Send notification whenever status becomes 'completed'
+      if (status === 'completed') {
+        try {
+          await sendNotify();
+          alert(visaUrl ? 'Виза загружена! Уведомление отправлено в Telegram.' : 'Статус обновлён. Уведомление отправлено в Telegram.');
+        } catch (notifyErr) {
+          alert(`Изменения сохранены, но уведомление не отправлено: ${String(notifyErr)}`);
+        }
+      } else {
+        alert('Изменения сохранены');
+      }
       onClose();
     } catch {
       alert('Ошибка сохранения');
@@ -505,6 +514,28 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                     {visaFile && <p className="text-sm text-green-600 mt-2">✓ {visaFile.name}</p>}
                   </div>
                 </div>
+              )}
+
+              {/* Resend notification for already-completed apps */}
+              {application.status === 'completed' && (
+                <button
+                  onClick={async () => {
+                    setNotifying(true);
+                    try {
+                      await sendNotify();
+                      alert('Уведомление отправлено!');
+                    } catch (e) {
+                      alert(`Ошибка: ${String(e)}`);
+                    } finally {
+                      setNotifying(false);
+                    }
+                  }}
+                  disabled={notifying}
+                  className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl transition font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+                >
+                  {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : '📨'}
+                  {notifying ? 'Отправка...' : 'Отправить уведомление повторно'}
+                </button>
               )}
 
               {/* Save */}
