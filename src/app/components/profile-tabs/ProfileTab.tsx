@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Gift, Flame, Shield, Save, Check, User, Mail, Phone, ChevronRight, RefreshCw, History } from 'lucide-react';
+import { Gift, Flame, Shield, Save, Check, User, Mail, Phone, RefreshCw, History } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface ProfileTabProps {
-  onOpenInfluencerDashboard?: () => void;
   onOpenAdmin?: () => void;
   onBonusChange?: (newBalance: number) => void;
 }
@@ -78,7 +77,7 @@ function StreakStrip({ streak }: { streak: number }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onBonusChange }: ProfileTabProps = {}) {
+export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabProps = {}) {
   const [loading, setLoading] = useState(true);
 
   // Core fields (synced with Supabase)
@@ -492,20 +491,6 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onB
         </div>
       </div>
 
-      {/* ── Partner cabinet ───────────────────────────────────────────── */}
-      {onOpenInfluencerDashboard && (
-        <button onClick={onOpenInfluencerDashboard}
-          className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 p-4 flex items-center justify-between hover:bg-gray-50 active:scale-95 transition-all">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🤝</span>
-            <div className="text-left">
-              <p className="text-sm font-medium text-gray-700">Партнёрский кабинет</p>
-              <p className="text-xs text-gray-400">Реферальная программа и статистика</p>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-gray-400" />
-        </button>
-      )}
     </div>
   );
 }

@@ -1,32 +1,29 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, User, FileText, ListTodo, Users, Star } from 'lucide-react';
+import { ChevronLeft, User, FileText, Users, Star } from 'lucide-react';
 import ProfileTab from './profile-tabs/ProfileTab';
 import ApplicationsTab from './profile-tabs/ApplicationsTab';
-import TasksTab from './profile-tabs/TasksTab';
 import ReferralsTab from './profile-tabs/ReferralsTab';
 import ReviewsTab from './profile-tabs/ReviewsTab';
 
 interface UserProfileProps {
   onBack: () => void;
-  onOpenInfluencerDashboard: () => void;
   onOpenPartnerApplication?: () => void;
   onContinueDraft?: (draft: any) => void;
   onOpenAdmin?: () => void;
   initialTab?: Tab;
 }
 
-type Tab = 'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews';
+type Tab = 'profile' | 'applications' | 'referrals' | 'reviews';
 
 const TABS = [
   { id: 'profile' as Tab,      label: 'Профиль',    icon: User },
   { id: 'applications' as Tab, label: 'Мои заявки', icon: FileText },
-  { id: 'tasks' as Tab,        label: 'Задания',     icon: ListTodo },
   { id: 'referrals' as Tab,    label: 'Рефералы',   icon: Users },
   { id: 'reviews' as Tab,      label: 'Отзывы',     icon: Star },
 ];
 
 export default function UserProfile({
-  onBack, onOpenInfluencerDashboard, onOpenPartnerApplication,
+  onBack, onOpenPartnerApplication,
   onContinueDraft, onOpenAdmin, initialTab,
 }: UserProfileProps) {
   const [activeTab, setActiveTab]       = useState<Tab>(initialTab ?? 'profile');
@@ -100,9 +97,9 @@ export default function UserProfile({
 
       {/* Content */}
       <div className="max-w-2xl mx-auto p-4">
-        {activeTab === 'profile'      && <ProfileTab onOpenInfluencerDashboard={onOpenInfluencerDashboard} onOpenAdmin={onOpenAdmin} onBonusChange={handleBonusChange} />}
+        {activeTab === 'profile'      && <ProfileTab onOpenAdmin={onOpenAdmin} onBonusChange={handleBonusChange} />}
         {activeTab === 'applications' && <ApplicationsTab onContinueDraft={onContinueDraft} onBonusChange={handleBonusChange} />}
-        {activeTab === 'tasks'        && <TasksTab />}
+
         {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} />}
         {activeTab === 'reviews'      && <ReviewsTab />}
       </div>

@@ -3,7 +3,6 @@ import SplashScreen from './components/SplashScreen';
 import Home from './components/Home';
 import ApplicationForm from './components/ApplicationForm';
 import UserProfile from './components/UserProfile';
-import InfluencerDashboard from './components/InfluencerDashboard';
 import SriLankaExtensionForm from './components/SriLankaExtensionForm';
 import PartnerApplicationForm from './components/PartnerApplicationForm';
 import { AdminApp } from './admin/AdminApp';
@@ -44,7 +43,6 @@ type Screen =
   | 'home'
   | 'application'
   | 'profile'
-  | 'influencer'
   | 'extension'
   | 'partner_application'
   | 'admin';
@@ -207,16 +205,13 @@ function App() {
         {currentScreen === 'profile' && (
           <UserProfile
             onBack={handleBackToHome}
-            onOpenInfluencerDashboard={() => setCurrentScreen('influencer')}
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
             onContinueDraft={handleContinueDraft}
             onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
             initialTab={initialProfileTab}
           />
         )}
-        {currentScreen === 'influencer' && (
-          <InfluencerDashboard onBack={handleBackToHome} />
-        )}
+
         {currentScreen === 'extension' && selectedVisa && (
           <SriLankaExtensionForm
             visa={selectedVisa}

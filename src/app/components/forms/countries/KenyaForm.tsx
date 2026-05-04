@@ -285,6 +285,25 @@ export default function KenyaForm({ formData, updateFormData, onNext }: KenyaFor
         )}
       </FormField>
 
+      <FormField label="Как вы о нас узнали?">
+        <select
+          value={formData.howHeard?.[0] || ''}
+          onChange={(e) => updateFormData({ howHeard: e.target.value ? [e.target.value] : [] })}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+        >
+          <option value="">Выберите вариант</option>
+          <option value="telegram">Telegram</option>
+          <option value="instagram">Instagram</option>
+          <option value="youtube">YouTube</option>
+          <option value="tiktok">TikTok</option>
+          <option value="vk">VK</option>
+          <option value="rutube">RuTube</option>
+          <option value="friends">Посоветовали друзья</option>
+          <option value="repeat">Оформлял(-а) визу ранее</option>
+        </select>
+      </FormField>
+
+
       <button
         type="submit"
         className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
