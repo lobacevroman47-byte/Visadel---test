@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
-import { saveApplication, uploadFile, updateUser } from '../../lib/db';
+import { saveApplication, uploadFile, updateUser, payReferralBonus } from '../../lib/db';
 import { haptic } from '../../lib/telegram';
 
 interface Step7Props {
@@ -101,7 +101,12 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
         bonuses_used: bonusAmount,
       });
 
-      // 4. Deduct bonuses from Supabase + localStorage
+      // 4. Pay referral bonus to referrer (500₽ on first application)
+      if (telegramId) {
+        payReferralBonus(telegramId).catch(console.error);
+      }
+
+      // 5. Deduct bonuses from Supabase + localStorage
       if (useBonuses && bonusAmount > 0) {
         const newBalance = availableBonuses - bonusAmount;
         const updated = { ...userData, bonusBalance: newBalance };

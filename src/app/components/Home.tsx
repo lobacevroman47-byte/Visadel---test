@@ -167,7 +167,7 @@ function ReferralBanner() {
             <span className="text-xl">🎁</span>
             <p className="text-white font-bold text-base">Приведи друга — получи 500₽</p>
           </div>
-          <p className="text-blue-100 text-xs mb-2">Поделись ссылкой и зарабатывай бонусы с каждого друга</p>
+          <p className="text-blue-100 text-xs mb-2">Бонус придёт автоматически, когда друг оформит визу</p>
           <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
             <span className="text-white text-xs font-mono">{referralCode}</span>
             <span className="text-blue-200 text-xs">· твой код</span>

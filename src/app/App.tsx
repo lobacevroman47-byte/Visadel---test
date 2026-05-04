@@ -121,7 +121,8 @@ function App() {
 
     // Upsert user in Supabase / localStorage
     if (tg) {
-      upsertUser(tg)
+      const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;
+      upsertUser(tg, startParam)
         .then(async u => {
           setAppUser(u);
           localStorage.setItem('vd_user', JSON.stringify(u));

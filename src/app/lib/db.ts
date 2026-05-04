@@ -74,7 +74,7 @@ function lsSet(key: string, value: unknown) {
 
 // ─── User ─────────────────────────────────────────────────────────────────────
 
-export async function upsertUser(tgUser: TelegramUser): Promise<AppUser> {
+export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Promise<AppUser> {
   const referralCode = generateReferralCode(tgUser.id);
 
   if (isSupabaseConfigured()) {
@@ -115,6 +115,7 @@ export async function upsertUser(tgUser: TelegramUser): Promise<AppUser> {
         bonus_balance: 0,
         is_influencer: false,
         referral_code: referralCode,
+        referred_by: referredBy ?? null,
         bonus_streak: 0,
       })
       .select()
@@ -453,6 +454,43 @@ export async function submitReview(params: {
   } catch (e) {
     console.warn('Failed to post review to channel:', e);
   }
+}
+
+// Called when a referred user submits their first application — pays 500₽ to referrer
+export async function payReferralBonus(telegramId: number): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  // Get this user's referred_by code
+  const { data: user } = await supabase
+    .from('users')
+    .select('referred_by')
+    .eq('telegram_id', telegramId)
+    .single();
+
+  const referredBy = (user as { referred_by?: string } | null)?.referred_by;
+  if (!referredBy) return;
+
+  // Check this is their first application
+  const { count } = await supabase
+    .from('applications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_telegram_id', telegramId);
+  if ((count ?? 0) > 1) return; // already had applications before
+
+  // Find referrer by referral_code
+  const { data: referrer } = await supabase
+    .from('users')
+    .select('telegram_id, bonus_balance')
+    .eq('referral_code', referredBy)
+    .single();
+
+  if (!referrer) return;
+
+  const newBalance = ((referrer as { bonus_balance: number }).bonus_balance ?? 0) + 500;
+  await supabase
+    .from('users')
+    .update({ bonus_balance: newBalance })
+    .eq('telegram_id', (referrer as { telegram_id: number }).telegram_id);
 }
 
 export async function getReviewedAppIds(telegramId: number): Promise<Set<string>> {
