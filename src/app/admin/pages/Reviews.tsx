@@ -265,11 +265,15 @@ export const Reviews: React.FC = () => {
   const handleApprove = async (id: string) => {
     setApproving(id);
     try {
-      const { error } = await supabase.from('reviews').update({ status: 'approved' }).eq('id', id);
-      if (error) throw error;
+      const res = await fetch('/api/update-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status: 'approved' }),
+      });
+      if (!res.ok) throw new Error('approve failed');
       setReviews(prev => prev.map(r => r.id === id ? { ...r, status: 'approved' } : r));
-      showToast('Отзыв опубликован', 'success');
-    } catch { showToast('Ошибка', 'error'); }
+      showToast('Отзыв опубликован ✓', 'success');
+    } catch { showToast('Ошибка при одобрении', 'error'); }
     finally { setApproving(null); }
   };
 
@@ -311,14 +315,19 @@ export const Reviews: React.FC = () => {
     if (!editReview) return;
     try {
       const patch = {
+        id: editReview.id,
         rating: f.rating,
         country: f.country || 'Не указана',
         text: f.text.trim(),
         author_name: f.authorName.trim() || 'Клиент',
         avatar: f.avatar,
       };
-      const { error } = await supabase.from('reviews').update(patch).eq('id', editReview.id);
-      if (error) throw error;
+      const res = await fetch('/api/update-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      if (!res.ok) throw new Error('edit failed');
       setReviews(prev => prev.map(r => r.id === editReview.id ? { ...r, ...patch } : r));
       setEditReview(null);
       showToast('Отзыв обновлён', 'success');
