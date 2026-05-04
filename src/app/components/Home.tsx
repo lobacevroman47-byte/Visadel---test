@@ -166,11 +166,11 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-md border-b border-gray-100">
-        <div className="relative px-3 py-0">
+        <div className="relative px-3 overflow-hidden" style={{ marginBottom: '-18%' }}>
           <img
             src={logo}
             alt="Visadel Agency"
-            style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'contain' }}
+            style={{ width: '100%', height: 'auto', display: 'block' }}
           />
           <button
             onClick={onOpenProfile}
