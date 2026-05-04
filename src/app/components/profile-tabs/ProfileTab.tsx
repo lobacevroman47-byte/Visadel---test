@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 interface ProfileTabProps {
   onOpenInfluencerDashboard?: () => void;
   onOpenAdmin?: () => void;
+  onBonusChange?: (newBalance: number) => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ function StreakStrip({ streak }: { streak: number }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin }: ProfileTabProps = {}) {
+export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onBonusChange }: ProfileTabProps = {}) {
   const [loading, setLoading] = useState(true);
 
   // Core fields (synced with Supabase)
@@ -162,6 +163,7 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin }: P
       setStreak(newStreak);
       setLastCheckIn(today);
       setBonusBalance(newBalance);
+      onBonusChange?.(newBalance);
 
       // Reset weekly claims if streak broke
       if (!wasYesterday && meta.weeklyBonusesClaimed > 0) {
@@ -189,6 +191,7 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin }: P
       const newBalance = bonusBalance + 5;
       const newMeta    = { ...meta, weeklyBonusesClaimed: meta.weeklyBonusesClaimed + 1 };
       setBonusBalance(newBalance);
+      onBonusChange?.(newBalance);
       setMetaState(newMeta);
       saveMeta(telegramId, newMeta);
       await updateUserBonus(telegramId, { bonus_balance: newBalance });
@@ -209,6 +212,7 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin }: P
       const newBalance = bonusBalance + 30;
       const newMeta    = { ...meta, monthlyBonusesClaimed: [...meta.monthlyBonusesClaimed, currentMonth] };
       setBonusBalance(newBalance);
+      onBonusChange?.(newBalance);
       setMetaState(newMeta);
       saveMeta(telegramId, newMeta);
       await updateUserBonus(telegramId, { bonus_balance: newBalance });

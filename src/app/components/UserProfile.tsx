@@ -40,6 +40,8 @@ export default function UserProfile({
     setBonusBalance(userData.bonusBalance || 0);
   }, [activeTab]);
 
+  const handleBonusChange = (newBalance: number) => setBonusBalance(newBalance);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const y = e.currentTarget.scrollTop;
     const diff = y - lastScrollY.current;
@@ -98,7 +100,7 @@ export default function UserProfile({
 
       {/* Content */}
       <div className="max-w-2xl mx-auto p-4">
-        {activeTab === 'profile'      && <ProfileTab onOpenInfluencerDashboard={onOpenInfluencerDashboard} onOpenAdmin={onOpenAdmin} />}
+        {activeTab === 'profile'      && <ProfileTab onOpenInfluencerDashboard={onOpenInfluencerDashboard} onOpenAdmin={onOpenAdmin} onBonusChange={handleBonusChange} />}
         {activeTab === 'applications' && <ApplicationsTab onContinueDraft={onContinueDraft} />}
         {activeTab === 'tasks'        && <TasksTab />}
         {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} />}
