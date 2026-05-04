@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { User, ChevronRight, Settings } from 'lucide-react';
 import type { VisaOption } from '../App';
+import logo from '../../assets/logo.png';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean) => void;
@@ -167,8 +168,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
       <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-6 sticky top-0 z-10 shadow-lg">
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <div>
-            <h1 className="text-2xl mb-1">Visadel Agency</h1>
-            <p className="text-[#E3F2FD] text-sm">Виза в один клик</p>
+            <img src={logo} alt="Visadel Agency" className="h-10 w-auto object-contain" style={{ mixBlendMode: 'screen' }} />
           </div>
           <button
             onClick={onOpenProfile}
