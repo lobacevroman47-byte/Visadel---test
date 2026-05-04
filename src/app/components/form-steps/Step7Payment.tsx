@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
-import { saveApplication, uploadFile } from '../../lib/db';
+import { saveApplication, uploadFile, updateUser } from '../../lib/db';
 import { haptic } from '../../lib/telegram';
 
 interface Step7Props {
@@ -101,11 +101,15 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
         bonuses_used: bonusAmount,
       });
 
-      // 3. Deduct bonuses locally
+      // 4. Deduct bonuses from Supabase + localStorage
       if (useBonuses && bonusAmount > 0) {
-        const updated = { ...userData, bonusBalance: availableBonuses - bonusAmount };
+        const newBalance = availableBonuses - bonusAmount;
+        const updated = { ...userData, bonusBalance: newBalance };
         localStorage.setItem('userData', JSON.stringify(updated));
         localStorage.setItem('vd_user', JSON.stringify(updated));
+        if (telegramId) {
+          await updateUser(telegramId, { bonus_balance: newBalance }).catch(console.error);
+        }
       }
 
       // 4. Remove draft

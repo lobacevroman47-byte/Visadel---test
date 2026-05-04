@@ -265,13 +265,15 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                     </div>
 
                     <div className="space-y-1 text-sm text-gray-500 mb-3">
-                      <div className="flex justify-between">
-                        <span>Стоимость:</span>
-                        <span>{app.price} ₽</span>
+                      <div className="flex justify-between items-center">
+                        <span>К оплате:</span>
+                        <span className="text-base font-semibold text-gray-800">
+                          {(app.price - (app.bonuses_used ?? 0)).toLocaleString('ru-RU')} ₽
+                        </span>
                       </div>
                       {app.bonuses_used > 0 && (
-                        <div className="flex justify-between text-green-600">
-                          <span>Бонусами:</span><span>−{app.bonuses_used} ₽</span>
+                        <div className="flex justify-between text-green-600 text-xs">
+                          <span>Списано бонусов:</span><span>−{app.bonuses_used} ₽</span>
                         </div>
                       )}
                       <div className="flex justify-between">

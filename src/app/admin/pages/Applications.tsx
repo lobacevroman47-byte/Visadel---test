@@ -469,15 +469,25 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               </div>
 
               {/* Оплата */}
-              <div className="bg-gray-50 rounded-xl p-4 grid grid-cols-2 gap-3">
-                <div>
-                  <p className="text-xs text-gray-500">Стоимость</p>
-                  <p className="text-xl text-blue-600 font-semibold">{application.cost.toLocaleString('ru-RU')} ₽</p>
+              <div className="bg-gray-50 rounded-xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <p className="text-sm text-gray-500">Итого к оплате</p>
+                  <p className="text-xl text-blue-600 font-semibold">
+                    {(application.cost - application.bonusesUsed).toLocaleString('ru-RU')} ₽
+                  </p>
                 </div>
-                <div>
-                  <p className="text-xs text-gray-500">Бонусы</p>
-                  <p className="text-xl text-green-600 font-semibold">{application.bonusesUsed} ₽</p>
-                </div>
+                {application.bonusesUsed > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-gray-400">Полная сумма</p>
+                    <p className="text-gray-400">{application.cost.toLocaleString('ru-RU')} ₽</p>
+                  </div>
+                )}
+                {application.bonusesUsed > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <p className="text-green-600">Списано бонусов</p>
+                    <p className="text-green-600 font-medium">−{application.bonusesUsed} ₽</p>
+                  </div>
+                )}
               </div>
 
               {/* Статус */}
@@ -738,9 +748,14 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                       )}
                     </td>
                     <td className="px-6 py-4 text-sm">{app.phone}</td>
-                    <td className="px-6 py-4 text-sm text-blue-600">{app.cost.toLocaleString('ru-RU')} ₽</td>
+                    <td className="px-6 py-4 text-sm">
+                      <span className="font-semibold text-blue-600">{(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽</span>
+                      {app.bonusesUsed > 0 && (
+                        <span className="text-xs text-gray-400 block">из {app.cost.toLocaleString('ru-RU')} ₽</span>
+                      )}
+                    </td>
                     <td className="px-6 py-4 text-sm text-green-600">
-                      {app.bonusesUsed > 0 ? `-${app.bonusesUsed} ₽` : '—'}
+                      {app.bonusesUsed > 0 ? `−${app.bonusesUsed} ₽` : '—'}
                     </td>
                     <td className="px-6 py-4 text-sm">
                       <span className="px-2 py-1 rounded text-xs text-white"
