@@ -160,13 +160,8 @@ function ReferralBanner() {
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
     const text = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Бонус дают новым пользователям 🎁`;
-    // tg://msg_url puts text FIRST, then url — opposite of t.me/share/url
-    const tgDeepLink = `tg://msg_url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
-    const a = document.createElement('a');
-    a.href = tgDeepLink;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
+    window.Telegram?.WebApp?.openTelegramLink(shareUrl);
   };
 
   const handleCopy = (e: React.MouseEvent) => {
