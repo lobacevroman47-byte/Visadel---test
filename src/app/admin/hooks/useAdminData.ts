@@ -139,12 +139,28 @@ export function useAdminApplications() {
   return { applications, loading, refetch: fetch };
 }
 
-export async function updateApplicationStatus(id: string, status: AdminApplication['status'], visaFileUrl?: string) {
+export async function updateApplicationStatus(
+  id: string,
+  status: AdminApplication['status'],
+  visaFileUrl?: string,
+  telegramId?: number,
+  country?: string,
+  visaType?: string,
+) {
   const dbStatus = status === 'completed' ? 'ready' : status;
   if (isSupabaseConfigured()) {
     const patch: Record<string, unknown> = { status: dbStatus };
     if (visaFileUrl) patch.visa_file_url = visaFileUrl;
     await supabase.from('applications').update(patch).eq('id', id);
+  }
+
+  // Send status notification (skip 'draft' and 'completed' — 'completed' handled by notify.js)
+  if (telegramId && status !== 'draft' && status !== 'completed') {
+    fetch('/api/notify-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telegram_id: telegramId, status: dbStatus, country, visa_type: visaType }),
+    }).catch(console.error);
   }
 }
 

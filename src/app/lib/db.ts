@@ -456,6 +456,15 @@ export async function submitReview(params: {
   }
 }
 
+export async function getReferralCount(referralCode: string): Promise<number> {
+  if (!isSupabaseConfigured()) return 0;
+  const { count } = await supabase
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('referred_by', referralCode);
+  return count ?? 0;
+}
+
 // Called when a referred user submits their first application — pays 500₽ to referrer
 export async function payReferralBonus(telegramId: number): Promise<void> {
   if (!isSupabaseConfigured()) return;

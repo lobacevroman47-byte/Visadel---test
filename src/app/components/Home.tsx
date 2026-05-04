@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { User, ChevronRight, Settings } from 'lucide-react';
 import type { VisaOption } from '../App';
 import logo from '../../assets/logo2.png';
+import { getReferralCount } from '../lib/db';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean) => void;
@@ -145,6 +146,13 @@ function ReferralBanner() {
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const referralCode = userData.referralCode ?? '';
   const botUsername = 'Visadel_test_bot';
+  const [friendCount, setFriendCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (referralCode) {
+      getReferralCount(referralCode).then(setFriendCount);
+    }
+  }, [referralCode]);
 
   const handleShare = () => {
     const url = `https://t.me/${botUsername}?start=${referralCode}`;
@@ -168,9 +176,18 @@ function ReferralBanner() {
             <p className="text-white font-bold text-base">Приведи друга — получи 500₽</p>
           </div>
           <p className="text-blue-100 text-xs mb-2">Бонус придёт автоматически, когда друг оформит визу</p>
-          <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
-            <span className="text-white text-xs font-mono">{referralCode}</span>
-            <span className="text-blue-200 text-xs">· твой код</span>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
+              <span className="text-white text-xs font-mono">{referralCode}</span>
+              <span className="text-blue-200 text-xs">· твой код</span>
+            </div>
+            {friendCount !== null && (
+              <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
+                <span className="text-white text-xs">👥</span>
+                <span className="text-white text-xs font-semibold">{friendCount}</span>
+                <span className="text-blue-200 text-xs">{friendCount === 1 ? 'друг' : friendCount >= 2 && friendCount <= 4 ? 'друга' : 'друзей'}</span>
+              </div>
+            )}
           </div>
         </div>
         <div className="ml-3 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">

@@ -368,7 +368,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         const url = await uploadVisaFile(visaFile);
         visaUrl = url ?? undefined;
       }
-      await updateApplicationStatus(application.id, status, visaUrl);
+      await updateApplicationStatus(application.id, status, visaUrl, application.telegramId, application.country, application.visaType);
 
       // Send notification whenever status becomes 'completed'
       if (status === 'completed') {
