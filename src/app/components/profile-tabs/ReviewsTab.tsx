@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Star, RefreshCw, MessageSquare, Plus, X, Check } from 'lucide-react';
+import { Star, RefreshCw, MessageSquare, Plus } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface Review {
@@ -176,11 +176,9 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
 // ── Main tab ──────────────────────────────────────────────────────────────────
 
 export default function ReviewsTab() {
-  const [reviews, setReviews]       = useState<Review[]>([]);
-  const [loading, setLoading]       = useState(true);
+  const [reviews, setReviews]         = useState<Review[]>([]);
+  const [loading, setLoading]         = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
-  const [showForm, setShowForm]     = useState(false);
-  const [sentToast, setSentToast]   = useState(false);
 
   const loadReviews = useCallback(async () => {
     setLoading(true);
@@ -215,23 +213,6 @@ export default function ReviewsTab() {
   return (
     <div className="space-y-4 p-4 pb-24">
 
-      {showForm && (
-        <SubmitReviewForm
-          onClose={() => setShowForm(false)}
-          onSent={() => {
-            setSentToast(true);
-            setTimeout(() => setSentToast(false), 4000);
-          }}
-        />
-      )}
-
-      {/* Sent toast */}
-      {sentToast && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white text-sm font-medium px-4 py-2.5 rounded-xl shadow-lg animate-in slide-in-from-top-2">
-          ✓ Отзыв отправлен на проверку
-        </div>
-      )}
-
       {/* Header */}
       <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-2xl p-5 text-white shadow-lg">
         <div className="flex items-center justify-between mb-1">
@@ -259,7 +240,14 @@ export default function ReviewsTab() {
 
       {/* Leave review button */}
       <button
-        onClick={() => setShowForm(true)}
+        onClick={() => {
+          const tg = (window as any).Telegram?.WebApp;
+          if (tg?.openTelegramLink) {
+            tg.openTelegramLink('https://t.me/visadel_recall');
+          } else {
+            window.open('https://t.me/visadel_recall', '_blank');
+          }
+        }}
         className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-yellow-300 text-yellow-600 bg-yellow-50 text-sm font-semibold hover:bg-yellow-100 active:scale-95 transition-all"
       >
         <Plus className="w-4 h-4" />
