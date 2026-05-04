@@ -65,6 +65,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [selectedVisa, setSelectedVisa] = useState<VisaOption | null>(null);
   const [urgentVisa, setUrgentVisa] = useState(false);
+  const [initialProfileTab, setInitialProfileTab] = useState<'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews' | undefined>(undefined);
 
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
   const [appUser, setAppUser] = useState<AppUser | null>(null);
@@ -106,6 +107,10 @@ function App() {
       setIsLoading(false);
       return;
     }
+    const tabParam = urlParams.get('tab');
+    if (tabParam === 'applications' || tabParam === 'tasks' || tabParam === 'referrals' || tabParam === 'reviews') {
+      setInitialProfileTab(tabParam);
+    }
 
     // Get Telegram user (or mock for local dev)
     const tg = isTelegramWebApp() ? getTelegramUser() : getMockUser();
@@ -143,7 +148,13 @@ function App() {
     }
 
     const timer = setTimeout(() => {
-      setCurrentScreen('home');
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && tab !== 'profile') {
+        setCurrentScreen('profile');
+      } else {
+        setCurrentScreen('home');
+      }
     }, 2500);
     return () => clearTimeout(timer);
   }, []);
@@ -194,6 +205,7 @@ function App() {
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
             onContinueDraft={handleContinueDraft}
             onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
+            initialTab={initialProfileTab}
           />
         )}
         {currentScreen === 'influencer' && (

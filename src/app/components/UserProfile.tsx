@@ -12,6 +12,7 @@ interface UserProfileProps {
   onOpenPartnerApplication?: () => void;
   onContinueDraft?: (draft: any) => void;
   onOpenAdmin?: () => void;
+  initialTab?: Tab;
 }
 
 type Tab = 'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews';
@@ -24,8 +25,8 @@ const TABS = [
   { id: 'reviews' as Tab, label: 'Отзывы', icon: Star },
 ];
 
-export default function UserProfile({ onBack, onOpenInfluencerDashboard, onOpenPartnerApplication, onContinueDraft, onOpenAdmin }: UserProfileProps) {
-  const [activeTab, setActiveTab] = useState<Tab>('profile');
+export default function UserProfile({ onBack, onOpenInfluencerDashboard, onOpenPartnerApplication, onContinueDraft, onOpenAdmin, initialTab }: UserProfileProps) {
+  const [activeTab, setActiveTab] = useState<Tab>(initialTab ?? 'profile');
   const [bonusBalance, setBonusBalance] = useState(0);
 
   useEffect(() => {

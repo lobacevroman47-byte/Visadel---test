@@ -38,7 +38,7 @@ export default async function handler(req, res) {
           inline_keyboard: [[
             {
               text: '📥 Открыть в приложении',
-              web_app: { url: appUrl }
+              web_app: { url: `${appUrl}?tab=applications` }
             }
           ]]
         }
