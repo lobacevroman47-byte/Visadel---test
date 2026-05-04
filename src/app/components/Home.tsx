@@ -147,6 +147,7 @@ function ReferralBanner() {
   const referralCode = userData.referralCode ?? '';
   const botUsername = 'Visadel_test_bot';
   const [friendCount, setFriendCount] = useState<number | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (referralCode) {
@@ -154,34 +155,47 @@ function ReferralBanner() {
     }
   }, [referralCode]);
 
-  const handleShare = () => {
-    const url = `https://t.me/${botUsername}?start=${referralCode}`;
+  const referralUrl = `https://t.me/${botUsername}?start=${referralCode}`;
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
     const text = `🌍 Оформляю визы через Visadel Agency — быстро и удобно! Получи бонус при первом заказе:`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
     window.Telegram?.WebApp?.openTelegramLink(shareUrl);
+  };
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(referralUrl).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
   if (!referralCode) return null;
 
   return (
     <div
-      onClick={handleShare}
-      className="mx-4 mb-4 rounded-2xl p-4 cursor-pointer active:scale-95 transition-transform"
+      className="mx-4 mb-4 rounded-2xl p-4"
       style={{ background: 'linear-gradient(135deg, #1565C0 0%, #0288D1 50%, #00ACC1 100%)' }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xl">🎁</span>
             <p className="text-white font-bold text-base">Приведи друга — получи 500₽</p>
           </div>
-          <p className="text-blue-100 text-xs mb-2">Бонус придёт автоматически, когда друг оформит визу</p>
+          <p className="text-blue-100 text-xs mb-3">Бонус придёт автоматически, когда друг оформит визу</p>
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-2">
-              <span className="text-white text-xs font-mono">{referralCode}</span>
-              <span className="text-blue-200 text-xs">· твой код</span>
-            </div>
-            {friendCount !== null && (
+            {/* Copy link button */}
+            <button
+              onClick={handleCopy}
+              className="bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5"
+            >
+              <span className="text-white text-xs">{copied ? '✓' : '🔗'}</span>
+              <span className="text-white text-xs font-medium">{copied ? 'Скопировано!' : 'Скопировать ссылку'}</span>
+            </button>
+            {friendCount !== null && friendCount > 0 && (
               <div className="bg-white/20 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5">
                 <span className="text-white text-xs">👥</span>
                 <span className="text-white text-xs font-semibold">{friendCount}</span>
@@ -190,9 +204,13 @@ function ReferralBanner() {
             )}
           </div>
         </div>
-        <div className="ml-3 w-10 h-10 bg-white/20 rounded-full flex items-center justify-center shrink-0">
+        {/* Share arrow — only this triggers forward */}
+        <button
+          onClick={handleShare}
+          className="w-10 h-10 bg-white/20 hover:bg-white/30 active:scale-95 transition-all rounded-full flex items-center justify-center shrink-0"
+        >
           <span className="text-lg">→</span>
-        </div>
+        </button>
       </div>
     </div>
   );
