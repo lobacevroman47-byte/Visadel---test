@@ -10,7 +10,7 @@ export default function SplashScreen() {
         transition={{ duration: 0.6, ease: 'easeOut' }}
         className="w-full flex justify-center"
       >
-        <img src={logo} alt="Visadel Agency" className="w-full object-contain" />
+        <img src={logo} alt="Visadel Agency" className="w-64 object-contain" />
       </motion.div>
 
       <motion.div
