@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Star, Trash2, RefreshCw, MessageSquare, TrendingUp, AlertTriangle, Plus, X, Sparkles } from 'lucide-react';
+import { Star, Trash2, RefreshCw, MessageSquare, TrendingUp, AlertTriangle, Plus, X } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface Review {
@@ -20,27 +20,6 @@ function getAvatar(name: string): string {
   if (!name) return '🧑';
   const first = name.trim().split(/\s+/)[0].toLowerCase();
   return /[аяь]$/i.test(first) ? '👩' : '👨';
-}
-
-function parseChannelText(raw: string): Partial<AddForm> | null {
-  try {
-    const starMatch = raw.match(/⭐/g);
-    const rating = starMatch ? Math.min(starMatch.length, 5) : 0;
-    const countryMatch = raw.match(/Страна:\s*[*_\\]*([\p{L}\s\-]+)[*_\\]*/u);
-    const country = countryMatch ? countryMatch[1].trim() : '';
-    const textMatch = raw.match(/"([^"]+)"/);
-    const text = textMatch ? textMatch[1].trim() : '';
-    const authorMatch = raw.match(/—\s*(.+)$/m);
-    let authorName = '';
-    if (authorMatch) {
-      const raw2 = authorMatch[1].trim().replace(/^@/, '');
-      if (!/^[a-zA-Z0-9_]+$/.test(raw2)) authorName = raw2;
-    }
-    if (!text && !rating) return null;
-    return { rating: rating || 5, country, text, authorName };
-  } catch {
-    return null;
-  }
 }
 
 // ── Star picker ──────────────────────────────────────────────────────────────
@@ -87,23 +66,9 @@ function AddModal({ onSave, onClose }: {
 }) {
   const [form, setForm] = useState<AddForm>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [tab, setTab] = useState<'paste' | 'manual'>('paste');
 
   const set = (key: keyof AddForm, val: string | number) =>
     setForm(f => ({ ...f, [key]: val }));
-
-  const handleParse = () => {
-    const parsed = parseChannelText(form.rawText);
-    if (!parsed) return;
-    setForm(f => ({
-      ...f,
-      rating: parsed.rating ?? f.rating,
-      country: parsed.country ?? f.country,
-      text: parsed.text ?? f.text,
-      authorName: parsed.authorName ?? f.authorName,
-    }));
-    setTab('manual');
-  };
 
   const handleSave = async () => {
     if (!form.text.trim() || !form.rating) return;
@@ -126,112 +91,58 @@ function AddModal({ onSave, onClose }: {
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-1 px-6 pt-4">
-          <button
-            onClick={() => setTab('paste')}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-              tab === 'paste' ? 'bg-[#2196F3] text-white' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            Вставить из канала
-          </button>
-          <button
-            onClick={() => setTab('manual')}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-              tab === 'manual' ? 'bg-[#2196F3] text-white' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            Заполнить вручную
-          </button>
-        </div>
+        <div className="px-6 py-5 space-y-4">
+          {/* Rating */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Оценка</label>
+            <StarPicker value={form.rating} onChange={v => set('rating', v)} />
+          </div>
 
-        <div className="px-6 py-4 space-y-4">
-          {tab === 'paste' ? (
-            <>
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">
-                  Текст поста из канала
-                </label>
-                <textarea
-                  value={form.rawText}
-                  onChange={e => set('rawText', e.target.value)}
-                  rows={6}
-                  placeholder={"⭐⭐⭐⭐⭐\n\nСтрана: Индия\n\n\"Отличный сервис, всё быстро!\"\n\n— Иван Петров"}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] resize-none font-mono"
-                />
-              </div>
-              <button
-                onClick={handleParse}
-                disabled={!form.rawText.trim()}
-                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-500 text-white text-sm font-semibold hover:bg-violet-600 transition-colors disabled:opacity-40"
-              >
-                <Sparkles className="w-4 h-4" />
-                Распознать автоматически
-              </button>
-            </>
-          ) : (
-            <>
-              {/* Rating */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-2 uppercase tracking-wide">Оценка</label>
-                <StarPicker value={form.rating} onChange={v => set('rating', v)} />
-              </div>
+          {/* Author + Country */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Имя</label>
+              <input
+                value={form.authorName}
+                onChange={e => set('authorName', e.target.value)}
+                placeholder="Иван Петров"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Страна</label>
+              <input
+                value={form.country}
+                onChange={e => set('country', e.target.value)}
+                placeholder="Индия"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]"
+              />
+            </div>
+          </div>
 
-              {/* Author + Country */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Имя</label>
-                  <input
-                    value={form.authorName}
-                    onChange={e => set('authorName', e.target.value)}
-                    placeholder="Иван Петров"
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Страна</label>
-                  <input
-                    value={form.country}
-                    onChange={e => set('country', e.target.value)}
-                    placeholder="Индия"
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]"
-                  />
-                </div>
-              </div>
-
-              {/* Text */}
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Текст отзыва</label>
-                <textarea
-                  value={form.text}
-                  onChange={e => set('text', e.target.value)}
-                  rows={4}
-                  placeholder="Отличный сервис, всё сделали быстро и без проблем!"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] resize-none"
-                />
-              </div>
-            </>
-          )}
+          {/* Text */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Текст отзыва</label>
+            <textarea
+              value={form.text}
+              onChange={e => set('text', e.target.value)}
+              rows={4}
+              placeholder="Отличный сервис, всё сделали быстро и без проблем!"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] resize-none"
+            />
+          </div>
         </div>
 
         {/* Footer */}
         <div className="flex gap-3 px-6 pb-5">
-          <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors"
-          >
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">
             Отмена
           </button>
-          <button
-            onClick={tab === 'paste' ? handleParse : handleSave}
-            disabled={tab === 'paste' ? !form.rawText.trim() : (!canSave || saving)}
-            className={`flex-1 py-2.5 rounded-xl text-white text-sm font-semibold transition-colors disabled:opacity-40 flex items-center justify-center gap-2 ${
-              tab === 'paste' ? 'bg-violet-500 hover:bg-violet-600' : 'bg-[#2196F3] hover:bg-[#1E88E5]'
-            }`}
-          >
-            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
-            {tab === 'paste' ? 'Распознать' : saving ? 'Сохраняем...' : 'Сохранить'}
+          <button onClick={handleSave} disabled={!canSave || saving}
+            className="flex-1 py-2.5 rounded-xl bg-[#2196F3] text-white text-sm font-semibold hover:bg-[#1E88E5] transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+            {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
+            {saving ? 'Сохраняем...' : 'Сохранить'}
           </button>
         </div>
       </div>
