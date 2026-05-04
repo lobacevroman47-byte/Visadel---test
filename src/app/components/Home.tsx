@@ -170,7 +170,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
           <img
             src={logo}
             alt="Visadel Agency"
-            className="h-20 w-auto object-contain"
+            className="h-20 object-contain flex-1"
             style={{ imageRendering: '-webkit-optimize-contrast' }}
           />
           <button
