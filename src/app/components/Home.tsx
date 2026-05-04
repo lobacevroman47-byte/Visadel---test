@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'motion/react';
 import { User, ChevronRight, Settings } from 'lucide-react';
 import type { VisaOption } from '../App';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/logo2.png';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean) => void;

@@ -3,7 +3,7 @@ import logo from '../../assets/logo.png';
 
 export default function SplashScreen() {
   return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-start pt-32">
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}

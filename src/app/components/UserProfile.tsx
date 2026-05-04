@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, FileText, ListTodo, Users, Star } from 'lucide-react';
-import logo2 from '../../assets/logo2.png';
 import ProfileTab from './profile-tabs/ProfileTab';
 import ApplicationsTab from './profile-tabs/ApplicationsTab';
 import TasksTab from './profile-tabs/TasksTab';
@@ -48,8 +47,8 @@ export default function UserProfile({ onBack, onOpenInfluencerDashboard, onOpenP
             >
               <ChevronLeft className="w-6 h-6" />
             </button>
-            <img src={logo2} alt="Visadel Agency" className="h-10 w-auto object-contain" style={{ imageRendering: '-webkit-optimize-contrast' }} />
-            <div className="w-10" />
+            <h1 className="text-xl">Личный кабинет</h1>
+            <div className="w-10" /> {/* Spacer */}
           </div>
 
           {/* Bonus Balance */}
