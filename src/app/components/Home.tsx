@@ -159,7 +159,7 @@ function ReferralBanner() {
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `🌍 Оформляю визы через Visadel Agency — быстро и удобно! Получи бонус при первом заказе:`;
+    const text = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Там ещё бонус дают новым, держи ссылку 🎁`;
     const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
     window.Telegram?.WebApp?.openTelegramLink(shareUrl);
   };
