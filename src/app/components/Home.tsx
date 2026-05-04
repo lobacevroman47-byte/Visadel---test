@@ -159,8 +159,8 @@ function ReferralBanner() {
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const text = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Бонус дают новым пользователям 🎁\n\n${referralUrl}`;
-    const shareUrl = `https://t.me/share/url?text=${encodeURIComponent(text)}`;
+    const text = `✈️ Слушай, нашёл где делать визы — всё чётко, без беготни и нервов. Бонус дают новым пользователям 🎁`;
+    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
     window.Telegram?.WebApp?.openTelegramLink(shareUrl);
   };
 
