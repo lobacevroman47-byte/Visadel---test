@@ -51,6 +51,7 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, onNext
             <div className="space-y-2 text-sm">
               {Object.entries(formData.basicData).map(([key, value]) => {
                 if (!value || value === '') return null;
+                if (key === 'howHeard') return null;
                 const label = getFieldLabel(key);
                 const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
                 return (
@@ -86,16 +87,12 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, onNext
         )}
 
         {/* How Heard */}
-        {formData.howHeard.length > 0 && (
+        {(formData.basicData.howHeard || formData.howHeard.length > 0) && (
           <div className="border-b pb-4">
             <h3 className="text-gray-700 mb-3">Как узнали о нас</h3>
-            <div className="flex flex-wrap gap-2">
-              {formData.howHeard.map(source => (
-                <span key={source} className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
-                  {source}
-                </span>
-              ))}
-            </div>
+            <span className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
+              {formData.basicData.howHeard || formData.howHeard[0]}
+            </span>
           </div>
         )}
 

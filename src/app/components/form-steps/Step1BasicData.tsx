@@ -84,6 +84,27 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
       {country === 'Камбоджа' && <CambodiaForm formData={formData} updateField={updateField} errors={errors} />}
       {country === 'Кения' && <KenyaForm formData={formData} updateField={updateField} errors={errors} />}
 
+      <div className="mt-6">
+        <label className="block mb-2 text-gray-700">
+          Как вы о нас узнали?
+        </label>
+        <select
+          value={formData.howHeard || ''}
+          onChange={(e) => updateField('howHeard', e.target.value)}
+          className="form-input bg-white"
+        >
+          <option value="">Выберите вариант</option>
+          <option value="telegram">Telegram</option>
+          <option value="instagram">Instagram</option>
+          <option value="youtube">YouTube</option>
+          <option value="tiktok">TikTok</option>
+          <option value="vk">ВКонтакте</option>
+          <option value="rutube">RuTube</option>
+          <option value="friends">Посоветовали друзья</option>
+          <option value="repeat">Оформлял(-а) визу ранее</option>
+        </select>
+      </div>
+
       <button
         onClick={validateAndNext}
         className="w-full mt-6 bg-[#2196F3] text-white py-4 rounded-[16px] hover:bg-[#1E88E5] transition flex items-center justify-center gap-2"
@@ -229,6 +250,67 @@ function SouthAsiaVisitsSelect({ value, onChange }: { value: SouthAsiaVisit[]; o
   );
 }
 
+// ─── Date Input Component ──────────────────────────────────────────────────
+
+function DateInput({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  const toDisplay = (v: string) => {
+    if (!v) return '';
+    const m = v.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) return `${m[3]}.${m[2]}.${m[1]}`;
+    return v;
+  };
+
+  const [display, setDisplay] = useState(() => toDisplay(value));
+
+  useEffect(() => {
+    const converted = toDisplay(value);
+    if (converted !== display) setDisplay(converted);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    const digits = raw.replace(/\D/g, '').slice(0, 8);
+    let formatted = digits;
+    if (digits.length > 4) {
+      formatted = digits.slice(0, 2) + '.' + digits.slice(2, 4) + '.' + digits.slice(4);
+    } else if (digits.length > 2) {
+      formatted = digits.slice(0, 2) + '.' + digits.slice(2);
+    }
+    setDisplay(formatted);
+    if (digits.length === 8) {
+      const d = digits.slice(0, 2), mo = digits.slice(2, 4), y = digits.slice(4, 8);
+      onChange(`${y}-${mo}-${d}`);
+    } else {
+      onChange('');
+    }
+  };
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        inputMode="numeric"
+        value={display}
+        onChange={handleChange}
+        placeholder={placeholder || 'дд.мм.гггг'}
+        maxLength={10}
+        className="form-input pr-10"
+      />
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none select-none text-base">
+        📅
+      </span>
+    </div>
+  );
+}
+
 // ─── India Form ─────────────────────────────────────────────────────────────
 
 function IndiaForm({ formData, updateField, errors }: any) {
@@ -257,11 +339,9 @@ function IndiaForm({ formData, updateField, errors }: any) {
         hint="можно примерную"
         error={errors.arrivalDate}
       >
-        <input
-          type="date"
+        <DateInput
           value={formData.arrivalDate || ''}
-          onChange={(e) => updateField('arrivalDate', e.target.value)}
-          className="form-input"
+          onChange={(v) => updateField('arrivalDate', v)}
         />
       </FormField>
 
@@ -497,11 +577,9 @@ function IndiaForm({ formData, updateField, errors }: any) {
           </FormField>
 
           <FormField label="Дата посещения Индии">
-            <input
-              type="date"
+            <DateInput
               value={formData.prevVisitDate || ''}
-              onChange={(e) => updateField('prevVisitDate', e.target.value)}
-              className="form-input"
+              onChange={(v) => updateField('prevVisitDate', v)}
             />
           </FormField>
         </div>
@@ -591,19 +669,15 @@ function VietnamForm({ formData, updateField, errors }: any) {
         error={errors.plannedDates}
       >
         <div className="grid grid-cols-2 gap-3">
-          <input
-            type="date"
+          <DateInput
             value={formData.plannedDateFrom || ''}
-            onChange={(e) => updateField('plannedDateFrom', e.target.value)}
-            className="form-input"
-            placeholder="С"
+            onChange={(v) => updateField('plannedDateFrom', v)}
+            placeholder="С дд.мм.гггг"
           />
-          <input
-            type="date"
+          <DateInput
             value={formData.plannedDateTo || ''}
-            onChange={(e) => updateField('plannedDateTo', e.target.value)}
-            className="form-input"
-            placeholder="По"
+            onChange={(v) => updateField('plannedDateTo', v)}
+            placeholder="По дд.мм.гггг"
           />
         </div>
       </FormField>
@@ -804,11 +878,9 @@ function SriLankaForm({ formData, updateField, errors }: any) {
         required
         error={errors.arrivalDate}
       >
-        <input
-          type="date"
+        <DateInput
           value={formData.arrivalDate || ''}
-          onChange={(e) => updateField('arrivalDate', e.target.value)}
-          className="form-input"
+          onChange={(v) => updateField('arrivalDate', v)}
         />
       </FormField>
 
@@ -1042,19 +1114,15 @@ function KoreaForm({ formData, updateField, errors }: any) {
         error={errors.tripDates}
       >
         <div className="grid grid-cols-2 gap-3">
-          <input
-            type="date"
+          <DateInput
             value={formData.tripDateFrom || ''}
-            onChange={(e) => updateField('tripDateFrom', e.target.value)}
-            className="form-input"
-            placeholder="С"
+            onChange={(v) => updateField('tripDateFrom', v)}
+            placeholder="С дд.мм.гггг"
           />
-          <input
-            type="date"
+          <DateInput
             value={formData.tripDateTo || ''}
-            onChange={(e) => updateField('tripDateTo', e.target.value)}
-            className="form-input"
-            placeholder="По"
+            onChange={(v) => updateField('tripDateTo', v)}
+            placeholder="По дд.мм.гггг"
           />
         </div>
       </FormField>
@@ -1084,11 +1152,9 @@ function IsraelForm({ formData, updateField, errors }: any) {
       </FormField>
 
       <FormField label="Дата прилёта" required error={errors.arrivalDate}>
-        <input
-          type="date"
+        <DateInput
           value={formData.arrivalDate || ''}
-          onChange={(e) => updateField('arrivalDate', e.target.value)}
-          className="form-input"
+          onChange={(v) => updateField('arrivalDate', v)}
         />
       </FormField>
 
@@ -1234,19 +1300,15 @@ function PakistanForm({ formData, updateField, errors }: any) {
         error={errors.stayDates}
       >
         <div className="grid grid-cols-2 gap-3">
-          <input
-            type="date"
+          <DateInput
             value={formData.stayDateFrom || ''}
-            onChange={(e) => updateField('stayDateFrom', e.target.value)}
-            className="form-input"
-            placeholder="С"
+            onChange={(v) => updateField('stayDateFrom', v)}
+            placeholder="С дд.мм.гггг"
           />
-          <input
-            type="date"
+          <DateInput
             value={formData.stayDateTo || ''}
-            onChange={(e) => updateField('stayDateTo', e.target.value)}
-            className="form-input"
-            placeholder="По"
+            onChange={(v) => updateField('stayDateTo', v)}
+            placeholder="По дд.мм.гггг"
           />
         </div>
       </FormField>
@@ -1316,11 +1378,9 @@ function CambodiaForm({ formData, updateField, errors }: any) {
         required
         error={errors.expectedEntryDate}
       >
-        <input
-          type="date"
+        <DateInput
           value={formData.expectedEntryDate || ''}
-          onChange={(e) => updateField('expectedEntryDate', e.target.value)}
-          className="form-input"
+          onChange={(v) => updateField('expectedEntryDate', v)}
         />
       </FormField>
 
@@ -1390,18 +1450,14 @@ function KenyaForm({ formData, updateField, errors }: any) {
 
       <FormField label="Дата прилета и вылета" required error={errors.travelDates}>
         <div className="grid grid-cols-2 gap-3">
-          <input
-            type="date"
+          <DateInput
             value={formData.arrivalDate || ''}
-            onChange={(e) => updateField('arrivalDate', e.target.value)}
-            className="form-input"
+            onChange={(v) => updateField('arrivalDate', v)}
             placeholder="Прилет"
           />
-          <input
-            type="date"
+          <DateInput
             value={formData.departureDate || ''}
-            onChange={(e) => updateField('departureDate', e.target.value)}
-            className="form-input"
+            onChange={(v) => updateField('departureDate', v)}
             placeholder="Вылет"
           />
         </div>

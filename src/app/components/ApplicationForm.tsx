@@ -4,7 +4,6 @@ import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
 import Step1BasicData from './form-steps/Step1BasicData';
 import Step2AdditionalDocs from './form-steps/Step2AdditionalDocs';
-import Step3HowHeard from './form-steps/Step3HowHeard';
 import Step4ContactInfo from './form-steps/Step4ContactInfo';
 import Step5PhotoUpload from './form-steps/Step5PhotoUpload';
 import Step6Review from './form-steps/Step6Review';
@@ -45,7 +44,6 @@ export interface FormData {
 const STEPS = [
   'Основные данные',
   'Усиление заявки',
-  'Как узнали',
   'Контакты',
   'Загрузка фото',
   'Проверка',
@@ -263,14 +261,6 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
             />
           )}
           {currentStep === 2 && (
-            <Step3HowHeard
-              data={formData.howHeard}
-              onChange={(data) => updateFormData('howHeard', data)}
-              onNext={goToNextStep}
-              onPrev={goToPrevStep}
-            />
-          )}
-          {currentStep === 3 && (
             <Step4ContactInfo
               data={formData.contactInfo}
               onChange={(data) => updateFormData('contactInfo', data)}
@@ -278,7 +268,7 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
               onPrev={goToPrevStep}
             />
           )}
-          {currentStep === 4 && (
+          {currentStep === 3 && (
             <Step5PhotoUpload
               country={visa.country}
               data={formData.photos}
@@ -288,7 +278,7 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
               onPrev={goToPrevStep}
             />
           )}
-          {currentStep === 5 && (
+          {currentStep === 4 && (
             <Step6Review
               formData={formData}
               visa={visa}
@@ -298,7 +288,7 @@ export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft 
               onPrev={goToPrevStep}
             />
           )}
-          {currentStep === 6 && (
+          {currentStep === 5 && (
             <Step7Payment
               formData={formData}
               visa={visa}
