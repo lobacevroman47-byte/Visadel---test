@@ -8,6 +8,7 @@ import { FormBuilder } from '../pages/FormBuilder';
 import { Administrators } from '../pages/Administrators';
 import { Settings } from '../pages/Settings';
 import { AdditionalServices } from '../pages/AdditionalServices';
+import { Reviews } from '../pages/Reviews';
 import { useAdmin } from '../contexts/AdminContext';
 import { Menu } from 'lucide-react';
 
@@ -73,6 +74,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       case 'additional-services':
         return hasPermission(['owner', 'admin']) ? (
           <AdditionalServices />
+        ) : (
+          <PermissionDenied />
+        );
+      case 'reviews':
+        return hasPermission(['owner', 'admin']) ? (
+          <Reviews />
         ) : (
           <PermissionDenied />
         );

@@ -1,15 +1,16 @@
 import React from 'react';
-import { 
-  Home, 
-  FileText, 
-  Users, 
-  Globe, 
-  FileEdit, 
-  Shield, 
-  Settings, 
+import {
+  Home,
+  FileText,
+  Users,
+  Globe,
+  FileEdit,
+  Shield,
+  Settings,
   LogOut,
   ArrowLeft,
   Package,
+  MessageSquare,
   X
 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
@@ -158,6 +159,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="Доп. услуги"
           active={activeSection === 'additional-services'}
           onClick={() => onSectionChange('additional-services')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<MessageSquare size={20} />}
+          label="Отзывы"
+          active={activeSection === 'reviews'}
+          onClick={() => onSectionChange('reviews')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
       </nav>
