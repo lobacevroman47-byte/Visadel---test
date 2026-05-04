@@ -3,14 +3,14 @@ import logo from '../../assets/logo.png';
 
 export default function SplashScreen() {
   return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-start pt-32">
       <motion.div
         initial={{ scale: 0.8, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full flex justify-center"
+        className="w-full flex justify-center px-8"
       >
-        <img src={logo} alt="Visadel Agency" className="w-64 object-contain" />
+        <img src={logo} alt="Visadel Agency" className="w-80 object-contain" />
       </motion.div>
 
       <motion.div
