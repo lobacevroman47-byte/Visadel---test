@@ -18,24 +18,21 @@ interface UserProfileProps {
 type Tab = 'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews';
 
 const TABS = [
-  { id: 'profile' as Tab,      label: 'Профиль',     icon: User },
-  { id: 'applications' as Tab, label: 'Мои заявки',  icon: FileText },
-  { id: 'tasks' as Tab,        label: 'Задания',      icon: ListTodo },
-  { id: 'referrals' as Tab,    label: 'Рефералы',    icon: Users },
-  { id: 'reviews' as Tab,      label: 'Отзывы',      icon: Star },
+  { id: 'profile' as Tab,      label: 'Профиль',    icon: User },
+  { id: 'applications' as Tab, label: 'Мои заявки', icon: FileText },
+  { id: 'tasks' as Tab,        label: 'Задания',     icon: ListTodo },
+  { id: 'referrals' as Tab,    label: 'Рефералы',   icon: Users },
+  { id: 'reviews' as Tab,      label: 'Отзывы',     icon: Star },
 ];
-
-const HEADER_H = 120; // px — height of the blue header block
 
 export default function UserProfile({
   onBack, onOpenInfluencerDashboard, onOpenPartnerApplication,
   onContinueDraft, onOpenAdmin, initialTab,
 }: UserProfileProps) {
-  const [activeTab, setActiveTab]     = useState<Tab>(initialTab ?? 'profile');
+  const [activeTab, setActiveTab]       = useState<Tab>(initialTab ?? 'profile');
   const [bonusBalance, setBonusBalance] = useState(0);
-  const [headerVisible, setHeaderVisible] = useState(true);
+  const [headerHidden, setHeaderHidden] = useState(false);
 
-  const scrollRef  = useRef<HTMLDivElement>(null);
   const lastScrollY = useRef(0);
 
   useEffect(() => {
@@ -43,37 +40,23 @@ export default function UserProfile({
     setBonusBalance(userData.bonusBalance || 0);
   }, [activeTab]);
 
-  // ── Collapse header on scroll down, reveal on scroll up ──────────────────
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const onScroll = () => {
-      const y = el.scrollTop;
-      const diff = y - lastScrollY.current;
-      if (diff > 4 && y > 30)  setHeaderVisible(false); // scrolling down
-      if (diff < -4)            setHeaderVisible(true);  // scrolling up
-      lastScrollY.current = y;
-    };
-
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const y = e.currentTarget.scrollTop;
+    const diff = y - lastScrollY.current;
+    if (diff > 6 && y > 20)  setHeaderHidden(true);   // scrolling down
+    if (diff < -6)            setHeaderHidden(false);  // scrolling up
+    lastScrollY.current = y;
+  };
 
   return (
-    <div className="flex flex-col h-screen bg-[#F5F7FA] overflow-hidden">
+    <div className="min-h-screen bg-[#F5F7FA] pb-20" onScroll={handleScroll} style={{ overflowY: 'auto' }}>
 
-      {/* ── Blue header (collapses on scroll down) ────────────────────────── */}
+      {/* Blue header — slides up when scrolling down */}
       <div
-        style={{
-          height: headerVisible ? HEADER_H : 0,
-          overflow: 'hidden',
-          transition: 'height 0.25s ease',
-          flexShrink: 0,
-        }}
-        className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white shadow-lg"
+        className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white shadow-lg sticky top-0 z-20 transition-transform duration-300"
+        style={{ transform: headerHidden ? 'translateY(-100%)' : 'translateY(0)' }}
       >
-        <div className="max-w-2xl mx-auto px-4 pt-4">
+        <div className="max-w-2xl mx-auto p-4">
           <div className="flex items-center justify-between mb-3">
             <button onClick={onBack} className="p-2 hover:bg-white/20 rounded-full transition">
               <ChevronLeft className="w-6 h-6" />
@@ -81,15 +64,15 @@ export default function UserProfile({
             <h1 className="text-xl">Личный кабинет</h1>
             <div className="w-10" />
           </div>
-          <div className="bg-white/10 rounded-lg px-3 py-2 backdrop-blur-sm">
-            <p className="text-xs text-[#E3F2FD]">Бонусный счёт</p>
-            <p className="text-2xl leading-tight">{bonusBalance}₽</p>
+          <div className="bg-white/10 rounded-lg p-3 backdrop-blur-sm">
+            <p className="text-sm text-[#E3F2FD]">Бонусный счёт</p>
+            <p className="text-2xl">{bonusBalance}₽</p>
           </div>
         </div>
       </div>
 
-      {/* ── Tab bar (always visible) ─────────────────────────────────────── */}
-      <div className="bg-white border-b shadow-sm z-10 flex-shrink-0">
+      {/* Tab bar — always visible, sticks right under header (or top when header hidden) */}
+      <div className="bg-white border-b sticky top-0 z-10 shadow-sm">
         <div className="max-w-2xl mx-auto overflow-x-auto">
           <div className="flex">
             {TABS.map(tab => {
@@ -113,15 +96,13 @@ export default function UserProfile({
         </div>
       </div>
 
-      {/* ── Scrollable content ───────────────────────────────────────────── */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto p-4 pb-20">
-          {activeTab === 'profile'      && <ProfileTab onOpenInfluencerDashboard={onOpenInfluencerDashboard} onOpenAdmin={onOpenAdmin} />}
-          {activeTab === 'applications' && <ApplicationsTab onContinueDraft={onContinueDraft} />}
-          {activeTab === 'tasks'        && <TasksTab />}
-          {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} />}
-          {activeTab === 'reviews'      && <ReviewsTab />}
-        </div>
+      {/* Content */}
+      <div className="max-w-2xl mx-auto p-4">
+        {activeTab === 'profile'      && <ProfileTab onOpenInfluencerDashboard={onOpenInfluencerDashboard} onOpenAdmin={onOpenAdmin} />}
+        {activeTab === 'applications' && <ApplicationsTab onContinueDraft={onContinueDraft} />}
+        {activeTab === 'tasks'        && <TasksTab />}
+        {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} />}
+        {activeTab === 'reviews'      && <ReviewsTab />}
       </div>
     </div>
   );
