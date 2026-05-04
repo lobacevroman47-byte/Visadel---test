@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Gift, Flame, Shield, Save, Check, User, Mail, Phone, ChevronRight, RefreshCw } from 'lucide-react';
+import { Gift, Flame, Shield, Save, Check, User, Mail, Phone, ChevronRight, RefreshCw, History } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface ProfileTabProps {
@@ -102,12 +102,22 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onB
   const [claimingMonthly, setClaimingMonthly] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileSaved, setProfileSaved]   = useState(false);
+  const [bonusHistory, setBonusHistory]   = useState<{ id: string; type: string; amount: number; description: string; created_at: string }[]>([]);
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000); };
 
   // ── Load from Supabase (source of truth) ─────────────────────────────────
   const loadFromSupabase = useCallback(async (tgId: number) => {
-    const user = await getSupabaseUser(tgId);
+    const [user, histRes] = await Promise.all([
+      getSupabaseUser(tgId),
+      isSupabaseConfigured()
+        ? supabase.from('bonus_logs')
+            .select('id,type,amount,description,created_at')
+            .eq('telegram_id', tgId)
+            .order('created_at', { ascending: false })
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+    ]);
     if (user) {
       setBonusBalance(user.bonus_balance ?? 0);
       setStreak(user.bonus_streak ?? 0);
@@ -124,6 +134,7 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onB
         lastCheckIn: user.last_bonus_date ?? '',
       }));
     }
+    setBonusHistory((histRes as any).data ?? []);
   }, []);
 
   useEffect(() => {
@@ -396,6 +407,44 @@ export default function ProfileTab({ onOpenInfluencerDashboard, onOpenAdmin, onB
             className="w-full mt-4 bg-gradient-to-r from-gray-700 to-gray-900 text-white py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:shadow-lg transition">
             <Shield className="w-4 h-4" /> Админ-панель
           </button>
+        )}
+      </div>
+
+      {/* ── Bonus history ─────────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <History className="w-5 h-5 text-blue-500" />
+          <h3 className="text-sm font-semibold text-gray-700">История начислений</h3>
+        </div>
+        {bonusHistory.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">Бонусов пока нет</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {bonusHistory.map(entry => {
+              const cfg: Record<string, { icon: string; color: string }> = {
+                daily:    { icon: '📅', color: 'text-blue-600' },
+                weekly:   { icon: '🏆', color: 'text-green-600' },
+                monthly:  { icon: '🌟', color: 'text-yellow-600' },
+                referral: { icon: '👫', color: 'text-purple-600' },
+                visa:     { icon: '🎉', color: 'text-emerald-600' },
+                review:   { icon: '⭐', color: 'text-pink-600' },
+                payment:  { icon: '💳', color: 'text-indigo-600' },
+              };
+              const { icon, color } = cfg[entry.type] ?? { icon: '🎁', color: 'text-gray-600' };
+              return (
+                <div key={entry.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-gray-50">
+                  <span className="text-base shrink-0">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-gray-700 truncate">{entry.description}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {new Date(entry.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <span className={`text-sm font-bold shrink-0 ${color}`}>+{entry.amount}₽</span>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
 

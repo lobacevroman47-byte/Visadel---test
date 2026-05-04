@@ -14,6 +14,7 @@ interface Draft {
 
 interface ApplicationsTabProps {
   onContinueDraft?: (draft: Draft) => void;
+  onBonusChange?: (newBalance: number) => void;
 }
 
 const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
@@ -120,7 +121,7 @@ function ReviewModal({ app, onClose, onSubmitted }: {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProps) {
+export default function ApplicationsTab({ onContinueDraft, onBonusChange }: ApplicationsTabProps) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -179,10 +180,15 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
     load();
   };
 
-  // One-click: submit review + open Telegram + unlock visa
+  // One-click: submit review + open Telegram + give 100₽ review bonus
   const handleQuickReview = async (app: Application) => {
     if (submittingReviewId) return;
     setSubmittingReviewId(app.id!);
+
+    const username = (() => {
+      try { return JSON.parse(localStorage.getItem('userData') ?? '{}').username ?? ''; } catch { return ''; }
+    })();
+
     try {
       await submitReview({
         telegramId,
@@ -190,20 +196,44 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
         country: app.country,
         rating: 5,
         text: 'Отзыв оставлен в Telegram-канале',
-        username: (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}').username ?? ''; } catch { return ''; } })(),
+        username,
       });
-      // Add bonus to localStorage
-      try {
-        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-        ud.bonusBalance = (ud.bonusBalance ?? 0) + 100;
-        localStorage.setItem('userData', JSON.stringify(ud));
-      } catch {}
+
+      // Grant +100₽ review bonus via service-key API (with dedup)
+      if (telegramId) {
+        try {
+          const res = await fetch('/api/grant-bonus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: telegramId,
+              type: 'review',
+              amount: 100,
+              description: `+100₽ за отзыв о визе ${app.country} (${app.id})`,
+              application_id: app.id,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.skipped && data.newBalance != null) {
+              try {
+                const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+                ud.bonusBalance = data.newBalance;
+                localStorage.setItem('userData', JSON.stringify(ud));
+              } catch {}
+              onBonusChange?.(data.newBalance);
+            }
+          }
+        } catch (e) { console.error('review bonus error', e); }
+      }
+
       setReviewedIds(prev => new Set([...prev, app.id!]));
     } catch (e) {
       console.error(e);
     } finally {
       setSubmittingReviewId(null);
     }
+
     // Open Telegram channel
     const tg = (window as any).Telegram?.WebApp;
     if (tg?.openTelegramLink) {
