@@ -204,15 +204,19 @@ export async function updateApplicationStatus(
 
     // Log status change to audit trail (skip if status didn't actually change)
     if (prevStatus && prevStatus !== status) {
-      try {
-        await supabase.from('status_log').insert({
-          application_id: id,
-          from_status: prevStatus,
-          to_status: status,
-          changed_by_id: changedBy?.id ?? null,
-          changed_by_name: changedBy?.name ?? null,
-        });
-      } catch (e) { console.warn('status log insert failed', e); }
+      const { error: logError } = await supabase.from('status_log').insert({
+        application_id: id,
+        from_status: prevStatus,
+        to_status: status,
+        changed_by_id: changedBy?.id ?? null,
+        changed_by_name: changedBy?.name ?? null,
+      });
+      if (logError) {
+        // supabase-js doesn't throw on errors — putting them in response.
+        // Surface this so we can diagnose; don't block the status change itself.
+        console.error('[status_log] insert failed:', logError);
+        alert(`⚠️ Статус обновлён, но запись в истории не создалась:\n${logError.message}\n\nКод: ${logError.code}\nДеталь: ${logError.details ?? '—'}\nПодсказка: ${logError.hint ?? '—'}`);
+      }
     }
   }
 
