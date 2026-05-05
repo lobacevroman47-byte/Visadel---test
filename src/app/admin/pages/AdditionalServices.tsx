@@ -1,256 +1,272 @@
-import React, { useState } from 'react';
-import { Settings, Plus, Edit, Trash2, Save } from 'lucide-react';
-import { defaultAdditionalServices, AdditionalService } from '../data/additionalServices';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Package, Plus, Edit2, Trash2, X, Save, Loader2, RefreshCw, Eye, EyeOff,
+} from 'lucide-react';
+import {
+  getAdditionalServices, upsertAdditionalService, deleteAdditionalService,
+  type AdditionalService,
+} from '../../lib/db';
 
-const ServiceEditor: React.FC<{
-  service: AdditionalService | null;
-  onSave: (service: AdditionalService) => void;
-  onCancel: () => void;
-}> = ({ service, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<AdditionalService>(
-    service || {
-      id: `service-${Date.now()}`,
-      name: '',
-      icon: '',
-      description: '',
-      price: 0,
-      enabled: true
-    }
-  );
+export const AdditionalServices: React.FC = () => {
+  const [services, setServices] = useState<AdditionalService[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<AdditionalService | null>(null);
+  const [adding, setAdding] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
+  const load = async () => {
+    setLoading(true);
+    try { setServices(await getAdditionalServices()); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const totalEnabled = useMemo(() => services.filter(s => s.enabled).length, [services]);
+
+  const handleToggle = async (s: AdditionalService) => {
+    await upsertAdditionalService({ ...s, enabled: !s.enabled });
+    setServices(prev => prev.map(x => x.id === s.id ? { ...x, enabled: !s.enabled } : x));
+  };
+
+  const handleDelete = async (s: AdditionalService) => {
+    if (!confirm(`Удалить «${s.name}»? Это нельзя отменить.`)) return;
+    await deleteAdditionalService(s.id);
+    setServices(prev => prev.filter(x => x.id !== s.id));
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-2xl w-full">
-        <div className="p-6 border-b border-gray-200">
-          <h2>{service ? 'Редактировать услугу' : 'Добавить услугу'}</h2>
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div>
+          <h1>Дополнительные услуги</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            {services.length} услуг · {totalEnabled} активных · цены применяются на странице оплаты визы
+          </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">Название услуги *</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="Срочное оформление"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">Иконка (эмодзи) *</label>
-              <input
-                type="text"
-                value={formData.icon}
-                onChange={(e) => setFormData({ ...formData, icon: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="⚡"
-                required
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Описание</label>
-            <textarea
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              rows={2}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Краткое описание услуги"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Стоимость (₽) *</label>
-            <input
-              type="number"
-              value={formData.price}
-              onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              required
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="enabled"
-              checked={formData.enabled}
-              onChange={(e) => setFormData({ ...formData, enabled: e.target.checked })}
-              className="w-4 h-4 text-[#2196F3] rounded focus:ring-[#2196F3]"
-            />
-            <label htmlFor="enabled" className="text-sm text-gray-700 cursor-pointer">
-              Включена (отображается пользователям)
-            </label>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Отмена
-            </button>
-          </div>
-        </form>
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 text-sm select-none"
+          >
+            <Plus size={16} /> Добавить услугу
+          </button>
+          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg" title="Обновить">
+            <RefreshCw size={16} className="text-gray-500" />
+          </button>
+        </div>
       </div>
+
+      {!loading && services.length === 0 && (
+        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-10 text-center">
+          <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-gray-700 mb-2">Пока пусто</h3>
+          <p className="text-sm text-gray-500 mb-4">Добавь первую услугу — она появится в калькуляторе на странице визы</p>
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg inline-flex items-center gap-2 select-none"
+          >
+            <Plus size={16} /> Добавить услугу
+          </button>
+        </div>
+      )}
+
+      {services.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <div className="divide-y divide-gray-100">
+            {services.map(s => (
+              <div key={s.id} className={`px-4 py-3 flex flex-wrap items-center gap-3 ${!s.enabled ? 'opacity-50' : ''}`}>
+                <div className="text-3xl shrink-0">{s.icon ?? '⭐'}</div>
+                <div className="flex-1 min-w-[200px]">
+                  <p className="text-gray-800 font-medium">{s.name}</p>
+                  {s.description && <p className="text-xs text-gray-500 mt-0.5">{s.description}</p>}
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{s.id}</p>
+                </div>
+                <div className="text-blue-600 font-semibold whitespace-nowrap">
+                  +{s.price.toLocaleString('ru-RU')} ₽
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleToggle(s)}
+                    className={`p-2 rounded-lg ${s.enabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                    title={s.enabled ? 'Активна — скрыть' : 'Скрыта — показать'}
+                  >
+                    {s.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                  </button>
+                  <button
+                    onClick={() => setEditing(s)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                    title="Редактировать"
+                  >
+                    <Edit2 size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(s)}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                    title="Удалить"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {(editing || adding) && (
+        <ServiceFormModal
+          service={editing}
+          existingIds={services.map(s => s.id)}
+          onClose={() => { setEditing(null); setAdding(false); }}
+          onSaved={async (saved) => {
+            await upsertAdditionalService(saved);
+            setEditing(null); setAdding(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };
 
-export const AdditionalServices: React.FC = () => {
-  const [services, setServices] = useState<AdditionalService[]>(defaultAdditionalServices);
-  const [editingService, setEditingService] = useState<AdditionalService | null>(null);
-
-  const handleSaveService = (service: AdditionalService) => {
-    const existingIndex = services.findIndex(s => s.id === service.id);
-    
-    if (existingIndex >= 0) {
-      // Update existing service
-      const newServices = [...services];
-      newServices[existingIndex] = service;
-      setServices(newServices);
-    } else {
-      // Add new service
-      setServices([...services, service]);
+const ServiceFormModal: React.FC<{
+  service: AdditionalService | null;
+  existingIds: string[];
+  onClose: () => void;
+  onSaved: (s: Omit<AdditionalService, 'created_at' | 'updated_at'>) => Promise<void>;
+}> = ({ service, existingIds, onClose, onSaved }) => {
+  const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
+    service ?? {
+      id: '', name: '', icon: '⭐', description: '',
+      price: 0, enabled: true, sort_order: 0,
     }
-    
-    setEditingService(null);
-  };
+  );
+  const [saving, setSaving] = useState(false);
 
-  const handleDeleteService = (serviceId: string) => {
-    if (confirm('Вы уверены, что хотите удалить эту услугу?')) {
-      setServices(services.filter(s => s.id !== serviceId));
+  const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(p => ({ ...p, [k]: v }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.id || !form.name || form.price < 0) {
+      alert('Заполни ID, название и корректную цену');
+      return;
     }
-  };
-
-  const handleToggleEnabled = (serviceId: string) => {
-    setServices(services.map(s => 
-      s.id === serviceId ? { ...s, enabled: !s.enabled } : s
-    ));
+    if (!service && existingIds.includes(form.id)) {
+      alert('Услуга с таким ID уже есть');
+      return;
+    }
+    setSaving(true);
+    try { await onSaved(form); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1>Дополнительные услуги</h1>
-          <p className="text-sm text-gray-600 mt-2">
-            Управление дополнительными услугами для усиления заявок
-          </p>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <Package className="w-5 h-5 text-blue-500" />
+            {service ? 'Редактировать услугу' : 'Добавить услугу'}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
         </div>
-        <button
-          onClick={() => setEditingService({
-            id: `service-${Date.now()}`,
-            name: '',
-            icon: '',
-            description: '',
-            price: 0,
-            enabled: true
-          })}
-          className="px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors flex items-center gap-2"
-        >
-          <Plus size={20} />
-          Добавить услугу
-        </button>
-      </div>
 
-      {/* Services Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {services.map((service) => (
-          <div
-            key={service.id}
-            className={`bg-white rounded-xl border-2 transition-all h-full flex flex-col ${
-              service.enabled 
-                ? 'border-[#00C853] shadow-sm' 
-                : 'border-gray-200 opacity-60'
-            }`}
-          >
-            {/* Card Header - Fixed height */}
-            <div className="p-5 flex-1 flex flex-col">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-3xl flex-shrink-0">{service.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-base font-medium mb-1.5 leading-snug">{service.name}</p>
-                  <p className="text-sm text-gray-600 leading-relaxed line-clamp-2">{service.description}</p>
-                </div>
-              </div>
-
-              <div className="mt-auto pt-3">
-                <p className="text-xl text-[#2196F3] font-medium">{service.price.toLocaleString('ru-RU')} ₽</p>
-              </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="md:col-span-1">
+              <label className="block text-sm text-gray-700 mb-1">Иконка (emoji)</label>
+              <input
+                type="text" value={form.icon ?? ''} onChange={e => set('icon', e.target.value)}
+                placeholder="⚡"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-2xl text-center"
+              />
             </div>
-
-            {/* Card Footer - Fixed Height */}
-            <div className="p-5 pt-0 space-y-2.5">
-              <button
-                onClick={() => handleToggleEnabled(service.id)}
-                className={`w-full px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  service.enabled
-                    ? 'bg-[#00C853] text-white hover:bg-[#00A344] shadow-sm'
-                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                }`}
-              >
-                {service.enabled ? '✓ Включена' : 'Выключена'}
-              </button>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setEditingService(service)}
-                  className="flex-1 px-3 py-2 bg-[#F5F7FA] hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
-                >
-                  <Edit size={15} />
-                  Редактировать
-                </button>
-                <button
-                  onClick={() => handleDeleteService(service.id)}
-                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm text-gray-700 mb-1">ID *</label>
+              <input
+                type="text" value={form.id} onChange={e => set('id', e.target.value)}
+                disabled={!!service}
+                placeholder="urgent-processing"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm"
+                required
+              />
+              <p className="text-xs text-gray-400 mt-1">Уникальный, только латинские буквы/цифры/тире (нельзя менять)</p>
             </div>
           </div>
-        ))}
-      </div>
 
-      {/* Info Block */}
-      <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-        <div className="flex items-start gap-3">
-          <Settings size={24} className="text-blue-600 flex-shrink-0 mt-1" />
           <div>
-            <p className="font-medium mb-2">Автоматическая синхронизация</p>
-            <p className="text-sm text-gray-700">
-              Все изменения автоматически отображаются в пользовательском интерфейсе. 
-              Включенные услуги будут доступны при оформлении визы, выключенные — скрыты.
-            </p>
+            <label className="block text-sm text-gray-700 mb-1">Название *</label>
+            <input
+              type="text" value={form.name} onChange={e => set('name', e.target.value)}
+              placeholder="Срочное оформление"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+            />
           </div>
-        </div>
-      </div>
 
-      {/* Service Editor Modal */}
-      {editingService && (
-        <ServiceEditor
-          service={editingService}
-          onSave={handleSaveService}
-          onCancel={() => setEditingService(null)}
-        />
-      )}
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Описание</label>
+            <textarea
+              value={form.description ?? ''} onChange={e => set('description', e.target.value)}
+              rows={2}
+              placeholder="Приоритетная обработка заявки"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Цена ₽ *</label>
+              <input
+                type="number" value={form.price} min={0}
+                onChange={e => set('price', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Порядок</label>
+              <input
+                type="number" value={form.sort_order} min={0}
+                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Видимость</p>
+              <p className="text-xs text-gray-500">Если выключена — услуга не предлагается на странице визы</p>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox" checked={form.enabled}
+                onChange={e => set('enabled', e.target.checked)}
+                className="w-5 h-5 accent-emerald-500"
+              />
+              <span className="text-sm">{form.enabled ? 'Активна' : 'Скрыта'}</span>
+            </label>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button" onClick={onClose}
+              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl"
+            >
+              Отмена
+            </button>
+            <button
+              type="submit" disabled={saving}
+              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none"
+            >
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+              {saving ? 'Сохраняем…' : 'Сохранить'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 };

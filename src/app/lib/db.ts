@@ -111,8 +111,9 @@ export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Pro
     }
 
     // Create new user
-    // Welcome bonus: 200₽ if user came via referral link
-    const welcomeBonus = referredBy ? 200 : 0;
+    // Welcome bonus: read from app_settings (fallback BONUS_CONFIG.NEW_USER_WELCOME)
+    const settings = await getAppSettings();
+    const welcomeBonus = referredBy ? settings.new_user_welcome_bonus : 0;
     const { data: created, error } = await supabase
       .from('users')
       .insert({
@@ -705,8 +706,9 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   const referrerId = r.telegram_id;
   const isPartner = r.is_influencer === true;
 
-  // Default: flat regular bonus
-  let amount = BONUS_CONFIG.REFERRER_REGULAR;
+  // Default: flat regular bonus from app_settings (fallback to BONUS_CONFIG)
+  const settings = await getAppSettings();
+  let amount = settings.referrer_regular_bonus;
   let description = `+${amount}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`;
 
   // Partner override: percentage of the actual order price
@@ -724,7 +726,7 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
         .eq('id', a.visa_id)
         .single();
       const pct = (product as { partner_commission_pct: number } | null)?.partner_commission_pct
-        ?? BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT;
+        ?? settings.partner_commission_pct_default;
       amount = partnerCommission(a.price, pct);
       description = `+${amount}₽ партнёру (${pct}% от ${a.price}₽, реферал ${refereeTelegramId})`;
     }
@@ -744,6 +746,79 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
       }),
     });
   } catch (e) { console.warn('payReferralBonus error', e); }
+}
+
+// ─── App Settings (single-row config) ────────────────────────────────────────
+
+export interface AppSettings {
+  id: number;
+  new_user_welcome_bonus: number;
+  referrer_regular_bonus: number;
+  partner_commission_pct_default: number;
+  max_bonus_usage_regular: number;
+  max_bonus_usage_partner: number | null;
+  bonus_expiration_days: number;
+  updated_at?: string;
+}
+
+const SETTINGS_DEFAULTS: AppSettings = {
+  id: 1,
+  new_user_welcome_bonus: BONUS_CONFIG.NEW_USER_WELCOME,
+  referrer_regular_bonus: BONUS_CONFIG.REFERRER_REGULAR,
+  partner_commission_pct_default: BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT,
+  max_bonus_usage_regular: BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR,
+  max_bonus_usage_partner: BONUS_CONFIG.MAX_BONUS_USAGE_PARTNER,
+  bonus_expiration_days: 365,
+};
+
+export async function getAppSettings(): Promise<AppSettings> {
+  if (!isSupabaseConfigured()) return SETTINGS_DEFAULTS;
+  const { data } = await supabase.from('app_settings').select('*').eq('id', 1).maybeSingle();
+  return (data as AppSettings) ?? SETTINGS_DEFAULTS;
+}
+
+export async function saveAppSettings(s: Omit<AppSettings, 'id' | 'updated_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('app_settings').upsert(
+    { id: 1, ...s, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  );
+}
+
+// ─── Additional Services Catalog ──────────────────────────────────────────────
+
+export interface AdditionalService {
+  id: string;
+  name: string;
+  icon: string | null;
+  description: string | null;
+  price: number;
+  enabled: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getAdditionalServices(): Promise<AdditionalService[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data } = await supabase
+    .from('additional_services')
+    .select('*')
+    .order('sort_order', { ascending: true });
+  return (data as AdditionalService[]) ?? [];
+}
+
+export async function upsertAdditionalService(s: Omit<AdditionalService, 'created_at' | 'updated_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('additional_services').upsert(
+    { ...s, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  );
+}
+
+export async function deleteAdditionalService(id: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('additional_services').delete().eq('id', id);
 }
 
 // ─── Finance / Analytics ──────────────────────────────────────────────────────

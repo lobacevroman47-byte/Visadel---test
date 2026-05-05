@@ -3,7 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
 import type { VisaOption } from '../App';
 import logo from '../../assets/logo2.png';
-import { getReferralStats, getVisaProducts, type VisaProduct } from '../lib/db';
+import {
+  getReferralStats, getVisaProducts, getAdditionalServices,
+  type VisaProduct, type AdditionalService,
+} from '../lib/db';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean, addons?: AddonsState) => void;
@@ -78,8 +81,17 @@ export interface AddonsState {
   ticket: boolean;
 }
 
+interface AddonPrices {
+  urgent: number;
+  hotel: number;
+  ticket: number;
+}
+
+const DEFAULT_ADDON_PRICES: AddonPrices = { urgent: 1000, hotel: 1000, ticket: 2000 };
+
 interface VisaCardProps {
   visa: VisaOption;
+  addonPrices: AddonPrices;
   onSelect: (addons: AddonsState) => void;
   isUrgent?: boolean;
   hideCalculator?: boolean;
@@ -123,7 +135,7 @@ function AddonToggle({ icon, label, hint, price, active, onToggle }: {
   );
 }
 
-function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: VisaCardProps) {
+function VisaCard({ visa, addonPrices, onSelect, isUrgent = false, hideCalculator = false }: VisaCardProps) {
   const [showCalc, setShowCalc] = useState(false);
   const [urgent, setUrgent] = useState(false);
   const [hotel, setHotel] = useState(false);
@@ -133,7 +145,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
   const isVietnam = visa.country === 'Вьетнам';
   const urgentApplied = urgent && !isVietnam;
 
-  const addons = (urgentApplied ? 1000 : 0) + (hotel ? 1000 : 0) + (ticket ? 2000 : 0);
+  const addons = (urgentApplied ? addonPrices.urgent : 0) + (hotel ? addonPrices.hotel : 0) + (ticket ? addonPrices.ticket : 0);
   const total = visa.price + addons;
   const hasAddons = urgentApplied || hotel || ticket;
 
@@ -214,7 +226,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
                   icon="⚡"
                   label="Срочное оформление"
                   hint="Приоритетная обработка заявки"
-                  price={1000}
+                  price={addonPrices.urgent}
                   active={urgent}
                   onToggle={() => setUrgent(!urgent)}
                 />
@@ -223,7 +235,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
                 icon="🏨"
                 label="Подтверждение проживания"
                 hint="Бронь отеля для визы"
-                price={1000}
+                price={addonPrices.hotel}
                 active={hotel}
                 onToggle={() => setHotel(!hotel)}
               />
@@ -231,7 +243,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
                 icon="✈️"
                 label="Обратный билет"
                 hint="Подтверждение возвратного рейса"
-                price={2000}
+                price={addonPrices.ticket}
                 active={ticket}
                 onToggle={() => setTicket(!ticket)}
               />
@@ -338,14 +350,27 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
   const [showExtensions, setShowExtensions] = useState(false);
   const [countries, setCountries] = useState<Country[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(true);
+  const [addonPrices, setAddonPrices] = useState<AddonPrices>(DEFAULT_ADDON_PRICES);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const products = await getVisaProducts();
-        if (alive) setCountries(productsToCountries(products));
+        const [products, services] = await Promise.all([
+          getVisaProducts(),
+          getAdditionalServices(),
+        ]);
+        if (!alive) return;
+        setCountries(productsToCountries(products));
+        // Map standard addon IDs to prices; fall back to defaults if service is missing/disabled
+        const enabled = services.filter(s => s.enabled);
+        const byId = new Map(enabled.map(s => [s.id, s.price] as const));
+        setAddonPrices({
+          urgent: byId.get('urgent-processing') ?? DEFAULT_ADDON_PRICES.urgent,
+          hotel:  byId.get('hotel-booking')     ?? DEFAULT_ADDON_PRICES.hotel,
+          ticket: byId.get('flight-booking')    ?? DEFAULT_ADDON_PRICES.ticket,
+        });
       } catch (e) {
         console.warn('Failed to load visa catalog:', e);
       } finally {
@@ -464,6 +489,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
+                    addonPrices={addonPrices}
                     hideCalculator
                     onSelect={() => onOpenExtension && onOpenExtension(visa)}
                   />
@@ -478,6 +504,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
+                    addonPrices={addonPrices}
                     onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}
@@ -500,6 +527,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
+                    addonPrices={addonPrices}
                     onSelect={(addons) => onVisaSelect(visa, true, addons)}
                     isUrgent
                   />
@@ -514,6 +542,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
+                    addonPrices={addonPrices}
                     onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}

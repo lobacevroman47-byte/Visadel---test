@@ -4,7 +4,6 @@ import {
   FileText,
   Users,
   Globe,
-  FileEdit,
   Shield,
   Settings,
   LogOut,
@@ -135,6 +134,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
+          icon={<Package size={20} />}
+          label="Доп. услуги"
+          active={activeSection === 'additional-services'}
+          onClick={() => onSectionChange('additional-services')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
           icon={<Shield size={20} />}
           label="Администраторы"
           active={activeSection === 'administrators'}
@@ -154,6 +160,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           active={activeSection === 'bonus-logs'}
           onClick={() => onSectionChange('bonus-logs')}
           disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<Settings size={20} />}
+          label="Настройки"
+          active={activeSection === 'settings'}
+          onClick={() => onSectionChange('settings')}
+          disabled={!canAccessSettings}
         />
       </nav>
 
