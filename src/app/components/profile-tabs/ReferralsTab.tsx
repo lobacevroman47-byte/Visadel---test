@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Users, Copy, TrendingUp, Award, Share2, Loader2, Download, QrCode, Send, Calculator, Sparkles, Lock, Check } from 'lucide-react';
+import { Users, Award, Share2, Loader2, Download, QrCode, Send, Calculator, Sparkles, Lock, Check, Link2 } from 'lucide-react';
+import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
@@ -80,7 +81,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   };
 
   // Multi-channel sharing — opens corresponding social network share dialog
-  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'copy') => {
+  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'max' | 'copy') => {
     const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void } } }).Telegram?.WebApp;
     const open = (url: string) => {
       if (channel === 'telegram' && tg?.openTelegramLink) tg.openTelegramLink(url);
@@ -100,6 +101,11 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
       case 'instagram':
         navigator.clipboard.writeText(shareText).catch(() => {});
         alert('Текст скопирован! Откройте Instagram и вставьте в сториз или сообщение.');
+        break;
+      case 'max':
+        // MAX (мессенджер от VK) — нет универсального share URL, копируем текст
+        navigator.clipboard.writeText(shareText).catch(() => {});
+        open('https://max.ru/');
         break;
       case 'copy':
         copyLink();
@@ -186,12 +192,13 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           <Share2 className="w-4 h-4 text-gray-500" />
           <h4 className="text-sm font-semibold text-gray-700">Поделиться ссылкой</h4>
         </div>
-        <div className="grid grid-cols-5 gap-2">
-          <ShareBtn label="Telegram" emoji="✈️" color="bg-blue-500" onClick={() => shareTo('telegram')} />
-          <ShareBtn label="WhatsApp" emoji="💬" color="bg-green-500" onClick={() => shareTo('whatsapp')} />
-          <ShareBtn label="VK" emoji="🅥" color="bg-blue-700" onClick={() => shareTo('vk')} />
-          <ShareBtn label="Instagram" emoji="📷" color="bg-gradient-to-br from-pink-500 to-orange-500" onClick={() => shareTo('instagram')} />
-          <ShareBtn label={copied ? 'Готово' : 'Копия'} emoji={copied ? '✓' : '🔗'} color="bg-gray-500" onClick={() => shareTo('copy')} />
+        <div className="grid grid-cols-3 gap-2">
+          <ShareBtn label="Telegram" icon={<FaTelegramPlane className="w-6 h-6" />} color="bg-[#229ED9]" onClick={() => shareTo('telegram')} />
+          <ShareBtn label="WhatsApp" icon={<FaWhatsapp className="w-6 h-6" />} color="bg-[#25D366]" onClick={() => shareTo('whatsapp')} />
+          <ShareBtn label="VK" icon={<FaVk className="w-6 h-6" />} color="bg-[#0077FF]" onClick={() => shareTo('vk')} />
+          <ShareBtn label="Instagram" icon={<FaInstagram className="w-6 h-6" />} color="bg-gradient-to-br from-[#FEDA75] via-[#FA7E1E] to-[#D62976]" onClick={() => shareTo('instagram')} />
+          <ShareBtn label="MAX" icon={<MaxIcon className="w-6 h-6" />} color="bg-gradient-to-br from-[#0077FF] to-[#0048AA]" onClick={() => shareTo('max')} />
+          <ShareBtn label={copied ? 'Скопировано' : 'Копировать'} icon={copied ? <Check className="w-6 h-6" /> : <Link2 className="w-6 h-6" />} color="bg-gray-700" onClick={() => shareTo('copy')} />
         </div>
 
         {/* QR toggle */}
@@ -403,15 +410,24 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   );
 }
 
-function ShareBtn({ label, emoji, color, onClick }: { label: string; emoji: string; color: string; onClick: () => void }) {
+function ShareBtn({ label, icon, color, onClick }: { label: string; icon: React.ReactNode; color: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center gap-1 py-2 px-1 ${color} text-white rounded-xl hover:opacity-90 active:scale-95 transition`}
+      className={`flex flex-col items-center gap-1.5 py-3 px-1 ${color} text-white rounded-xl hover:opacity-90 active:scale-95 transition shadow-sm`}
     >
-      <span className="text-xl">{emoji}</span>
-      <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
+      {icon}
+      <span className="text-[11px] font-medium leading-tight text-center">{label}</span>
     </button>
+  );
+}
+
+// MAX мессенджер — простая SVG-иконка (стилизованная буква M)
+function MaxIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M3 4h3.5l5.5 9 5.5-9H21v16h-3.5V10.5l-4.5 7.5h-2L6.5 10.5V20H3V4z" />
+    </svg>
   );
 }
 
