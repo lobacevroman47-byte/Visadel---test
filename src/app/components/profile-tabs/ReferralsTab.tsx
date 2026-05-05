@@ -115,7 +115,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         <div className="mt-4 space-y-1 text-sm text-blue-100">
           <p>• {headlineRefBonus}</p>
           {!isPartner && <p>• +{BONUS_CONFIG.NEW_USER_WELCOME}₽ новичку при первой оплате</p>}
-          {!isPartner && <p>• Можно оплатить до {BONUS_CONFIG.MAX_BONUS_USAGE_REFERRAL_USER}₽ бонусами</p>}
+          {!isPartner && <p>• Можно оплатить до {BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR}₽ бонусами за один заказ</p>}
           {isPartner && <p>• 100% оплата визы бонусами</p>}
           {isPartner && <p>• Подробные проценты по каждой услуге — в партнёрском кабинете</p>}
         </div>

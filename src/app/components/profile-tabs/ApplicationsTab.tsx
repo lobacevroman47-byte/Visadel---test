@@ -84,10 +84,11 @@ function StatusProgress({ status }: { status: string }) {
 }
 
 // ── Review Modal ──────────────────────────────────────────────────────────────
-function ReviewModal({ app, onClose, onSubmitted }: {
+function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   app: Application;
   onClose: () => void;
   onSubmitted: () => void;
+  isPartner: boolean;
 }) {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -112,12 +113,14 @@ function ReviewModal({ app, onClose, onSubmitted }: {
         text: comment.trim(),
         username,
       });
-      // sync bonus locally
-      try {
-        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-        ud.bonusBalance = (ud.bonusBalance ?? 0) + 200;
-        localStorage.setItem('userData', JSON.stringify(ud));
-      } catch {}
+      // sync bonus locally — partners excluded
+      if (!isPartner) {
+        try {
+          const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+          ud.bonusBalance = (ud.bonusBalance ?? 0) + 200;
+          localStorage.setItem('userData', JSON.stringify(ud));
+        } catch {}
+      }
       onSubmitted();
     } catch {
       alert('Ошибка при отправке отзыва');
@@ -160,10 +163,12 @@ function ReviewModal({ app, onClose, onSubmitted }: {
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
             />
           </div>
-          {/* Bonus hint */}
-          <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-            <p className="text-sm text-green-700">🎁 За отзыв вы получите <strong>200 ₽</strong> на бонусный счёт</p>
-          </div>
+          {/* Bonus hint — hidden for partners */}
+          {!isPartner && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
+              <p className="text-sm text-green-700">🎁 За отзыв вы получите <strong>200 ₽</strong> на бонусный счёт</p>
+            </div>
+          )}
           <button
             onClick={handleSubmit}
             disabled={submitting}
@@ -302,8 +307,8 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
         username,
       });
 
-      // Grant +200₽ review bonus via service-key API (with dedup)
-      if (telegramId) {
+      // Grant +200₽ review bonus via service-key API (with dedup) — partners excluded
+      if (telegramId && !appUser?.is_influencer) {
         try {
           const res = await fetch('/api/grant-bonus', {
             method: 'POST',
@@ -509,7 +514,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                               {submittingReviewId === app.id
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
                                 : <Star className="w-4 h-4" />}
-                              Оставить отзыв (+200 ₽)
+                              {appUser?.is_influencer ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
                             </button>
                           </div>
                         ) : (
@@ -559,6 +564,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
           app={reviewApp}
           onClose={() => setReviewApp(null)}
           onSubmitted={handleReviewSubmitted}
+          isPartner={appUser?.is_influencer ?? false}
         />
       )}
     </>

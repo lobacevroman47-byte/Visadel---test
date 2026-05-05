@@ -85,6 +85,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
   const [bonusBalance, setBonusBalance] = useState(0);
   const [streak, setStreak]           = useState(0);
   const [lastCheckIn, setLastCheckIn] = useState('');
+  const [isPartner, setIsPartner]     = useState(false);
 
   // Meta (local per user, separate key)
   const [meta, setMetaState] = useState<BonusMeta>({ weeklyBonusesClaimed: 0, monthlyBonusesClaimed: [] });
@@ -124,6 +125,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
       setPhone(user.phone ?? '');
       setEmail(user.email ?? '');
       setName([user.first_name, user.last_name].filter(Boolean).join(' '));
+      setIsPartner(user.is_influencer ?? false);
       // Sync to localStorage so other components stay in sync
       const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
       localStorage.setItem('userData', JSON.stringify({
@@ -389,12 +391,19 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
           <p className="text-4xl font-bold text-purple-600">{bonusBalance}₽</p>
         </div>
         <div className="space-y-2 text-sm">
-          {[
-            ['💳', 'При заказе можно оплатить до 500₽ бонусами'],
-            ['👫', '+500₽ за друга с оплаченной визой'],
-            ['⭐', '+200₽ за оставленный отзыв'],
-            ['🌟', 'Партнёрам — до 20% с каждого заказа'],
-          ].map(([icon, text]) => (
+          {(isPartner
+            ? [
+                ['🌟', 'До 20% с каждого заказа (визы, отели, билеты, страховки)'],
+                ['💳', '100% оплата заказа бонусами'],
+                ['👫', 'Реферальные начисления — за каждую оплаченную услугу'],
+              ]
+            : [
+                ['💳', 'При заказе можно оплатить до 500₽ бонусами'],
+                ['👫', '+500₽ за друга с оплаченной визой'],
+                ['⭐', '+200₽ за оставленный отзыв'],
+                ['🌟', 'Партнёрам — до 20% с каждого заказа'],
+              ]
+          ).map(([icon, text]) => (
             <div key={text} className="flex items-start gap-2">
               <span>{icon}</span>
               <p className="text-gray-600">{text}</p>

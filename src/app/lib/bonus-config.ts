@@ -16,8 +16,7 @@ export const BONUS_CONFIG = {
   PARTNER_COMMISSION_MAX_PCT: 20,        // marketing cap shown in UI ("до 20%")
 
   // ── Bonus usage limits at checkout ─────────────────────────────────────────
-  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — regular user can apply up to this
-  MAX_BONUS_USAGE_REFERRAL_USER: 1000,   // ₽ — user with referrals can apply up to this
+  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — regular user can apply up to this per order
   MAX_BONUS_USAGE_PARTNER: null as number | null, // null = 100% allowed for partners
 };
 
