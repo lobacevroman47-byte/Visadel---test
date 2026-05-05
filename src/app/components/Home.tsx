@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, ChevronRight, ChevronDown, Calculator, Check } from 'lucide-react';
+import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
 import type { VisaOption } from '../App';
 import logo from '../../assets/logo2.png';
-import { getReferralStats } from '../lib/db';
+import { getReferralStats, getVisaProducts, type VisaProduct } from '../lib/db';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean, addons?: AddonsState) => void;
@@ -22,93 +22,54 @@ interface Country {
   extensionOptions?: VisaOption[];
 }
 
-const COUNTRIES: Country[] = [
-  {
-    name: 'Индия',
-    flag: '🇮🇳',
-    visaOptions: [
-      { id: 'india-30', country: 'Индия', type: 'E-VISA на 30 дней', duration: '30 дней', price: 5490, readinessTime: '1-3 дня (Возможны задержки до 10 дней)' },
-      { id: 'india-1y', country: 'Индия', type: 'E-VISA на 1 год', duration: '1 год', price: 7490, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
-      { id: 'india-5y-rf', country: 'Индия', type: 'E-VISA на 5 лет (граждане РФ)', duration: '5 лет', price: 14990, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
-      { id: 'india-5y-other', country: 'Индия', type: 'E-VISA на 5 лет (остальные страны)', duration: '5 лет', price: 19990, readinessTime: '1-3 дня (Возможны задержки до 10 дней)', description: 'Пребывание - максимум 90 дней за раз, 180 дней в год' },
-    ]
-  },
-  {
-    name: 'Вьетнам',
-    flag: '🇻🇳',
-    visaOptions: [
-      { id: 'vietnam-90-single', country: 'Вьетнам', type: 'E-VISA на 90 дней однократная', duration: '90 дней', price: 5490, readinessTime: 'до 5 рабочих дней' },
-      { id: 'vietnam-90-multi', country: 'Вьетнам', type: 'E-VISA на 90 дней многократная', duration: '90 дней', price: 8490, readinessTime: 'до 5 рабочих дней' },
-    ],
-    urgentOptions: [
-      { id: 'vietnam-3d-single', country: 'Вьетнам', type: '3 дня - однократная', duration: '90 дней', price: 6990, readinessTime: '3 дня' },
-      { id: 'vietnam-3d-multi', country: 'Вьетнам', type: '3 дня - многократная', duration: '90 дней', price: 9990, readinessTime: '3 дня' },
-      { id: 'vietnam-2d-single', country: 'Вьетнам', type: '2 дня - однократная', duration: '90 дней', price: 7990, readinessTime: '2 дня' },
-      { id: 'vietnam-2d-multi', country: 'Вьетнам', type: '2 дня - многократная', duration: '90 дней', price: 10990, readinessTime: '2 дня' },
-      { id: 'vietnam-1d-single', country: 'Вьетнам', type: '1 день - однократная', duration: '90 дней', price: 8990, readinessTime: '1 день' },
-      { id: 'vietnam-1d-multi', country: 'Вьетнам', type: '1 день - многократная', duration: '90 дней', price: 11990, readinessTime: '1 день' },
-      { id: 'vietnam-4h-single', country: 'Вьетнам', type: '4 часа - однократная', duration: '90 дней', price: 9990, readinessTime: '4 часа' },
-      { id: 'vietnam-4h-multi', country: 'Вьетнам', type: '4 часа - многократная', duration: '90 дней', price: 12990, readinessTime: '4 часа' },
-      { id: 'vietnam-2h-single', country: 'Вьетнам', type: '2 часа - однократная', duration: '90 дней', price: 11990, readinessTime: '2 часа' },
-      { id: 'vietnam-2h-multi', country: 'Вьетнам', type: '2 часа - многократная', duration: '90 дней', price: 13990, readinessTime: '2 часа' },
-    ]
-  },
-  {
-    name: 'Шри-Ланка',
-    flag: '🇱🇰',
-    visaOptions: [
-      { id: 'srilanka-rf', country: 'Шри-Ланка', type: 'ETA на 30 дней (гражданам РФ)', duration: '30 дней', price: 2490, readinessTime: '1-3 дня' },
-      { id: 'srilanka-other', country: 'Шри-Ланка', type: 'ETA на 30 дней (остальные страны)', duration: '30 дней', price: 8490, readinessTime: '1-3 дня' },
-    ],
-    extensionOptions: [
-      { id: 'srilanka-ext1', country: 'Шри-Ланка', type: 'Первое продление на 60 дней', duration: '60 дней', price: 8990, readinessTime: '1-3 дня' },
-      { id: 'srilanka-ext2', country: 'Шри-Ланка', type: 'Второе продление до 90 дней', duration: '90 дней', price: 18990, readinessTime: '1-3 дня' },
-      { id: 'srilanka-ext3', country: 'Шри-Ланка', type: 'Третье продление до 90 дней', duration: '90 дней', price: 23990, readinessTime: '1-3 дня' },
-    ]
-  },
-  {
-    name: 'Южная Корея',
-    flag: '🇰🇷',
-    visaOptions: [
-      { id: 'korea', country: 'Южная Корея', type: 'K-ETA на 3 года', duration: '3 года', price: 3490, readinessTime: 'до 3-х дней', description: 'Пребывание 60+30 дней за полгода' },
-    ]
-  },
-  {
-    name: 'Израиль',
-    flag: '🇮🇱',
-    visaOptions: [
-      { id: 'israel', country: 'Израиль', type: 'ETA на 2 года', duration: '2 года', price: 3490, readinessTime: 'до 3-х дней', description: 'Пребывание 90 дней за полгода' },
-    ]
-  },
-  {
-    name: 'Пакистан',
-    flag: '🇵🇰',
-    visaOptions: [
-      { id: 'pakistan', country: 'Пакистан', type: 'E-VISA до 90 дней', duration: '90 дней', price: 6490, readinessTime: '1-3 дня', description: '⚠️ Подача онлайн, получение в посольстве' },
-    ]
-  },
-  {
-    name: 'Камбоджа',
-    flag: '🇰🇭',
-    visaOptions: [
-      { id: 'cambodia', country: 'Камбоджа', type: 'E-VISA на 30 дней', duration: '30 дней', price: 6490, readinessTime: '3-5 дней' },
-    ]
-  },
-  {
-    name: 'Кения',
-    flag: '🇰🇪',
-    visaOptions: [
-      { id: 'kenya', country: 'Кения', type: 'ETA на 90 дней', duration: '90 дней', price: 6490, readinessTime: '1-3 дня' },
-    ]
-  },
-  {
-    name: 'Филиппины',
-    flag: '🇵🇭',
-    visaOptions: [
-      { id: 'philippines-etravel', country: 'Филиппины', type: 'E-Travel на 30 дней', duration: '30 дней', price: 1990, readinessTime: '1-3 дня', description: 'Электронная регистрация для въезда' },
-    ]
-  },
-];
+// Try to extract human-readable duration from visa name
+// e.g. "E-VISA на 30 дней" → "30 дней", "K-ETA на 3 года" → "3 года"
+function extractDuration(name: string): string {
+  const m = name.match(/(\d+)\s*(дней|дня|день|года|год|лет|месяц[а-я]*|часа?|часов)/i);
+  return m ? `${m[1]} ${m[2]}` : '';
+}
+
+// Map DB visa products → grouped country structure with urgent/extension classification
+function productsToCountries(products: VisaProduct[]): Country[] {
+  const enabled = products.filter(p => p.enabled);
+  const groups = new Map<string, { flag: string; minSort: number; products: VisaProduct[] }>();
+  for (const p of enabled) {
+    const g = groups.get(p.country);
+    if (g) {
+      g.products.push(p);
+      if (p.sort_order < g.minSort) g.minSort = p.sort_order;
+    } else {
+      groups.set(p.country, { flag: p.flag ?? '🌍', minSort: p.sort_order, products: [p] });
+    }
+  }
+  const ordered = Array.from(groups.entries()).sort((a, b) => a[1].minSort - b[1].minSort);
+
+  return ordered.map(([name, { flag, products: items }]) => {
+    const sorted = [...items].sort((a, b) => a.sort_order - b.sort_order);
+    const visaOptions: VisaOption[] = [];
+    const urgentOptions: VisaOption[] = [];
+    const extensionOptions: VisaOption[] = [];
+    for (const p of sorted) {
+      const opt: VisaOption = {
+        id: p.id,
+        country: p.country,
+        type: p.name,
+        duration: extractDuration(p.name),
+        price: p.price,
+        readinessTime: p.processing_time ?? '',
+        description: p.description ?? undefined,
+      };
+      if (/продлен/i.test(p.name)) extensionOptions.push(opt);
+      else if (p.country === 'Вьетнам' && /срочн/i.test(p.name)) urgentOptions.push(opt);
+      else visaOptions.push(opt);
+    }
+    return {
+      name, flag, visaOptions,
+      urgentOptions: urgentOptions.length ? urgentOptions : undefined,
+      extensionOptions: extensionOptions.length ? extensionOptions : undefined,
+    };
+  });
+}
 
 // ─── Unified Card Component ───────────────────────────────────────────────────
 export interface AddonsState {
@@ -375,7 +336,24 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [showUrgentVietnam, setShowUrgentVietnam] = useState(false);
   const [showExtensions, setShowExtensions] = useState(false);
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const products = await getVisaProducts();
+        if (alive) setCountries(productsToCountries(products));
+      } catch (e) {
+        console.warn('Failed to load visa catalog:', e);
+      } finally {
+        if (alive) setCatalogLoading(false);
+      }
+    })();
+    return () => { alive = false; };
+  }, []);
 
   // Scroll to top after any screen transition
   useEffect(() => {
@@ -431,8 +409,19 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
         {!selectedCountry && (
           <div>
             <h2 className="text-xl mb-4 text-gray-800">Выберите страну</h2>
+            {catalogLoading && countries.length === 0 && (
+              <div className="flex justify-center items-center py-16">
+                <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+              </div>
+            )}
+            {!catalogLoading && countries.length === 0 && (
+              <div className="bg-white rounded-2xl p-8 text-center shadow-md border border-gray-100">
+                <p className="text-gray-600">Каталог пока пуст</p>
+                <p className="text-sm text-gray-400 mt-1">Загляните позже</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
-              {COUNTRIES.map((country) => (
+              {countries.map((country) => (
                 <button
                   key={country.name}
                   onClick={() => handleCountryClick(country)}
@@ -493,12 +482,14 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   />
                 ))}
 
-                <button
-                  onClick={() => setShowUrgentVietnam(true)}
-                  className="w-full bg-gradient-to-r from-red-600 to-orange-500 text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
-                >
-                  ⚡ Срочные визы
-                </button>
+                {selectedCountry.urgentOptions && selectedCountry.urgentOptions.length > 0 && (
+                  <button
+                    onClick={() => setShowUrgentVietnam(true)}
+                    className="w-full bg-gradient-to-r from-red-600 to-orange-500 text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
+                  >
+                    ⚡ Срочные визы
+                  </button>
+                )}
               </div>
             )}
 
