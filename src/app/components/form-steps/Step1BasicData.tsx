@@ -92,32 +92,34 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <h2 className="text-2xl mb-6 text-gray-800">Основные данные</h2>
 
-      {/* Universal name fields — на латинице, как в загранпаспорте.
-          Сохраняются на каждую заявку для поиска в админке. */}
-      <div className="space-y-4 mb-6 pb-6 border-b border-gray-100">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <FormField label="Имя (на английском)" required hint="как в загранпаспорте" error={errors.firstName}>
-            <input
-              type="text"
-              value={formData.firstName || ''}
-              onChange={(e) => updateField('firstName', e.target.value.toUpperCase())}
-              placeholder="IVAN"
-              className="form-input uppercase"
-              autoComplete="given-name"
-            />
-          </FormField>
-          <FormField label="Фамилия (на английском)" required hint="как в загранпаспорте" error={errors.lastName}>
-            <input
-              type="text"
-              value={formData.lastName || ''}
-              onChange={(e) => updateField('lastName', e.target.value.toUpperCase())}
-              placeholder="IVANOV"
-              className="form-input uppercase"
-              autoComplete="family-name"
-            />
-          </FormField>
+      {/* Universal name fields — рендерим только если их нет в БД (иначе будет дубль:
+          DynamicForm рендерит свои firstName/lastName из visa_form_fields). */}
+      {!dbFields.some(f => f.field_key === 'firstName' || f.field_key === 'lastName') && (
+        <div className="space-y-4 mb-6 pb-6 border-b border-gray-100">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <FormField label="Имя (на английском)" required hint="как в загранпаспорте" error={errors.firstName}>
+              <input
+                type="text"
+                value={formData.firstName || ''}
+                onChange={(e) => updateField('firstName', e.target.value.toUpperCase())}
+                placeholder="IVAN"
+                className="form-input uppercase"
+                autoComplete="given-name"
+              />
+            </FormField>
+            <FormField label="Фамилия (на английском)" required hint="как в загранпаспорте" error={errors.lastName}>
+              <input
+                type="text"
+                value={formData.lastName || ''}
+                onChange={(e) => updateField('lastName', e.target.value.toUpperCase())}
+                placeholder="IVANOV"
+                className="form-input uppercase"
+                autoComplete="family-name"
+              />
+            </FormField>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* While DB load is in flight, show a spinner. After it settles, prefer DB-driven
           DynamicForm; fall back to legacy hardcoded country form only if DB has nothing
@@ -1954,16 +1956,20 @@ function DynamicField({
         <input type="file" onChange={(e) => onChange(e.target.files?.[0] || null)} className="form-input" />
       );
       break;
-    default:
+    default: {
+      // firstName / lastName forced to uppercase (passport convention)
+      const isNameField = field.field_key === "firstName" || field.field_key === "lastName";
       input = (
         <input
           type={field_type}
           value={value || ""}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(isNameField ? e.target.value.toUpperCase() : e.target.value)}
           placeholder={placeholderStr}
-          className="form-input"
+          className={`form-input ${isNameField ? "uppercase" : ""}`}
+          autoComplete={field.field_key === "firstName" ? "given-name" : field.field_key === "lastName" ? "family-name" : undefined}
         />
       );
+    }
   }
 
   return (

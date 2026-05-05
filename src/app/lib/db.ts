@@ -912,6 +912,37 @@ export async function seedFormFieldsFromCode(
 
   let countryIdx = 0;
   for (const country of dataset.countriesVisaData) {
+    // Universal name fields prepended to every country's anketa.
+    // Sort_order is negative so they always sit at the top.
+    fieldRows.push({
+      id: `${country.name}__firstName`,
+      country: country.name,
+      visa_id: null,
+      field_key: 'firstName',
+      label: 'Имя (на английском)',
+      field_type: 'text',
+      required: true,
+      placeholder: 'IVAN',
+      comment: 'как в загранпаспорте',
+      options: null,
+      warning: null,
+      sort_order: countryIdx * 1000 - 2,
+    });
+    fieldRows.push({
+      id: `${country.name}__lastName`,
+      country: country.name,
+      visa_id: null,
+      field_key: 'lastName',
+      label: 'Фамилия (на английском)',
+      field_type: 'text',
+      required: true,
+      placeholder: 'IVANOV',
+      comment: 'как в загранпаспорте',
+      options: null,
+      warning: null,
+      sort_order: countryIdx * 1000 - 1,
+    });
+
     // Group visas by formFields reference equality
     const sets: Array<{ ref: NonNullable<typeof country.visaTypes[number]['formFields']>; visaIds: string[] }> = [];
     for (const v of country.visaTypes) {
