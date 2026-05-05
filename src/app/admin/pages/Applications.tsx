@@ -387,10 +387,22 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         } catch (e) { console.error('payment bonus error', e); }
       }
 
-      // Send notification whenever status becomes 'completed'
-      if (status === 'completed') {
+      // Send status notification for all statuses that have a message
+      const NOTIFIABLE = ['pending_confirmation', 'in_progress', 'ready', 'pending_payment', 'completed'];
+      if (NOTIFIABLE.includes(status) && application.telegramId) {
         try {
-          await sendNotify();
+          const notifyRes = await fetch('/api/notify-status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: application.telegramId,
+              status,
+              country: application.country,
+              visa_type: application.visaType,
+            }),
+          });
+          const notifyData = await notifyRes.json();
+          if (!notifyRes.ok || notifyData.error) throw new Error(notifyData.error ?? `HTTP ${notifyRes.status}`);
           alert(visaUrl ? 'Виза загружена! Уведомление отправлено в Telegram.' : 'Статус обновлён. Уведомление отправлено в Telegram.');
         } catch (notifyErr) {
           alert(`Изменения сохранены, но уведомление не отправлено: ${String(notifyErr)}`);
