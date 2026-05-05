@@ -80,13 +80,18 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     }
   };
 
-  // Multi-channel sharing — opens corresponding social network share dialog
-  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'tiktok' | 'max' | 'copy') => {
+  // Multi-channel sharing — opens corresponding social network share dialog.
+  // Always awaits clipboard write before opening external link, otherwise
+  // the context switch in WebView aborts the clipboard write before completion.
+  const shareTo = async (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'tiktok' | 'max' | 'copy') => {
     const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void } } }).Telegram?.WebApp;
     const open = (url: string) => {
       if (channel === 'telegram' && tg?.openTelegramLink) tg.openTelegramLink(url);
       else if (tg?.openLink) tg.openLink(url);
       else window.open(url, '_blank');
+    };
+    const copyToClipboard = async () => {
+      try { await navigator.clipboard.writeText(shareText); } catch { /* no-op */ }
     };
     switch (channel) {
       case 'telegram':
@@ -99,20 +104,15 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         open(`https://vk.com/share.php?url=${encodeURIComponent(link)}&title=${encodeURIComponent('Visadel Agency')}&description=${encodeURIComponent(shareText)}`);
         break;
       case 'instagram':
-        // Текст в буфер + открываем Instagram (на мобиле универсальная ссылка откроет приложение)
-        navigator.clipboard.writeText(shareText).catch(() => {});
+        await copyToClipboard();
         open('https://www.instagram.com/');
         break;
       case 'tiktok':
-        navigator.clipboard.writeText(shareText).catch(() => {});
-        alert('Текст скопирован! Откройте TikTok и вставьте в описание видео или сообщение.');
-        // Открываем приложение/сайт TikTok если установлено — universal link
+        await copyToClipboard();
         open('https://www.tiktok.com/');
         break;
       case 'max':
-        // MAX мессенджер от VK — пробуем открыть через универсальный линк max.me/share
-        // Если приложение установлено — iOS/Android откроют его через universal link
-        navigator.clipboard.writeText(shareText).catch(() => {});
+        await copyToClipboard();
         open(`https://max.ru/share?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
         break;
       case 'copy':
@@ -206,7 +206,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           <ShareBtn label="VK" icon={<FaVk className="w-6 h-6" />} color="bg-[#0077FF]" onClick={() => shareTo('vk')} />
           <ShareBtn label="Instagram" icon={<FaInstagram className="w-6 h-6" />} color="bg-gradient-to-br from-[#FEDA75] via-[#FA7E1E] to-[#D62976]" onClick={() => shareTo('instagram')} />
           <ShareBtn label="TikTok" icon={<FaTiktok className="w-6 h-6" />} color="bg-black" onClick={() => shareTo('tiktok')} />
-          <ShareBtn label="MAX" icon={<MaxIcon className="w-6 h-6" />} color="bg-gradient-to-br from-[#0077FF] to-[#0048AA]" onClick={() => shareTo('max')} />
+          <ShareBtn label="MAX" icon={<MaxIcon className="w-9 h-9 -my-1" />} color="bg-white border border-gray-100 !text-gray-700" onClick={() => shareTo('max')} />
         </div>
         {/* Copy link — wide button, secondary action */}
         <button
@@ -437,21 +437,27 @@ function ShareBtn({ label, icon, color, onClick }: { label: string; icon: React.
   );
 }
 
-// MAX мессенджер — фирменный логотип в виде сферы с вписанным символом (white-on-blue)
+// MAX мессенджер — официальный логотип
 function MaxIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+    <svg viewBox="0 0 1000 1000" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="maxGrad" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.85" />
+        <linearGradient id="maxGradA">
+          <stop offset="0" stopColor="#4cf" />
+          <stop offset=".662" stopColor="#53e" />
+          <stop offset="1" stopColor="#93d" />
         </linearGradient>
+        <linearGradient id="maxGradB">
+          <stop offset="0" stopColor="#00f" />
+          <stop offset="1" stopOpacity="0" />
+          <stop offset="1" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id="maxC" x1="117.847" x2="1000" y1="760.536" y2="500" gradientUnits="userSpaceOnUse" href="#maxGradA" />
+        <radialGradient id="maxD" cx="-87.392" cy="1166.116" r="500" fx="-87.392" fy="1166.116" gradientTransform="rotate(51.356 1551.478 559.3) scale(2.42703433 1)" gradientUnits="userSpaceOnUse" href="#maxGradB" />
       </defs>
-      {/* Внешний круг (фон уже даёт кнопка, поэтому делаем только M) */}
-      <path
-        fill="url(#maxGrad)"
-        d="M5 6.5 C5 5.7 5.7 5 6.5 5 L8.5 5 C9.1 5 9.6 5.3 9.9 5.8 L15.1 14.2 C15.5 14.8 16.5 14.8 16.9 14.2 L22.1 5.8 C22.4 5.3 22.9 5 23.5 5 L25.5 5 C26.3 5 27 5.7 27 6.5 L27 25.5 C27 26.3 26.3 27 25.5 27 L24 27 C23.2 27 22.5 26.3 22.5 25.5 L22.5 14.5 L18.5 21 C17.5 22.6 14.5 22.6 13.5 21 L9.5 14.5 L9.5 25.5 C9.5 26.3 8.8 27 8 27 L6.5 27 C5.7 27 5 26.3 5 25.5 Z"
-      />
+      <rect width="1000" height="1000" fill="url(#maxC)" ry="249.681" />
+      <rect width="1000" height="1000" fill="url(#maxD)" ry="249.681" />
+      <path fill="#fff" fillRule="evenodd" clipRule="evenodd" d="M508.211 878.328c-75.007 0-109.864-10.95-170.453-54.75-38.325 49.275-159.686 87.783-164.979 21.9 0-49.456-10.95-91.248-23.36-136.873-14.782-56.21-31.572-118.807-31.572-209.508 0-216.626 177.754-379.597 388.357-379.597 210.785 0 375.947 171.001 375.947 381.604.707 207.346-166.595 376.118-373.94 377.224m3.103-571.585c-102.564-5.292-182.499 65.7-200.201 177.024-14.6 92.162 11.315 204.398 33.397 210.238 10.585 2.555 37.23-18.98 53.837-35.587a189.8 189.8 0 0 0 92.71 33.032c106.273 5.112 197.08-75.794 204.215-181.95 4.154-106.382-77.67-196.486-183.958-202.574Z" />
     </svg>
   );
 }
