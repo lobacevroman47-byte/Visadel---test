@@ -410,8 +410,12 @@ const StatusHistory: React.FC<{
 const ApplicationModal: React.FC<{ application: Application; onClose: () => void }> = ({ application, onClose }) => {
   const { currentUser } = useAdmin();
   const [status, setStatus] = useState(application.status);
-  const [usdRate, setUsdRate] = useState(application.usdRateRub);
-  const [taxPct, setTaxPct] = useState(application.taxPct);
+  // Hold finance inputs as strings so user can fully clear the field while editing.
+  // Parse to number on save and for the live tax preview.
+  const [usdRateStr, setUsdRateStr] = useState(String(application.usdRateRub));
+  const [taxPctStr, setTaxPctStr] = useState(String(application.taxPct));
+  const usdRate = parseFloat(usdRateStr);
+  const taxPct = parseFloat(taxPctStr);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
@@ -476,11 +480,12 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         prevStatus, adminInfo,
       );
 
-      // Persist USD rate / tax % if admin changed them (used in finance reports)
-      if (usdRate !== application.usdRateRub && usdRate > 0) {
+      // Persist USD rate / tax % if admin changed them (used in finance reports).
+      // Skip silently if input is empty / invalid — preserves the snapshot.
+      if (Number.isFinite(usdRate) && usdRate > 0 && usdRate !== application.usdRateRub) {
         await updateApplicationUsdRate(application.id, usdRate);
       }
-      if (taxPct !== application.taxPct && taxPct >= 0) {
+      if (Number.isFinite(taxPct) && taxPct >= 0 && taxPct !== application.taxPct) {
         await updateApplicationTaxPct(application.id, taxPct);
       }
 
@@ -634,8 +639,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-500">1$ =</span>
                       <input
-                        type="number" value={usdRate} step="0.01" min={1}
-                        onChange={(e) => setUsdRate(parseFloat(e.target.value) || 0)}
+                        type="number" value={usdRateStr} step="0.01" min={0}
+                        onChange={(e) => setUsdRateStr(e.target.value)}
+                        onBlur={() => { if (usdRateStr.trim() === '' || !Number.isFinite(parseFloat(usdRateStr))) setUsdRateStr(String(application.usdRateRub)); }}
                         className="flex-1 px-2 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
                       />
                       <span className="text-xs text-gray-500">₽</span>
@@ -645,8 +651,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                     <label className="block text-xs text-gray-700 mb-1">Налог (%)</label>
                     <div className="flex items-center gap-1">
                       <input
-                        type="number" value={taxPct} step="0.5" min={0} max={100}
-                        onChange={(e) => setTaxPct(parseFloat(e.target.value) || 0)}
+                        type="number" value={taxPctStr} step="0.5" min={0} max={100}
+                        onChange={(e) => setTaxPctStr(e.target.value)}
+                        onBlur={() => { if (taxPctStr.trim() === '' || !Number.isFinite(parseFloat(taxPctStr))) setTaxPctStr(String(application.taxPct)); }}
                         className="flex-1 px-2 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
                       />
                       <span className="text-xs text-gray-500">%</span>
@@ -654,7 +661,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                   </div>
                 </div>
                 <p className="text-xs text-gray-500">
-                  Курс и налог влияют на расчёт прибыли в «Финансах». Налог считается от полной цены ({application.cost.toLocaleString('ru-RU')} ₽ × {taxPct}% = {Math.round(application.cost * taxPct / 100).toLocaleString('ru-RU')} ₽).
+                  Курс и налог влияют на расчёт прибыли в «Финансах». Налог считается от полной цены ({application.cost.toLocaleString('ru-RU')} ₽ × {Number.isFinite(taxPct) ? taxPct : 0}% = {Math.round(application.cost * (Number.isFinite(taxPct) ? taxPct : 0) / 100).toLocaleString('ru-RU')} ₽).
                 </p>
               </div>
 
