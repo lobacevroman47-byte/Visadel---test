@@ -97,22 +97,27 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
 
   return (
     <div className="flex h-screen bg-[#F5F7FA] overflow-hidden relative">
-      {/* Mobile top bar with hamburger — sits in document flow, doesn't overlap */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
-        <button
-          onClick={toggleSidebar}
-          className="w-9 h-9 rounded-lg vd-grad text-white flex items-center justify-center active:scale-95 transition vd-shadow-cta"
-          aria-label="Открыть меню"
-        >
-          <Menu size={18} strokeWidth={2.5} />
-        </button>
-        <div className="flex items-center gap-1.5">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[#0F2A36] font-extrabold text-[15px] tracking-tight">VISADEL</span>
+      {/* Mobile top bar with hamburger — fixed, respects safe-area inset */}
+      <div
+        className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-100"
+        style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+      >
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={toggleSidebar}
+            className="w-9 h-9 rounded-lg vd-grad text-white flex items-center justify-center active:scale-95 transition vd-shadow-cta"
+            aria-label="Открыть меню"
+          >
+            <Menu size={18} strokeWidth={2.5} />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="text-[#0F2A36] font-extrabold text-[15px] tracking-tight">VISADEL</span>
+          </div>
+          <span className="w-9" />
         </div>
-        <span className="w-9" />
       </div>
 
       {/* Backdrop for mobile */}
@@ -136,9 +141,13 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       />
 
       {/* Main Content — pad-top on mobile so the fixed header doesn't cover content */}
-      <div className="flex-1 overflow-y-auto pt-14 lg:pt-0">
+      <div className="flex-1 overflow-y-auto admin-main">
         {renderContent()}
       </div>
+      <style>{`
+        .admin-main { padding-top: calc(env(safe-area-inset-top, 0px) + 56px); }
+        @media (min-width: 1024px) { .admin-main { padding-top: 0 !important; } }
+      `}</style>
     </div>
   );
 };
