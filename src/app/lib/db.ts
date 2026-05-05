@@ -318,8 +318,12 @@ export async function uploadFile(
   file: File,
   folder: 'payments' | 'photos' | 'visas'
 ): Promise<string | null> {
+  // Guard: drafts restored from localStorage may have empty objects in place of Files
+  if (!file || !(file instanceof File) || !file.name) {
+    console.warn('uploadFile: invalid file (likely from restored draft)', file);
+    return null;
+  }
   if (!isSupabaseConfigured()) {
-    // Return a fake local URL for development
     return URL.createObjectURL(file);
   }
   const ext = file.name.split('.').pop();

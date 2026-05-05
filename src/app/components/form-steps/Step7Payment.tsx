@@ -41,9 +41,14 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
 
   const handleSaveDraft = () => {
     const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
+    // Strip File objects — they don't survive JSON.stringify and break the form on restore
+    const draftFormData = {
+      ...formData,
+      photos: { facePhoto: null, passportPhoto: null, additionalPhotos: {} },
+    };
     const draft = {
       id: draftKey,
-      formData,
+      formData: draftFormData,
       step: 5, // payment step (index in STEPS array)
       visa,
       urgent,
@@ -75,28 +80,37 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
       // 1. Upload payment screenshot
       const proofUrl = await uploadFile(paymentScreenshot, 'payments');
 
-      // 2. Upload all photos in parallel
+      // 2. Upload all photos in parallel — only real File objects (drafts strip them)
       const photoUrls: Record<string, string | null> = {};
       const photoUploads: Promise<void>[] = [];
+      const isFile = (f: unknown): f is File => f instanceof File;
 
-      if (formData.photos.facePhoto) {
+      if (isFile(formData.photos.facePhoto)) {
         photoUploads.push(
           uploadFile(formData.photos.facePhoto, 'photos').then(url => { photoUrls.facePhoto = url; })
         );
       }
-      if (formData.photos.passportPhoto) {
+      if (isFile(formData.photos.passportPhoto)) {
         photoUploads.push(
           uploadFile(formData.photos.passportPhoto, 'photos').then(url => { photoUrls.passportPhoto = url; })
         );
       }
       for (const [key, file] of Object.entries(formData.photos.additionalPhotos)) {
-        if (file) {
+        if (isFile(file)) {
           photoUploads.push(
-            uploadFile(file, 'photos').then(url => { photoUrls[key] = url; })
+            uploadFile(file as File, 'photos').then(url => { photoUrls[key] = url; })
           );
         }
       }
       await Promise.all(photoUploads);
+
+      // Check that we have at least the required photos uploaded — if user came from draft
+      // and photos got stripped, ask them to re-upload
+      if (!photoUrls.facePhoto && !photoUrls.passportPhoto) {
+        alert('Фотографии не были сохранены в черновике. Пожалуйста, вернитесь на шаг "Загрузка фото" и загрузите их заново.');
+        setSubmitting(false);
+        return;
+      }
 
       // 3. Save application to Supabase (or localStorage fallback)
       const savedApp = await saveApplication({

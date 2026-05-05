@@ -153,9 +153,14 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   };
 
   const saveDraft = () => {
+    // Strip File objects — they don't survive JSON.stringify
+    const draftFormData = {
+      ...formData,
+      photos: { facePhoto: null, passportPhoto: null, additionalPhotos: {} },
+    };
     const draft = {
       id: draftId,
-      formData,
+      formData: draftFormData,
       step: currentStep,
       visa,
       urgent,
