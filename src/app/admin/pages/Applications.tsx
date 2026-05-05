@@ -478,9 +478,11 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
       }
 
       // Pay referral bonus to the referrer when admin confirms payment (status -> in_progress).
-      // payReferralBonus has built-in checks: only first paid app counts, and uses bonus_logs for stats.
+      // — Regular referrer: flat 500₽
+      // — Partner referrer: % of this order's price (per-product partner_commission_pct)
+      // payReferralBonus has built-in checks: only first paid app counts (dedup by referee).
       if (status === 'in_progress' && application.telegramId) {
-        payReferralBonus(application.telegramId).catch(e => console.warn('referral bonus error', e));
+        payReferralBonus(application.telegramId, application.id).catch(e => console.warn('referral bonus error', e));
       }
 
       // Send Telegram notification for all statuses except draft

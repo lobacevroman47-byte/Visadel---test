@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import type { TelegramUser } from './telegram';
+import { BONUS_CONFIG, partnerCommission } from './bonus-config';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -663,12 +664,15 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
 }
 
 // Pays referral bonus to the referrer once the admin confirms the referee's first payment.
-// Uses grant-bonus API which has dedup by application_id, so calling this multiple times
-// for the same referee is safe — bonus is granted exactly once.
-export async function payReferralBonus(refereeTelegramId: number): Promise<void> {
+// — Regular referrer: flat BONUS_CONFIG.REFERRER_REGULAR (500₽)
+// — Partner referrer: percentage of order price, taken from visa_products.partner_commission_pct
+//   (or BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT if product has no override)
+// Uses grant-bonus API with dedup by application_id, so calling multiple times for the same
+// referee is safe — bonus is granted exactly once.
+export async function payReferralBonus(refereeTelegramId: number, applicationId?: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
-  // Find the referrer
+  // Find the referrer code
   const { data: user } = await supabase
     .from('users')
     .select('referred_by')
@@ -677,17 +681,43 @@ export async function payReferralBonus(refereeTelegramId: number): Promise<void>
   const referredBy = (user as { referred_by?: string } | null)?.referred_by;
   if (!referredBy) return;
 
+  // Resolve referrer with partner flag
   const { data: referrer } = await supabase
     .from('users')
-    .select('telegram_id')
+    .select('telegram_id, is_influencer')
     .eq('referral_code', referredBy)
     .single();
   if (!referrer) return;
+  const r = referrer as { telegram_id: number; is_influencer: boolean };
+  const referrerId = r.telegram_id;
+  const isPartner = r.is_influencer === true;
 
-  const referrerId = (referrer as { telegram_id: number }).telegram_id;
-  const REFERRER_REGULAR = 500;
+  // Default: flat regular bonus
+  let amount = BONUS_CONFIG.REFERRER_REGULAR;
+  let description = `+${amount}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`;
 
-  // Idempotent grant via API (dedup key = unique referee id)
+  // Partner override: percentage of the actual order price
+  if (isPartner && applicationId) {
+    const { data: app } = await supabase
+      .from('applications')
+      .select('price, visa_id')
+      .eq('id', applicationId)
+      .single();
+    if (app) {
+      const a = app as { price: number; visa_id: string };
+      const { data: product } = await supabase
+        .from('visa_products')
+        .select('partner_commission_pct')
+        .eq('id', a.visa_id)
+        .single();
+      const pct = (product as { partner_commission_pct: number } | null)?.partner_commission_pct
+        ?? BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT;
+      amount = partnerCommission(a.price, pct);
+      description = `+${amount}₽ партнёру (${pct}% от ${a.price}₽, реферал ${refereeTelegramId})`;
+    }
+  }
+
+  // Idempotent grant via API (dedup key = unique referee id, fires once per referee)
   try {
     await fetch('/api/grant-bonus', {
       method: 'POST',
@@ -695,9 +725,9 @@ export async function payReferralBonus(refereeTelegramId: number): Promise<void>
       body: JSON.stringify({
         telegram_id: referrerId,
         type: 'referral',
-        amount: REFERRER_REGULAR,
-        description: `+${REFERRER_REGULAR}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`,
-        application_id: `referral_${refereeTelegramId}`, // unique per referee = pays only once
+        amount,
+        description,
+        application_id: `referral_${refereeTelegramId}`,
       }),
     });
   } catch (e) { console.warn('payReferralBonus error', e); }
