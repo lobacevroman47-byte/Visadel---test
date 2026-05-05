@@ -147,7 +147,7 @@ export default function TasksTab() {
           <h3 className="text-lg text-gray-800 mb-3">Доступные задания</h3>
           <div className="space-y-3">
             {availableTasks.map((task) => (
-              <div key={task.id} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-blue-400">
+              <div key={task.id} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-[#5C7BFF]">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-start gap-3 flex-1">
                     <span className="text-2xl">{TYPE_ICONS[task.type]}</span>
@@ -167,13 +167,13 @@ export default function TasksTab() {
                       href={task.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition text-sm text-center"
+                      className="block w-full bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white py-2 rounded-lg transition text-sm text-center"
                     >
                       Открыть ссылку
                     </a>
 
                     {!screenshot ? (
-                      <label className="block border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition">
+                      <label className="block border-2 border-dashed border-gray-300 rounded-lg p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition">
                         <div className="flex flex-col items-center gap-2">
                           <Upload className="w-6 h-6 text-gray-400" />
                           <p className="text-sm text-gray-600">Загрузить скриншот</p>
@@ -226,7 +226,7 @@ export default function TasksTab() {
                 ) : (
                   <button
                     onClick={() => setSelectedTask(task.id)}
-                    className="w-full mt-3 bg-blue-100 text-blue-700 py-2 rounded-lg hover:bg-blue-200 transition text-sm"
+                    className="w-full mt-3 bg-[#EAF1FF] text-[#3B5BFF] py-2 rounded-lg hover:bg-[#DCE7FF] transition text-sm font-semibold"
                   >
                     Выполнить задание
                   </button>

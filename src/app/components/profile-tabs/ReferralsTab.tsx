@@ -244,7 +244,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             />
             <button
               onClick={downloadQR}
-              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-xl flex items-center gap-2 transition"
+              className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white text-sm rounded-xl flex items-center gap-2 transition"
             >
               <Download className="w-4 h-4" /> Сохранить картинку
             </button>
@@ -273,7 +273,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
       {/* ── 4. Stats grid ───────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-2">
         <StatCard label="Переходов" value={stats.clicks} color="text-cyan-600" loading={loading} />
-        <StatCard label="Зарегистрировались" value={stats.registered} color="text-blue-600" loading={loading} />
+        <StatCard label="Зарегистрировались" value={stats.registered} color="text-[#3B5BFF]" loading={loading} />
         <StatCard label="Оплатили визу" value={stats.paidReferrals} color="text-green-600" loading={loading} />
         <StatCard label="Заработано" value={`${stats.totalEarnings}₽`} color="text-purple-600" loading={loading} />
       </div>
@@ -395,7 +395,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
               <div key={ref.telegram_id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm text-gray-800 truncate">{ref.name}</p>
-                  {ref.username && <p className="text-xs text-blue-500">@{ref.username}</p>}
+                  {ref.username && <p className="text-xs text-[#3B5BFF]">@{ref.username}</p>}
                   <p className="text-xs text-gray-400 mt-0.5">
                     {new Date(ref.joined_at).toLocaleDateString('ru-RU')}
                   </p>

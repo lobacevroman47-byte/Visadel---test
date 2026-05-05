@@ -64,7 +64,7 @@ function StreakStrip({ streak }: { streak: number }) {
     <div className="flex gap-1.5 justify-center mt-3">
       {[1, 2, 3, 4, 5, 6, 7].map(d => (
         <div key={d} className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-          d < done  ? 'bg-white text-blue-600 shadow' :
+          d < done  ? 'bg-white text-[#3B5BFF] shadow' :
           d === done ? 'bg-yellow-400 text-white shadow-lg scale-110' :
           'bg-white/20 text-white/50'
         }`}>
@@ -270,25 +270,25 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
       )}
 
       {/* ── Daily check-in ────────────────────────────────────────────── */}
-      <div className="bg-gradient-to-br from-blue-600 to-cyan-500 rounded-2xl p-5 text-white shadow-lg">
+      <div className="vd-grad rounded-2xl p-5 text-white shadow-lg vd-shadow-cta">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-lg font-semibold">Ежедневный вход</h3>
-            <p className="text-blue-100 text-xs mt-0.5">Заходи каждый день — копи бонусы</p>
+            <p className="text-white/80 text-xs mt-0.5">Заходи каждый день — копи бонусы</p>
           </div>
           <div className="text-right">
             <div className="flex items-center gap-1 justify-end">
               <Flame className="w-5 h-5 text-orange-300" />
               <span className="text-2xl font-bold">{streak}</span>
             </div>
-            <p className="text-blue-100 text-xs">дней подряд</p>
+            <p className="text-white/80 text-xs">дней подряд</p>
           </div>
         </div>
 
         <StreakStrip streak={streak} />
 
         <div className="mt-3 mb-3">
-          <div className="flex justify-between text-xs text-blue-100 mb-1">
+          <div className="flex justify-between text-xs text-white/80 mb-1">
             <span>Прогресс недели</span>
             <span>{progressInWeek}/7</span>
           </div>
@@ -300,14 +300,14 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
 
         <button onClick={handleCheckIn} disabled={!canCheckIn || claimingDaily}
           className={`w-full py-3 rounded-xl font-semibold text-sm transition-all flex items-center justify-center gap-2 ${
-            canCheckIn ? 'bg-white text-blue-600 hover:bg-blue-50 active:scale-95 shadow'
+            canCheckIn ? 'bg-white text-[#3B5BFF] hover:bg-[#EAF1FF] active:scale-95 shadow'
                        : 'bg-white/20 text-white/60 cursor-not-allowed'
           }`}>
           {claimingDaily && <RefreshCw className="w-4 h-4 animate-spin" />}
           {canCheckIn ? '🎁 Получить +1₽' : '✓ Бонус получен на сегодня'}
         </button>
 
-        <p className="mt-3 text-xs text-blue-100 text-center">
+        <p className="mt-3 text-xs text-white/80 text-center">
           +1₽ ежедневно · +5₽ каждую неделю · +30₽ за месяц
         </p>
       </div>
@@ -421,7 +421,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
       {/* ── Bonus history ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center gap-2 mb-3">
-          <History className="w-5 h-5 text-blue-500" />
+          <History className="w-5 h-5 text-[#3B5BFF]" />
           <h3 className="text-sm font-semibold text-gray-700">История начислений</h3>
         </div>
         {bonusHistory.length === 0 ? (
@@ -430,7 +430,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
             {bonusHistory.map(entry => {
               const cfg: Record<string, { icon: string; color: string }> = {
-                daily:    { icon: '📅', color: 'text-blue-600' },
+                daily:    { icon: '📅', color: 'text-[#3B5BFF]' },
                 weekly:   { icon: '🏆', color: 'text-green-600' },
                 monthly:  { icon: '🌟', color: 'text-yellow-600' },
                 referral: { icon: '👫', color: 'text-purple-600' },
@@ -459,14 +459,14 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
       {/* ── Personal data ─────────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="flex items-center gap-2 mb-4">
-          <User className="w-5 h-5 text-blue-500" />
+          <User className="w-5 h-5 text-[#3B5BFF]" />
           <h3 className="text-sm font-semibold text-gray-700">Личные данные</h3>
         </div>
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Имя</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Иван Иванов"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Telegram</label>
@@ -482,7 +482,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             </label>
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
               placeholder="+7 (999) 123-45-67"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
@@ -490,10 +490,10 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             </label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="example@mail.com"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
           </div>
           <button onClick={handleSaveProfile} disabled={savingProfile}
-            className="w-full py-2.5 rounded-xl bg-blue-500 hover:bg-blue-600 disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-95">
+            className="w-full py-2.5 rounded-xl bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-95">
             {profileSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
             {profileSaved ? 'Сохранено!' : savingProfile ? 'Сохраняем...' : 'Сохранить данные'}
           </button>
