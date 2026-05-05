@@ -109,68 +109,6 @@ const COUNTRIES: Country[] = [
   },
 ];
 
-// ─── Documents per country ────────────────────────────────────────────────────
-
-interface DocItem { icon: string; text: string }
-
-const COUNTRY_DOCS: Record<string, DocItem[]> = {
-  'Индия': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '🪪', text: 'Серия и № внутреннего паспорта' },
-    { icon: '👨‍👩‍👧', text: 'Данные отца и матери — имя, гражданство, город рождения' },
-    { icon: '🏠', text: 'Адрес регистрации и фактического проживания' },
-    { icon: '💼', text: 'Место работы — название, адрес, телефон' },
-  ],
-  'Вьетнам': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '🏠', text: 'Адрес регистрации / прописки' },
-    { icon: '💼', text: 'Место работы или учёбы — название, адрес, телефон' },
-    { icon: '📞', text: 'Контакт на экстренный случай — имя, адрес, телефон' },
-  ],
-  'Шри-Ланка': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '🏠', text: 'Адрес регистрации / прописки' },
-  ],
-  'Южная Корея': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '💼', text: 'Место работы — название, телефон, примерная зарплата' },
-  ],
-  'Израиль': [
-    { icon: '🛂', text: 'Биометрический загранпаспорт' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '👨‍👩‍👧', text: 'Имена отца и матери (фамилия и имя)' },
-    { icon: '🏠', text: 'Домашний адрес — страна и город' },
-  ],
-  'Пакистан': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '👨‍👩‍👧', text: 'Имена и гражданство отца и матери' },
-    { icon: '💼', text: 'Место работы — дата трудоустройства, должность, телефон' },
-  ],
-  'Камбоджа': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '🏨', text: 'Название и адрес отеля в Камбодже' },
-  ],
-  'Кения': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '✈️', text: 'Авиабилеты — туда и обратно (номер рейса, авиакомпания)' },
-    { icon: '🏨', text: 'Адрес проживания в Кении' },
-  ],
-  'Филиппины': [
-    { icon: '🛂', text: 'Загранпаспорт — не менее 6 мес до окончания' },
-    { icon: '📸', text: 'Фото лица — светлый фон, 80% лица' },
-    { icon: '✈️', text: 'Авиабилет — номер рейса и авиакомпания' },
-    { icon: '🏨', text: 'Адрес отеля на Филиппинах' },
-    { icon: '💼', text: 'Место работы (если работаете)' },
-  ],
-};
-
 // ─── Unified Card Component ───────────────────────────────────────────────────
 export interface AddonsState {
   urgent: boolean;
@@ -225,12 +163,9 @@ function AddonToggle({ icon, label, hint, price, active, onToggle }: {
 
 function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: VisaCardProps) {
   const [showCalc, setShowCalc] = useState(false);
-  const [showDocs, setShowDocs] = useState(true);
   const [urgent, setUrgent] = useState(false);
   const [hotel, setHotel] = useState(false);
   const [ticket, setTicket] = useState(false);
-
-  const docs = COUNTRY_DOCS[visa.country] ?? [];
 
   // Vietnam already has dedicated urgent options, so no urgent toggle there
   const isVietnam = visa.country === 'Вьетнам';
@@ -254,46 +189,6 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
         )}
         <p className="text-sm text-[#616161]">Готовность: {visa.readinessTime}</p>
       </div>
-
-      {/* Documents Section */}
-      {docs.length > 0 && (
-        <div className="mb-4">
-          <button
-            onClick={() => setShowDocs(!showDocs)}
-            className="w-full flex items-center justify-between mb-2"
-          >
-            <span className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
-              <span className="text-base">📋</span>
-              Что понадобится
-              <span className="text-xs font-normal text-gray-400 ml-1">
-                {docs.length} {docs.length === 1 ? 'пункт' : docs.length < 5 ? 'пункта' : 'пунктов'}
-              </span>
-            </span>
-            <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${showDocs ? 'rotate-180' : ''}`} />
-          </button>
-
-          <AnimatePresence initial={false}>
-            {showDocs && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="bg-gray-50 rounded-xl border border-gray-100 divide-y divide-gray-100">
-                  {docs.map((doc, i) => (
-                    <div key={i} className="flex items-start gap-3 px-3.5 py-2.5">
-                      <span className="text-base shrink-0 mt-0.5">{doc.icon}</span>
-                      <span className="text-sm text-gray-700 leading-snug">{doc.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      )}
 
       {/* Price Block */}
       <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 mb-3 border border-blue-100">
