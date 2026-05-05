@@ -725,12 +725,20 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
 
               {/* Save */}
               <button
+                type="button"
                 onClick={handleSave}
                 disabled={saving}
-                className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+                aria-busy={saving}
+                className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none"
               >
-                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                {saving ? 'Сохранение...' : 'Сохранить изменения'}
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Сохранение…</span>
+                  </>
+                ) : (
+                  <span>Сохранить изменения</span>
+                )}
               </button>
 
               {/* Status history */}
