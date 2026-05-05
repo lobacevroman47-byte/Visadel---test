@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Plus, X, Loader2 } from 'lucide-react';
 import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
 import { getFormFields, type VisaFormField } from '../../lib/db';
@@ -357,11 +357,23 @@ function DateInput({
     }
   };
 
-  // Native picker — click on the 📅 icon opens the OS calendar.
-  // Hidden input is overlaid only over the icon (pointer-events: auto), so
-  // manual typing in the visible text input is unaffected. Uses the native
-  // date picker, so no JS/calendar library — zero lag.
+  // Native picker via showPicker() — the 📅 emoji is now a real button that
+  // opens the OS calendar. The hidden <input type="date"> stays sr-only (no
+  // layout, no rendering) and is purely a target for showPicker. Manual
+  // typing in the visible text input keeps working as before.
+  const dateInputRef = useRef<HTMLInputElement>(null);
   const dateIsoValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+
+  const openPicker = () => {
+    const el = dateInputRef.current;
+    if (!el) return;
+    // showPicker is the modern way; falls back to focus+click for older WebViews
+    if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
+      try { (el as HTMLInputElement & { showPicker: () => void }).showPicker(); return; } catch { /* fall through */ }
+    }
+    el.focus();
+    el.click();
+  };
 
   return (
     <div className="relative">
@@ -372,12 +384,19 @@ function DateInput({
         onChange={handleChange}
         placeholder={placeholder || 'дд.мм.гггг'}
         maxLength={10}
-        className="form-input pr-10"
+        className="form-input pr-12"
       />
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 select-none text-base pointer-events-none">
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Открыть календарь"
+        className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-base rounded-md hover:bg-gray-100 active:bg-gray-200 transition select-none"
+      >
         📅
-      </span>
+      </button>
+      {/* Visually hidden but interactable target for showPicker() */}
       <input
+        ref={dateInputRef}
         type="date"
         value={dateIsoValue}
         onChange={(e) => {
@@ -385,9 +404,9 @@ function DateInput({
           onChange(iso);
           setDisplay(toDisplay(iso));
         }}
-        aria-label="Открыть календарь"
-        title="Открыть календарь"
-        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 opacity-0 cursor-pointer"
+        tabIndex={-1}
+        aria-hidden="true"
+        className="sr-only"
       />
     </div>
   );
