@@ -375,6 +375,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
     setSelectedCountry(country);
     setShowUrgentVietnam(false);
     setShowExtensions(false);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleBackFromCountry = () => {
@@ -385,6 +386,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
     } else {
       setSelectedCountry(null);
     }
+    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   return (
