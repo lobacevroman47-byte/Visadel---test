@@ -372,15 +372,16 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
   const [showExtensions, setShowExtensions] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to top after any screen transition — runs after render
+  // Scroll to top after any screen transition
   useEffect(() => {
-    const el = scrollRef.current;
-    if (el) {
-      el.scrollTop = 0;
-    }
-    window.scrollTo(0, 0);
-    document.documentElement.scrollTop = 0;
-    document.body.scrollTop = 0;
+    // setTimeout pushes after browser's own focus-scroll handling
+    const t = setTimeout(() => {
+      window.scrollTo(0, 0);
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+      if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    }, 0);
+    return () => clearTimeout(t);
   }, [selectedCountry, showUrgentVietnam, showExtensions]);
 
   const handleCountryClick = (country: Country) => {
@@ -421,16 +422,9 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
       {!selectedCountry && <ReferralBanner />}
 
       <div className="max-w-2xl mx-auto p-4">
-        <AnimatePresence mode="wait">
         {/* Country Selection */}
         {!selectedCountry && (
-          <motion.div
-            key="country-grid"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-          >
+          <div>
             <h2 className="text-xl mb-4 text-gray-800">Выберите страну</h2>
             <div className="grid grid-cols-2 gap-4">
               {COUNTRIES.map((country) => (
@@ -444,18 +438,12 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                 </button>
               ))}
             </div>
-          </motion.div>
+          </div>
         )}
 
         {/* Visa Type Selection */}
         {selectedCountry && (
-          <motion.div
-            key="visa-list"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -20 }}
-            transition={{ duration: 0.2 }}
-          >
+          <div>
             <button
               onClick={handleBackFromCountry}
               className="mb-4 text-[#1976D2] hover:text-[#0D47A1] flex items-center gap-1"
@@ -546,9 +534,8 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                 )}
               </div>
             )}
-          </motion.div>
+          </div>
         )}
-        </AnimatePresence>
       </div>
     </div>
   );
