@@ -63,7 +63,7 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
   const tgUsername = user.username?.replace('@', '') ?? '';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[92vh] overflow-hidden flex flex-col shadow-2xl">
 
         {/* Header */}
@@ -148,7 +148,7 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 p-4 flex gap-3 shrink-0">
           <button onClick={handleSave} disabled={saving}
-            className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl transition font-medium flex items-center justify-center gap-2">
+            className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl transition font-medium flex items-center justify-center gap-2">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {saving ? 'Сохранение...' : 'Сохранить'}
           </button>
@@ -255,7 +255,7 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
                   <td className="px-6 py-4 text-sm text-gray-600">{user.applicationsCount}</td>
                   <td className="px-6 py-4">
                     <button onClick={() => setSelectedUser(user)}
-                      className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm transition">
+                      className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg text-sm transition">
                       Управление
                     </button>
                   </td>

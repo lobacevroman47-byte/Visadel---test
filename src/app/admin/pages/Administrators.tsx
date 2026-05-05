@@ -52,7 +52,7 @@ const AddAdminModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
         <div className="p-5 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-lg font-semibold">Добавить сотрудника</h2>
@@ -88,7 +88,7 @@ const AddAdminModal: React.FC<{
           </div>
           <div className="flex gap-3 pt-2">
             <button type="submit" disabled={saving}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2">
+              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
               {saving ? 'Сохраняем...' : 'Добавить'}
             </button>
@@ -159,7 +159,7 @@ export const Administrators: React.FC = () => {
             <RefreshCw size={16} className="text-gray-500" />
           </button>
           <button onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition flex items-center gap-2 text-sm">
+            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-xl transition flex items-center gap-2 text-sm">
             <Plus size={18} /> Добавить
           </button>
         </div>

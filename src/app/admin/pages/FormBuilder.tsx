@@ -146,7 +146,7 @@ export const FormBuilder: React.FC = () => {
             type="button"
             onClick={handleSeed}
             disabled={seeding}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg inline-flex items-center gap-2 select-none"
+            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg inline-flex items-center gap-2 select-none"
           >
             {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} />}
             {seeding ? 'Импортируем…' : 'Импортировать из кода'}
@@ -178,7 +178,7 @@ export const FormBuilder: React.FC = () => {
               type="button"
               onClick={() => setSelectedCountry(c.name)}
               className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition ${
-                selectedCountry === c.name ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
+                selectedCountry === c.name ? 'bg-[#3B5BFF] text-white shadow-sm' : 'text-[#0F2A36] hover:bg-gray-100'
               }`}
             >
               <span className="text-base">{c.flag ?? '🌍'}</span>
@@ -194,8 +194,8 @@ export const FormBuilder: React.FC = () => {
             <button
               type="button"
               onClick={() => setTab('fields')}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                tab === 'fields' ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition ${
+                tab === 'fields' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36] hover:bg-gray-50'
               }`}
             >
               <FileEdit size={16} />
@@ -204,8 +204,8 @@ export const FormBuilder: React.FC = () => {
             <button
               type="button"
               onClick={() => setTab('photos')}
-              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
-                tab === 'photos' ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 transition ${
+                tab === 'photos' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36] hover:bg-gray-50'
               }`}
             >
               <ImageIcon size={16} />
@@ -216,7 +216,7 @@ export const FormBuilder: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAddingField(true)}
-                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 text-sm"
+                  className="px-3 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg flex items-center gap-1.5 text-sm"
                 >
                   <Plus size={16} /> Добавить поле
                 </button>
@@ -224,7 +224,7 @@ export const FormBuilder: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setAddingPhoto(true)}
-                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 text-sm"
+                  className="px-3 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg flex items-center gap-1.5 text-sm"
                 >
                   <Plus size={16} /> Добавить фото
                 </button>
@@ -365,7 +365,7 @@ const FieldFormModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -480,7 +480,7 @@ const FieldFormModal: React.FC<{
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl">Отмена</button>
             <button type="submit" disabled={saving}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
+              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
               {saving ? 'Сохраняем…' : 'Сохранить'}
             </button>
@@ -521,7 +521,7 @@ const PhotoFormModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -610,7 +610,7 @@ const PhotoFormModal: React.FC<{
           <div className="flex gap-2 pt-2">
             <button type="button" onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl">Отмена</button>
             <button type="submit" disabled={saving}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
+              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
               {saving ? 'Сохраняем…' : 'Сохранить'}
             </button>
