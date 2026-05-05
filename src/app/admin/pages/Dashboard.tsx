@@ -106,7 +106,17 @@ const FinanceSection: React.FC = () => {
           <p className="text-xs opacity-75 mt-1">{stats?.paidApplicationsCount ?? 0} оплачено · после скидок бонусами</p>
         </div>
 
-        <div className={`p-5 rounded-xl text-white bg-gradient-to-br ${(stats?.profit ?? 0) >= 0 ? 'from-emerald-500 to-emerald-700' : 'from-red-500 to-red-700'}`}>
+        <div
+          className={`p-5 rounded-xl text-white bg-gradient-to-br cursor-help ${(stats?.profit ?? 0) >= 0 ? 'from-emerald-500 to-emerald-700' : 'from-red-500 to-red-700'}`}
+          title={`Формула прибыли:
+Выручка (${fmtRub(stats?.revenue ?? 0)})
+− Себестоимость (${fmtRub(stats?.costOfGoods ?? 0)})
+− Налог (${fmtRub(stats?.taxes ?? 0)})
+− Партнёрам (${fmtRub(stats?.commissionsPaid ?? 0)})
+= Прибыль (${fmtRub(stats?.profit ?? 0)})
+
+Бонусы клиентов уже учтены в выручке (price − bonuses_used).`}
+        >
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Прибыль</p>
             <PiggyBank size={16} className="opacity-70" />
@@ -143,7 +153,15 @@ const FinanceSection: React.FC = () => {
       </div>
 
       {/* Bonus journal — информационно: как двигались балансы юзеров */}
-      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2">Журнал бонусов <span className="text-gray-400 normal-case tracking-normal">(информация — не влияет на прибыль)</span></p>
+      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2">
+        Журнал бонусов
+        <span
+          className="text-gray-400 normal-case tracking-normal cursor-help ml-1"
+          title="Эти суммы НЕ вычитаются из прибыли отдельно: выданные бонусы — это долг компании, реальный расход возникает только когда юзер применяет их при оплате визы (это уже учтено в выручке через price − bonuses_used)."
+        >
+          (информация — не влияет на прибыль ⓘ)
+        </span>
+      </p>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
         <div className="bg-gray-50 p-3 rounded-lg">
           <p className="text-xs text-gray-500">Welcome (+200₽ за реф.)</p>
@@ -153,8 +171,11 @@ const FinanceSection: React.FC = () => {
           <p className="text-xs text-gray-500">Прочие (daily/admin/…)</p>
           <p className="text-lg font-semibold text-gray-700">+{fmtRub(stats?.otherBonusesPaid ?? 0)}</p>
         </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Списано клиентами при оплате</p>
+        <div
+          className="bg-gray-50 p-3 rounded-lg cursor-help"
+          title="Эти бонусы клиенты применили как скидку при оплате визы. Они УЖЕ снижают прибыль через выручку (revenue = price − bonuses_used) — отдельно из прибыли не вычитаются."
+        >
+          <p className="text-xs text-gray-500">Списано клиентами <span className="text-gray-400">(уже в выручке) ⓘ</span></p>
           <p className="text-lg font-semibold text-gray-700">−{fmtRub(stats?.bonusesUsed ?? 0)}</p>
         </div>
       </div>
