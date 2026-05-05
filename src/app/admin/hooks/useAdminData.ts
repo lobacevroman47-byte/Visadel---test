@@ -202,8 +202,9 @@ export async function updateApplicationStatus(
     if (visaFileUrl) patch.visa_file_url = visaFileUrl;
     await supabase.from('applications').update(patch).eq('id', id);
 
-    // Log status change to audit trail (skip if status didn't actually change)
-    if (prevStatus && prevStatus !== status) {
+    // Log every save attempt while we diagnose. Skip strictly only when prevStatus is missing.
+    console.log('[status_log] writing:', { id, prevStatus, status, changed: prevStatus !== status });
+    if (prevStatus) {
       const { error: logError } = await supabase.from('status_log').insert({
         application_id: id,
         from_status: prevStatus,
@@ -212,11 +213,12 @@ export async function updateApplicationStatus(
         changed_by_name: changedBy?.name ?? null,
       });
       if (logError) {
-        // supabase-js doesn't throw on errors — putting them in response.
-        // Surface this so we can diagnose; don't block the status change itself.
         console.error('[status_log] insert failed:', logError);
-        alert(`⚠️ Статус обновлён, но запись в истории не создалась:\n${logError.message}\n\nКод: ${logError.code}\nДеталь: ${logError.details ?? '—'}\nПодсказка: ${logError.hint ?? '—'}`);
+        alert(`⚠️ Запись истории не создалась:\n${logError.message}\nКод: ${logError.code}\nДеталь: ${logError.details ?? '—'}`);
       }
+    } else {
+      console.warn('[status_log] skipped: prevStatus is empty', { id, status });
+      alert(`⚠️ История не пишется: prevStatus пустой (status=${status})`);
     }
   }
 
