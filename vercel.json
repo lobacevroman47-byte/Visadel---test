@@ -14,7 +14,7 @@
   "crons": [
     {
       "path": "/api/process-reminders",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 9 * * *"
     }
   ]
 }
