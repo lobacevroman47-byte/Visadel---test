@@ -256,7 +256,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
             </button>
           </div>
 
-          {/* Progress bar — always visible but thinner */}
+          {/* Progress bar + step counter — always visible (incl. when keyboard is open) */}
           <div className="mt-1.5">
             <div className="h-1 bg-white/25 rounded-full overflow-hidden">
               <motion.div
@@ -266,12 +266,10 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
                 transition={{ duration: 0.3 }}
               />
             </div>
-            {!keyboardOpen && (
-              <div className="flex justify-between text-[10px] text-blue-200 mt-0.5">
-                <span>Шаг {currentStep + 1}/{STEPS.length}</span>
-                <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
-              </div>
-            )}
+            <div className="flex justify-between text-[10px] text-blue-200 mt-0.5">
+              <span>Шаг {currentStep + 1}/{STEPS.length}</span>
+              <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
+            </div>
           </div>
         </div>
       </div>
