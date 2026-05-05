@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Mail, Phone, MessageCircle } from 'lucide-react';
+import { useTelegram } from '../../App';
 
 interface Step4Props {
   data: {
@@ -13,8 +14,21 @@ interface Step4Props {
 }
 
 export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Step4Props) {
+  const { appUser } = useTelegram();
   const [formData, setFormData] = useState(data);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Auto-prefill from Telegram account on first open (only fills empty fields)
+  useEffect(() => {
+    if (!appUser) return;
+    setFormData(prev => {
+      const next = { ...prev };
+      if (!prev.telegram && appUser.username) next.telegram = appUser.username;
+      if (!prev.phone && appUser.phone) next.phone = appUser.phone;
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [appUser?.telegram_id]);
 
   useEffect(() => {
     onChange(formData);
