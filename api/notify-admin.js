@@ -73,11 +73,13 @@ export default async function handler(req, res) {
       `Оценка: ${'⭐'.repeat(review_rating ?? 5)}\n\n` +
       `<i>${(review_text ?? '').slice(0, 200)}</i>`;
   } else {
+    // Customer name (Имя + Фамилия) is the most useful piece — make it the title.
+    const nameLine = customer_name ? `<b>${customer_name}</b>` : '<i>Имя не указано</i>';
     text =
-      `📋 <b>Новая заявка${urgent ? ' (СРОЧНАЯ 🔥)' : ''}</b>\n\n` +
+      `📋 <b>Новая заявка${urgent ? ' · СРОЧНАЯ 🔥' : ''}</b>\n` +
+      `${nameLine}\n\n` +
       `🌍 ${country ?? '—'} · ${visa_type ?? ''}\n` +
       `💰 ${price ? `${price.toLocaleString('ru-RU')} ₽` : '—'}\n` +
-      (customer_name ? `👤 ${customer_name}\n` : '') +
       (customer_telegram ? `📱 @${String(customer_telegram).replace('@', '')}\n` : '') +
       `\nЗайди в админку и подтверди оплату.`;
   }
