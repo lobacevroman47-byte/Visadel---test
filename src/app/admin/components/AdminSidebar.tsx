@@ -98,6 +98,15 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
         </div>
         <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mt-2">Админ-панель</p>
+        {onBackToApp && (
+          <button
+            onClick={onBackToApp}
+            className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-[#EAF1FF] hover:bg-[#DCE7FF] text-[#3B5BFF] text-xs font-bold uppercase tracking-wider transition active:scale-[0.98]"
+          >
+            <ArrowLeft size={14} strokeWidth={2.5} />
+            К мини-аппу
+          </button>
+        )}
       </div>
 
       {/* User Info */}

@@ -12,7 +12,7 @@ import { AdditionalServices } from '../pages/AdditionalServices';
 import { Reviews } from '../pages/Reviews';
 import { BonusLogs } from '../pages/BonusLogs';
 import { useAdmin } from '../contexts/AdminContext';
-import { Menu } from 'lucide-react';
+import { Menu, ArrowLeft } from 'lucide-react';
 
 interface AdminLayoutProps {
   onBackToApp?: () => void;
@@ -189,7 +189,19 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
             <span className="text-[#0F2A36] font-extrabold text-[15px] tracking-tight">VISADEL</span>
             <span className="ml-1 text-[9px] uppercase tracking-widest text-[#3B5BFF] font-bold">Admin</span>
           </div>
-          <span className="w-9" />
+          {onBackToApp ? (
+            <button
+              onClick={onBackToApp}
+              className="h-9 px-2.5 rounded-xl bg-[#EAF1FF] text-[#3B5BFF] text-[11px] font-bold uppercase tracking-wider flex items-center gap-1 active:scale-95 transition"
+              aria-label="К мини-аппу"
+              title="К мини-аппу"
+            >
+              <ArrowLeft size={14} strokeWidth={2.5} />
+              <span className="hidden xs:inline">Мини-апп</span>
+            </button>
+          ) : (
+            <span className="w-9" />
+          )}
         </div>
       </div>
 

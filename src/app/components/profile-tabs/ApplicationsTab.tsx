@@ -22,7 +22,7 @@ interface ApplicationsTabProps {
 const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
   draft:                { label: 'Черновик',                icon: '📝', color: 'bg-gray-100 text-gray-700' },
   pending_payment:      { label: 'Ожидает оплаты',          icon: '💰', color: 'bg-yellow-100 text-yellow-700' },
-  pending_confirmation: { label: 'Ожидает подтверждения',   icon: '⏳', color: 'bg-blue-100 text-blue-700' },
+  pending_confirmation: { label: 'Ожидает подтверждения',   icon: '⏳', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
   in_progress:          { label: 'В работе',                icon: '✅', color: 'bg-green-100 text-green-700' },
   ready:                { label: 'Готово',                  icon: '🎉', color: 'bg-purple-100 text-purple-700' },
 };
@@ -57,14 +57,14 @@ function StatusProgress({ status }: { status: string }) {
               {/* Step circle + label */}
               <div className="flex flex-col items-center gap-1 min-w-[44px]">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shadow-sm transition-all ${
-                  done   ? 'bg-blue-500 text-white shadow-blue-200' :
-                  active ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 shadow-blue-300' :
+                  done   ? 'bg-[#3B5BFF] text-white' :
+                  active ? 'vd-grad text-white ring-2 ring-[#5C7BFF]/30 ring-offset-1 shadow-md' :
                            'bg-gray-100 text-gray-400'
                 }`}>
                   {done ? '✓' : step.icon}
                 </div>
                 <span className={`text-[9px] text-center leading-tight whitespace-pre-line ${
-                  active ? 'text-blue-600 font-semibold' : done ? 'text-blue-400' : 'text-gray-400'
+                  active ? 'text-[#3B5BFF] font-semibold' : done ? 'text-[#5C7BFF]' : 'text-gray-400'
                 }`}>
                   {step.label}
                 </span>
@@ -72,7 +72,7 @@ function StatusProgress({ status }: { status: string }) {
               {/* Connector line */}
               {idx < PROGRESS_STEPS.length - 1 && (
                 <div className={`flex-1 h-0.5 mt-4 mx-0.5 rounded-full transition-colors ${
-                  done ? 'bg-blue-500' : 'bg-gray-200'
+                  done ? 'bg-[#3B5BFF]' : 'bg-gray-200'
                 }`} />
               )}
             </div>
@@ -172,7 +172,7 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 font-medium"
+            className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 font-medium"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {submitting ? 'Отправляем...' : 'Отправить отзыв'}
@@ -354,7 +354,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#5C7BFF]" />
       </div>
     );
   }
@@ -412,7 +412,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                   ) : (
                     <div className="flex gap-2">
                       <button onClick={() => onContinueDraft?.(draft)}
-                        className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition text-sm">
+                        className="flex-1 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white py-2 rounded-lg transition text-sm">
                         Продолжить
                       </button>
                       <button onClick={() => setDeletingDraftKey(draft.draftKey)}
@@ -546,9 +546,9 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                     )}
 
                     {app.status === 'pending_confirmation' && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
-                        <Clock className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                        <p className="text-sm text-blue-800">Ожидаем подтверждение оплаты. Скоро возьмём заявку в работу</p>
+                      <div className="bg-[#EAF1FF] border border-[#5C7BFF]/20 rounded-lg p-3 flex items-start gap-2">
+                        <Clock className="w-4 h-4 text-[#3B5BFF] mt-0.5 shrink-0" />
+                        <p className="text-sm text-[#0F2A36]">Ожидаем подтверждение оплаты. Скоро возьмём заявку в работу</p>
                       </div>
                     )}
                   </div>
