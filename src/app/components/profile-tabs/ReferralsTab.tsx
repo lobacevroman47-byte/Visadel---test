@@ -99,8 +99,9 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         open(`https://vk.com/share.php?url=${encodeURIComponent(link)}&title=${encodeURIComponent('Visadel Agency')}&description=${encodeURIComponent(shareText)}`);
         break;
       case 'instagram':
+        // Текст в буфер + открываем Instagram (на мобиле универсальная ссылка откроет приложение)
         navigator.clipboard.writeText(shareText).catch(() => {});
-        alert('Текст скопирован! Откройте Instagram и вставьте в сториз или сообщение.');
+        open('https://www.instagram.com/');
         break;
       case 'tiktok':
         navigator.clipboard.writeText(shareText).catch(() => {});
@@ -436,11 +437,21 @@ function ShareBtn({ label, icon, color, onClick }: { label: string; icon: React.
   );
 }
 
-// MAX мессенджер — простая SVG-иконка (стилизованная буква M)
+// MAX мессенджер — фирменный логотип в виде сферы с вписанным символом (white-on-blue)
 function MaxIcon({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
-      <path d="M3 4h3.5l5.5 9 5.5-9H21v16h-3.5V10.5l-4.5 7.5h-2L6.5 10.5V20H3V4z" />
+    <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
+      <defs>
+        <linearGradient id="maxGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="1" />
+          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.85" />
+        </linearGradient>
+      </defs>
+      {/* Внешний круг (фон уже даёт кнопка, поэтому делаем только M) */}
+      <path
+        fill="url(#maxGrad)"
+        d="M5 6.5 C5 5.7 5.7 5 6.5 5 L8.5 5 C9.1 5 9.6 5.3 9.9 5.8 L15.1 14.2 C15.5 14.8 16.5 14.8 16.9 14.2 L22.1 5.8 C22.4 5.3 22.9 5 23.5 5 L25.5 5 C26.3 5 27 5.7 27 6.5 L27 25.5 C27 26.3 26.3 27 25.5 27 L24 27 C23.2 27 22.5 26.3 22.5 25.5 L22.5 14.5 L18.5 21 C17.5 22.6 14.5 22.6 13.5 21 L9.5 14.5 L9.5 25.5 C9.5 26.3 8.8 27 8 27 L6.5 27 C5.7 27 5 26.3 5 25.5 Z"
+      />
     </svg>
   );
 }
