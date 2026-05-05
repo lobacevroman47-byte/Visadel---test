@@ -37,6 +37,9 @@ export interface Application {
   // Snapshot of USD→RUB rate for this specific application — used to compute
   // cost-of-goods in finance reports. Editable by admin per application.
   usd_rate_rub?: number;
+  // Tax percent applied to this application's price (УСН/самозанятый, default 4%).
+  // Editable by admin per application; finance reports subtract this from profit.
+  tax_pct?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -274,6 +277,7 @@ export async function saveApplication(app: Application): Promise<Application> {
         payment_proof_url: app.payment_proof_url ?? null,
         bonuses_used: app.bonuses_used,
         usd_rate_rub: app.usd_rate_rub ?? BONUS_CONFIG.USD_RATE_RUB,
+        tax_pct: app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT,
       })
       .select()
       .single();
@@ -745,13 +749,16 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
 // ─── Finance / Analytics ──────────────────────────────────────────────────────
 
 export interface FinanceStats {
-  revenue: number;          // Выручка: Σ (price − bonuses_used) по оплаченным заявкам
-  costOfGoods: number;      // Себестоимость: Σ (cost_usd_fee + cost_usd_commission) × USD_RATE
-  commissionsPaid: number;  // Комиссии: Σ выплат партнёрам и обычным реферрерам (bonus_logs type='referral')
-  bonusesIssued: number;    // Бонусы выдано всего: welcome + referral + review (bonus_logs)
-  bonusesUsed: number;      // Бонусы списано клиентами при оплате (применены как скидка)
-  bonusesOutstanding: number; // Долг: текущая сумма на балансах всех юзеров
-  profit: number;           // Прибыль = revenue − costOfGoods − commissionsPaid
+  revenue: number;          // Выручка = Σ (price − bonuses_used) по оплаченным заявкам
+  costOfGoods: number;      // Себестоимость = Σ (cost_usd_fee + cost_usd_commission) × app.usd_rate_rub
+  taxes: number;            // Налог = Σ (price × app.tax_pct / 100)
+  commissionsPaid: number;  // Партнёрам = Σ bonus_logs WHERE type='referral'
+  welcomeBonusesPaid: number; // Новичкам = Σ bonus_logs WHERE type='welcome' (200₽ за переход по ссылке)
+  otherBonusesPaid: number; // Прочее = Σ bonus_logs WHERE type IN ('review','level','daily', …)
+  bonusesIssued: number;    // Σ всех начислений (welcomeBonusesPaid + commissionsPaid + otherBonusesPaid)
+  bonusesUsed: number;      // Σ bonuses_used — клиенты применили как скидку (уже учтено в выручке)
+  bonusesOutstanding: number; // Текущий долг: Σ users.bonus_balance
+  profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid − welcomeBonusesPaid − otherBonusesPaid
   paidApplicationsCount: number;
   series: { date: string; revenue: number; profit: number }[]; // ежедневная динамика
 }
@@ -759,7 +766,8 @@ export interface FinanceStats {
 // Period in days; 0 means "all time"
 export async function getFinanceStats(periodDays: number): Promise<FinanceStats> {
   const empty: FinanceStats = {
-    revenue: 0, costOfGoods: 0, commissionsPaid: 0,
+    revenue: 0, costOfGoods: 0, taxes: 0,
+    commissionsPaid: 0, welcomeBonusesPaid: 0, otherBonusesPaid: 0,
     bonusesIssued: 0, bonusesUsed: 0, bonusesOutstanding: 0,
     profit: 0, paidApplicationsCount: 0, series: [],
   };
@@ -772,7 +780,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   // Apps query — only paid statuses count toward revenue
   let appsQ = supabase
     .from('applications')
-    .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub')
+    .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub, tax_pct')
     .in('status', ['in_progress', 'ready']);
   if (sinceISO) appsQ = appsQ.gte('updated_at', sinceISO);
 
@@ -788,7 +796,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
 
   const [appsRes, bonusRes, balanceRes, productsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ]);
 
-  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null }>;
+  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null; tax_pct: number | null }>;
   const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
   const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
   const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
@@ -806,22 +814,36 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
     return usd * rate;
   };
 
+  // Per-app tax (% of full sticker price, not net of bonuses — matches УСН/самозанятый base)
+  const taxForApp = (a: { price: number; tax_pct: number | null }) => {
+    const pct = a.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT;
+    return ((a.price ?? 0) * pct) / 100;
+  };
+
   let revenue = 0;
   let bonusesUsed = 0;
   let costOfGoods = 0;
+  let taxes = 0;
   for (const a of apps) {
     revenue += (a.price ?? 0) - (a.bonuses_used ?? 0);
     bonusesUsed += a.bonuses_used ?? 0;
     costOfGoods += costForApp(a);
+    taxes += taxForApp(a);
   }
 
   const commissionsPaid = bonusLogs
     .filter(b => b.type === 'referral')
     .reduce((s, b) => s + (b.amount ?? 0), 0);
-  const bonusesIssued = bonusLogs.reduce((s, b) => s + (b.amount ?? 0), 0);
+  const welcomeBonusesPaid = bonusLogs
+    .filter(b => b.type === 'welcome')
+    .reduce((s, b) => s + (b.amount ?? 0), 0);
+  const otherBonusesPaid = bonusLogs
+    .filter(b => !['referral', 'welcome'].includes(b.type))
+    .reduce((s, b) => s + (b.amount ?? 0), 0);
+  const bonusesIssued = commissionsPaid + welcomeBonusesPaid + otherBonusesPaid;
   const bonusesOutstanding = balances.reduce((s, b) => s + (b.bonus_balance ?? 0), 0);
 
-  const profit = revenue - costOfGoods - commissionsPaid;
+  const profit = revenue - costOfGoods - taxes - commissionsPaid - welcomeBonusesPaid - otherBonusesPaid;
 
   // Build daily series — buckets only for displayed period (cap at 90 days for chart density)
   const seriesDays = periodDays > 0 ? Math.min(periodDays, 90) : 30;
@@ -830,23 +852,27 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   for (let i = seriesDays - 1; i >= 0; i--) {
     const d = new Date(today); d.setDate(d.getDate() - i);
     const key = d.toISOString().slice(0, 10);
-    let dayRev = 0, dayCost = 0;
+    let dayRev = 0, dayCost = 0, dayTax = 0;
     for (const a of apps) {
       if (a.updated_at?.slice(0, 10) === key) {
         dayRev += (a.price ?? 0) - (a.bonuses_used ?? 0);
         dayCost += costForApp(a);
+        dayTax += taxForApp(a);
       }
     }
-    const dayCommissions = bonusLogs
-      .filter(b => b.type === 'referral' && b.created_at?.slice(0, 10) === key)
+    const dayBonusOuts = bonusLogs
+      .filter(b => b.created_at?.slice(0, 10) === key)
       .reduce((s, b) => s + (b.amount ?? 0), 0);
-    series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayCommissions });
+    series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayTax - dayBonusOuts });
   }
 
   return {
     revenue,
     costOfGoods,
+    taxes,
     commissionsPaid,
+    welcomeBonusesPaid,
+    otherBonusesPaid,
     bonusesIssued,
     bonusesUsed,
     bonusesOutstanding,

@@ -22,6 +22,7 @@ export interface AdminApplication {
   visaFileUrl?: string;
   telegramId: number;
   usdRateRub: number;
+  taxPct: number;
 }
 
 export type AdminStaffRole = 'founder' | 'admin' | 'moderator';
@@ -79,6 +80,7 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
     paymentProofUrl: row.payment_proof_url as string | undefined,
     visaFileUrl: row.visa_file_url as string | undefined,
     usdRateRub: (row.usd_rate_rub as number) ?? 100,
+    taxPct: (row.tax_pct as number) ?? 4,
   };
 }
 
@@ -134,12 +136,13 @@ export function useAdminApplications() {
           urgent: Boolean(a.urgent),
           formData: (a.formData as Record<string, unknown>) ?? {},
           usdRateRub: 100,
+          taxPct: 4,
         }));
-        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100 }))]);
+        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100, taxPct: 4 }))]);
       }
     } catch (err) {
       console.error('Fetch applications error:', err);
-      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100 })));
+      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100, taxPct: 4 })));
     } finally {
       setLoading(false);
     }
@@ -217,6 +220,12 @@ export async function updateApplicationStatus(
 export async function updateApplicationUsdRate(id: string, rate: number) {
   if (!isSupabaseConfigured()) return;
   await supabase.from('applications').update({ usd_rate_rub: rate }).eq('id', id);
+}
+
+// Per-application tax % (УСН/самозанятый rate may vary; used in finance reports)
+export async function updateApplicationTaxPct(id: string, pct: number) {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('applications').update({ tax_pct: pct }).eq('id', id);
 }
 
 // ─── Status log (audit trail) ──────────────────────────────────────────────

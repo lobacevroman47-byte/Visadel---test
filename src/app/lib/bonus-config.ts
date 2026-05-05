@@ -21,7 +21,8 @@ export const BONUS_CONFIG = {
   MAX_BONUS_USAGE_PARTNER: null as number | null, // null = 100% allowed for partners
 
   // ── Finance ────────────────────────────────────────────────────────────────
-  USD_RATE_RUB: 100,                     // используется для расчёта себестоимости (cost_usd_fee + cost_usd_commission) в рубли
+  USD_RATE_RUB: 100,                     // курс по умолчанию для НОВЫХ заявок (можно поменять для каждой заявки в админке)
+  TAX_PCT_DEFAULT: 4,                    // налог % по умолчанию для НОВЫХ заявок (УСН для самозанятых)
 };
 
 // Maximum bonus usage per order, derived from PAID referrals count (level)

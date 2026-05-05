@@ -5,6 +5,7 @@ import {
   useAdminApplications,
   updateApplicationStatus,
   updateApplicationUsdRate,
+  updateApplicationTaxPct,
   uploadVisaFile,
   getStatusLog,
   type AdminApplication as Application,
@@ -410,6 +411,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const { currentUser } = useAdmin();
   const [status, setStatus] = useState(application.status);
   const [usdRate, setUsdRate] = useState(application.usdRateRub);
+  const [taxPct, setTaxPct] = useState(application.taxPct);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
@@ -474,9 +476,12 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         prevStatus, adminInfo,
       );
 
-      // Persist USD rate if admin changed it (used for cost-of-goods in finance reports)
+      // Persist USD rate / tax % if admin changed them (used in finance reports)
       if (usdRate !== application.usdRateRub && usdRate > 0) {
         await updateApplicationUsdRate(application.id, usdRate);
+      }
+      if (taxPct !== application.taxPct && taxPct >= 0) {
+        await updateApplicationTaxPct(application.id, taxPct);
       }
 
       // Refresh log if status actually changed
@@ -620,20 +625,36 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 )}
               </div>
 
-              {/* USD rate snapshot (used for profit calc on this specific application) */}
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
-                <label className="block text-sm text-gray-700 mb-1 font-medium">Курс USD на момент заявки</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-500">1$ =</span>
-                  <input
-                    type="number" value={usdRate} step="0.01" min={1}
-                    onChange={(e) => setUsdRate(parseFloat(e.target.value) || 0)}
-                    className="flex-1 px-3 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  />
-                  <span className="text-sm text-gray-500">₽</span>
+              {/* Финансы заявки — снапшот курса + налог + live превью прибыли */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-3">
+                <p className="text-xs font-medium text-amber-800 uppercase tracking-wider">Финансы заявки</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-gray-700 mb-1">Курс USD на момент оплаты</label>
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-500">1$ =</span>
+                      <input
+                        type="number" value={usdRate} step="0.01" min={1}
+                        onChange={(e) => setUsdRate(parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                      />
+                      <span className="text-xs text-gray-500">₽</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-700 mb-1">Налог (%)</label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number" value={taxPct} step="0.5" min={0} max={100}
+                        onChange={(e) => setTaxPct(parseFloat(e.target.value) || 0)}
+                        className="flex-1 px-2 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                      />
+                      <span className="text-xs text-gray-500">%</span>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Используется для расчёта себестоимости в «Финансах». Меняй если курс на момент оплаты отличался.
+                <p className="text-xs text-gray-500">
+                  Курс и налог влияют на расчёт прибыли в «Финансах». Налог считается от полной цены ({application.cost.toLocaleString('ru-RU')} ₽ × {taxPct}% = {Math.round(application.cost * taxPct / 100).toLocaleString('ru-RU')} ₽).
                 </p>
               </div>
 

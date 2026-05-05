@@ -128,22 +128,30 @@ const FinanceSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Breakdown row — 4 small cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      {/* Breakdown row — все компоненты прибыли */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Себестоимость виз</p>
-          <p className="text-lg font-semibold text-gray-800">{fmtRub(stats?.costOfGoods ?? 0)}</p>
+          <p className="text-xs text-gray-500">Себестоимость</p>
+          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.costOfGoods ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Комиссии партнёрам</p>
-          <p className="text-lg font-semibold text-gray-800">{fmtRub(stats?.commissionsPaid ?? 0)}</p>
+          <p className="text-xs text-gray-500">Налог</p>
+          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.taxes ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Бонусов выдано</p>
-          <p className="text-lg font-semibold text-gray-800">{fmtRub(stats?.bonusesIssued ?? 0)}</p>
+          <p className="text-xs text-gray-500">Партнёрам</p>
+          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.commissionsPaid ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Бонусов списано</p>
+          <p className="text-xs text-gray-500">Новичкам по реф.</p>
+          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.welcomeBonusesPaid ?? 0)}</p>
+        </div>
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-500">Прочие бонусы</p>
+          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.otherBonusesPaid ?? 0)}</p>
+        </div>
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <p className="text-xs text-gray-500">Списано клиентами</p>
           <p className="text-lg font-semibold text-gray-800">{fmtRub(stats?.bonusesUsed ?? 0)}</p>
         </div>
       </div>
