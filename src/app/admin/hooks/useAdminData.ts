@@ -324,6 +324,22 @@ export async function updateUserBonuses(telegramId: number, amount: number, add:
   const current = (data as { bonus_balance: number } | null)?.bonus_balance ?? 0;
   const newBalance = add ? current + amount : Math.max(0, current - amount);
   await supabase.from('users').update({ bonus_balance: newBalance }).eq('telegram_id', telegramId);
+
+  // Audit trail — log every manual change so the bonus journal & finance dashboard
+  // reflect reality. Signed amount: positive = grant, negative = revoke.
+  try {
+    const signed = add ? amount : -amount;
+    await supabase.from('bonus_logs').insert({
+      telegram_id: telegramId,
+      type: add ? 'admin_grant' : 'admin_revoke',
+      amount: signed,
+      description: add
+        ? `Админ начислил +${amount}₽ через панель`
+        : `Админ снял −${amount}₽ через панель`,
+    });
+  } catch (e) {
+    console.warn('admin bonus log insert failed', e);
+  }
 }
 
 export async function updateUserStatus(telegramId: number, isInfluencer: boolean) {
