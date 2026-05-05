@@ -65,7 +65,7 @@ function AvatarPicker({ value, onChange }: { value: string; onChange: (v: string
       {AVATARS.map(a => (
         <button key={a} type="button" onClick={() => onChange(a)}
           className={`w-11 h-11 text-2xl rounded-xl border-2 transition-all ${
-            value === a ? 'border-[#2196F3] bg-blue-50 scale-105' : 'border-gray-100 hover:border-gray-300 bg-gray-50'
+            value === a ? 'border-[#3B5BFF] bg-blue-50 scale-105' : 'border-gray-100 hover:border-gray-300 bg-gray-50'
           }`}>
           {a}
         </button>
@@ -128,13 +128,13 @@ function ReviewModal({ initial, title, onSave, onClose }: {
               <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Имя</label>
               <input value={form.authorName} onChange={e => set('authorName', e.target.value)}
                 placeholder="Иван Петров"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]" />
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/30 focus:border-[#3B5BFF]" />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Страна</label>
               <input value={form.country} onChange={e => set('country', e.target.value)}
                 placeholder="Индия"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3]" />
+                className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/30 focus:border-[#3B5BFF]" />
             </div>
           </div>
 
@@ -143,7 +143,7 @@ function ReviewModal({ initial, title, onSave, onClose }: {
             <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Текст отзыва</label>
             <textarea value={form.text} onChange={e => set('text', e.target.value)}
               rows={4} placeholder="Отличный сервис, всё сделали быстро и без проблем!"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#2196F3]/30 focus:border-[#2196F3] resize-none" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/30 focus:border-[#3B5BFF] resize-none" />
           </div>
         </div>
 
@@ -153,7 +153,7 @@ function ReviewModal({ initial, title, onSave, onClose }: {
             Отмена
           </button>
           <button onClick={handleSave} disabled={!canSave || saving}
-            className="flex-1 py-2.5 rounded-xl bg-[#2196F3] text-white text-sm font-semibold hover:bg-[#1E88E5] transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+            className="flex-1 py-2.5 rounded-xl bg-[#3B5BFF] text-white text-sm font-semibold hover:bg-[#4F2FE6] transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
             {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
             {saving ? 'Сохраняем...' : 'Сохранить'}
           </button>
@@ -390,7 +390,7 @@ export const Reviews: React.FC = () => {
             Обновить
           </button>
           <button onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#2196F3] text-white rounded-xl text-sm font-semibold hover:bg-[#1E88E5] active:scale-95 transition-all shadow-sm">
+            className="flex items-center gap-2 px-4 py-2.5 bg-[#3B5BFF] text-white rounded-xl text-sm font-semibold hover:bg-[#4F2FE6] active:scale-95 transition-all shadow-sm">
             <Plus className="w-4 h-4" />
             Добавить
           </button>
@@ -439,7 +439,7 @@ export const Reviews: React.FC = () => {
           ([key, label, cnt]) => (
             <button key={key} onClick={() => setFilter(key as Filter)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                filter === key ? 'bg-[#2196F3] text-white' : 'text-gray-500 hover:bg-gray-50'
+                filter === key ? 'bg-[#3B5BFF] text-white' : 'text-gray-500 hover:bg-gray-50'
               }`}>
               {label}
               <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
@@ -507,7 +507,7 @@ export const Reviews: React.FC = () => {
                       )}
                       <button onClick={() => setEditReview(review)}
                         title="Редактировать"
-                        className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-[#2196F3] hover:bg-blue-50 rounded-xl transition-all">
+                        className="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-[#3B5BFF] hover:bg-blue-50 rounded-xl transition-all">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 112.828 2.828L11.828 15.828a2 2 0 01-1.414.586H9v-2a2 2 0 01.586-1.414z" />
                         </svg>

@@ -101,7 +101,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       {!isSidebarOpen && (
         <button
           onClick={toggleSidebar}
-          className="lg:hidden fixed top-4 left-4 z-50 p-3.5 bg-[#2196F3] text-white rounded-xl shadow-lg hover:bg-[#1E88E5] transition-all active:scale-95 hover:shadow-xl"
+          className="lg:hidden fixed top-4 left-4 z-50 p-3.5 bg-[#3B5BFF] text-white rounded-xl shadow-lg hover:bg-[#4F2FE6] transition-all active:scale-95 hover:shadow-xl"
           aria-label="Открыть меню"
           title="Открыть меню"
         >

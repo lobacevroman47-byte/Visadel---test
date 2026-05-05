@@ -30,18 +30,18 @@ export const AdminLogin: React.FC = () => {
 
   if (!tgChecked) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#2196F3] to-[#1565C0] flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-[#3B5BFF] to-[#4F2FE6] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-white animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#2196F3] to-[#1565C0] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-[#3B5BFF] to-[#4F2FE6] flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="w-8 h-8 text-[#2196F3]" />
+            <ShieldCheck className="w-8 h-8 text-[#3B5BFF]" />
           </div>
           <h1 className="text-xl font-semibold text-gray-800 mb-1">Visadel Agency</h1>
           <p className="text-gray-500 text-sm">Вход в панель управления</p>
@@ -57,7 +57,7 @@ export const AdminLogin: React.FC = () => {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#2196F3] focus:border-transparent"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] focus:border-transparent"
               placeholder="Введите пароль"
               autoComplete="current-password"
               required
@@ -73,7 +73,7 @@ export const AdminLogin: React.FC = () => {
           <button
             type="submit"
             disabled={loading || !password.trim()}
-            className="w-full bg-[#2196F3] hover:bg-[#1E88E5] disabled:opacity-60 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white py-3 rounded-xl transition-colors flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {loading ? 'Проверяем...' : 'Войти'}

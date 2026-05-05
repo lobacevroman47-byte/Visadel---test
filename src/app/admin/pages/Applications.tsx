@@ -976,7 +976,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
               placeholder="ID, имя, Telegram, телефон, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+              className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
             />
             {searchQuery && (
               <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
@@ -985,7 +985,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
             )}
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3] text-sm">
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] text-sm">
             <option value="all">Все статусы</option>
             <option value="draft">Черновик</option>
             <option value="pending_payment">Ожидает оплаты</option>
@@ -994,7 +994,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
             <option value="completed">Готово</option>
           </select>
           <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3] text-sm">
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] text-sm">
             <option value="all">Все страны</option>
             {countries.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
@@ -1007,13 +1007,13 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
           </div>
           <input
             type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
             title="С"
           />
           <span className="text-gray-400 text-xs">—</span>
           <input
             type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
             title="По"
           />
           <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition text-sm ${urgentOnly ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
@@ -1117,7 +1117,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                     <td className="px-4 py-3 text-sm">
                       <button onClick={() => setSelectedApp(app)}
                         className="p-2 hover:bg-gray-100 rounded-lg transition" title="Открыть заявку">
-                        <Eye size={18} className="text-[#2196F3]" />
+                        <Eye size={18} className="text-[#3B5BFF]" />
                       </button>
                     </td>
                   </tr>
