@@ -175,15 +175,51 @@ export async function updateApplicationStatus(
   telegramId?: number,
   country?: string,
   visaType?: string,
+  prevStatus?: AdminApplication['status'],
+  changedBy?: { id: number; name: string },
 ) {
   const dbStatus = status === 'completed' ? 'ready' : status;
   if (isSupabaseConfigured()) {
     const patch: Record<string, unknown> = { status: dbStatus };
     if (visaFileUrl) patch.visa_file_url = visaFileUrl;
     await supabase.from('applications').update(patch).eq('id', id);
+
+    // Log status change to audit trail (skip if status didn't actually change)
+    if (prevStatus && prevStatus !== status) {
+      try {
+        await supabase.from('status_log').insert({
+          application_id: id,
+          from_status: prevStatus,
+          to_status: status,
+          changed_by_id: changedBy?.id ?? null,
+          changed_by_name: changedBy?.name ?? null,
+        });
+      } catch (e) { console.warn('status log insert failed', e); }
+    }
   }
 
   // Notification is sent by the caller (Applications.tsx handleSave) to avoid double-send
+}
+
+// ─── Status log (audit trail) ──────────────────────────────────────────────
+export interface StatusLogEntry {
+  id: string;
+  application_id: string;
+  from_status: string | null;
+  to_status: string;
+  changed_by_id: number | null;
+  changed_by_name: string | null;
+  created_at: string;
+}
+
+export async function getStatusLog(applicationId: string): Promise<StatusLogEntry[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data } = await supabase
+    .from('status_log')
+    .select('*')
+    .eq('application_id', applicationId)
+    .order('created_at', { ascending: true });
+  return (data as StatusLogEntry[]) ?? [];
 }
 
 export async function uploadVisaFile(file: File): Promise<string | null> {

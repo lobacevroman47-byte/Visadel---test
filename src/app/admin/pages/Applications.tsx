@@ -1,13 +1,16 @@
-import React, { useMemo, useState, useRef } from 'react';
-import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter } from 'lucide-react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
+import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, History, Clock } from 'lucide-react';
 import { statusLabels, statusColors } from '../data/mockData';
 import {
   useAdminApplications,
   updateApplicationStatus,
   uploadVisaFile,
+  getStatusLog,
   type AdminApplication as Application,
+  type StatusLogEntry,
 } from '../hooks/useAdminData';
 import { payReferralBonus } from '../../lib/db';
+import { useAdmin } from '../contexts/AdminContext';
 
 interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
@@ -336,17 +339,95 @@ const FilesView: React.FC<{ app: Application }> = ({ app }) => {
   );
 };
 
+// ── Status History Component ──────────────────────────────────────────────────
+const STATUS_LABELS_RU: Record<string, string> = {
+  draft: 'Черновик',
+  pending_payment: 'Ожидает оплаты',
+  pending_confirmation: 'Ожидает подтверждения',
+  in_progress: 'В работе',
+  completed: 'Готово',
+  ready: 'Готово',
+};
+
+const StatusHistory: React.FC<{
+  createdAt: string;
+  log: StatusLogEntry[];
+  loading: boolean;
+}> = ({ createdAt, log, loading }) => {
+  const fmt = (iso: string) =>
+    new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+  return (
+    <div className="mt-2 bg-gray-50 rounded-xl p-4 border border-gray-100">
+      <div className="flex items-center gap-2 mb-3">
+        <History className="w-4 h-4 text-gray-500" />
+        <h4 className="text-sm font-semibold text-gray-700">История изменений</h4>
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
+          <Loader2 className="w-3 h-3 animate-spin" /> Загружаем…
+        </div>
+      ) : (
+        <div className="relative pl-5 space-y-3">
+          <div className="absolute left-1.5 top-1.5 bottom-1.5 w-px bg-gray-200" />
+          {/* Creation entry */}
+          <div className="relative">
+            <div className="absolute -left-3.5 top-1 w-2 h-2 rounded-full bg-blue-400 ring-2 ring-white" />
+            <p className="text-xs text-gray-500">{fmt(createdAt)}</p>
+            <p className="text-sm text-gray-700">
+              <span className="font-medium">Заявка создана</span> · ожидает подтверждения
+            </p>
+          </div>
+          {/* Status changes */}
+          {log.map(entry => (
+            <div key={entry.id} className="relative">
+              <div className="absolute -left-3.5 top-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+              <p className="text-xs text-gray-500">{fmt(entry.created_at)}</p>
+              <p className="text-sm text-gray-700">
+                <span className="text-gray-400">{STATUS_LABELS_RU[entry.from_status ?? ''] ?? entry.from_status ?? '?'}</span>
+                {' → '}
+                <span className="font-medium">{STATUS_LABELS_RU[entry.to_status] ?? entry.to_status}</span>
+              </p>
+              {entry.changed_by_name && (
+                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
+                  <Clock className="w-3 h-3" /> {entry.changed_by_name}
+                </p>
+              )}
+            </div>
+          ))}
+          {log.length === 0 && (
+            <p className="text-xs text-gray-400 italic ml-1">Статус ещё не менялся</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Application Modal ─────────────────────────────────────────────────────────
 const ApplicationModal: React.FC<{ application: Application; onClose: () => void }> = ({ application, onClose }) => {
+  const { currentUser } = useAdmin();
   const [status, setStatus] = useState(application.status);
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
+  const [statusLog, setStatusLog] = useState<StatusLogEntry[]>([]);
+  const [logLoading, setLogLoading] = useState(true);
   const saveGuard = useRef(false); // prevent double-execution
 
   const tgUsername = (application.telegram ?? '').replace('@', '') ||
     ((application.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? '').replace('@', '');
+
+  // Load status history
+  useEffect(() => {
+    let cancelled = false;
+    setLogLoading(true);
+    getStatusLog(application.id)
+      .then(log => { if (!cancelled) setStatusLog(log); })
+      .finally(() => { if (!cancelled) setLogLoading(false); });
+    return () => { cancelled = true; };
+  }, [application.id]);
 
   // Returns: 'sent' | 'skipped' — throws on error
   const sendNotify = async (overrideStatus?: string): Promise<'sent' | 'skipped'> => {
@@ -377,7 +458,24 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         const url = await uploadVisaFile(visaFile);
         visaUrl = url ?? undefined;
       }
-      await updateApplicationStatus(application.id, status, visaUrl, application.telegramId, application.country, application.visaType);
+      const prevStatus = application.status;
+      const tgId = (() => {
+        try { return (window as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } } }).Telegram?.WebApp?.initDataUnsafe?.user?.id ?? 0; }
+        catch { return 0; }
+      })();
+      const adminInfo = currentUser
+        ? { id: tgId, name: `${currentUser.name}${currentUser.telegram ? ' ' + currentUser.telegram : ''}`.trim() }
+        : undefined;
+      await updateApplicationStatus(
+        application.id, status, visaUrl,
+        application.telegramId, application.country, application.visaType,
+        prevStatus, adminInfo,
+      );
+
+      // Refresh log if status actually changed
+      if (prevStatus !== status) {
+        getStatusLog(application.id).then(setStatusLog).catch(() => {});
+      }
 
       // Pay referral bonus to the referrer when admin confirms payment (status -> in_progress).
       // payReferralBonus has built-in checks: only first paid app counts, and uses bonus_logs for stats.
@@ -580,6 +678,13 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {saving ? 'Сохранение...' : 'Сохранить изменения'}
               </button>
+
+              {/* Status history */}
+              <StatusHistory
+                createdAt={application.date}
+                log={statusLog}
+                loading={logLoading}
+              />
             </div>
           )}
 
