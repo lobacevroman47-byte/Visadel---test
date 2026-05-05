@@ -25,3 +25,29 @@ export function partnerCommission(orderPriceRub: number, productCommissionPct?: 
   const pct = productCommissionPct ?? BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT;
   return Math.round((orderPriceRub * pct) / 100);
 }
+
+// ─── Referral achievement levels ───────────────────────────────────────────
+// Counts use total invited users (not only paid). Bonus is granted once per level.
+export interface ReferralLevel {
+  id: 1 | 2 | 3 | 4;
+  name: string;
+  minRefs: number;
+  bonus: number;
+  icon: string;
+  gradient: string;
+}
+
+export const REFERRAL_LEVELS: ReferralLevel[] = [
+  { id: 1, name: 'Новичок',    minRefs: 1,  bonus: 0,    icon: '🥉', gradient: 'from-amber-400 to-amber-600' },
+  { id: 2, name: 'Активист',   minRefs: 3,  bonus: 500,  icon: '🥈', gradient: 'from-gray-400 to-gray-600' },
+  { id: 3, name: 'Амбассадор', minRefs: 10, bonus: 2000, icon: '🥇', gradient: 'from-yellow-400 to-yellow-600' },
+  { id: 4, name: 'Легенда',    minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-purple-500 to-pink-600' },
+];
+
+export function getCurrentLevel(refCount: number): ReferralLevel | null {
+  return [...REFERRAL_LEVELS].reverse().find(l => refCount >= l.minRefs) ?? null;
+}
+
+export function getNextLevel(refCount: number): ReferralLevel | null {
+  return REFERRAL_LEVELS.find(l => refCount < l.minRefs) ?? null;
+}

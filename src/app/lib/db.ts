@@ -104,6 +104,8 @@ export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Pro
     }
 
     // Create new user
+    // Welcome bonus: 200₽ if user came via referral link
+    const welcomeBonus = referredBy ? 200 : 0;
     const { data: created, error } = await supabase
       .from('users')
       .insert({
@@ -112,7 +114,7 @@ export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Pro
         last_name: tgUser.last_name ?? null,
         username: tgUser.username ?? null,
         photo_url: tgUser.photo_url ?? null,
-        bonus_balance: 0,
+        bonus_balance: welcomeBonus,
         is_influencer: false,
         referral_code: referralCode,
         referred_by: referredBy ?? null,
@@ -122,6 +124,19 @@ export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Pro
       .single();
 
     if (error) throw error;
+
+    // Log welcome bonus
+    if (welcomeBonus > 0) {
+      try {
+        await supabase.from('bonus_logs').insert({
+          telegram_id: tgUser.id,
+          type: 'welcome',
+          amount: welcomeBonus,
+          description: `+${welcomeBonus}₽ приветственный бонус по реферальной ссылке`,
+        });
+      } catch (e) { console.warn('welcome bonus log failed', e); }
+    }
+
     const user = created as AppUser;
     lsSet(LS_KEY, user);
     return user;

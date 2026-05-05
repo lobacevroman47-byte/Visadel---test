@@ -1,8 +1,14 @@
-import { useEffect, useState } from 'react';
-import { Users, Copy, TrendingUp, Award, Share2, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Users, Copy, TrendingUp, Award, Share2, Loader2, Download, QrCode, Send, Calculator, Sparkles, Lock, Check } from 'lucide-react';
+import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
-import { BONUS_CONFIG } from '../../lib/bonus-config';
+import {
+  BONUS_CONFIG,
+  REFERRAL_LEVELS,
+  getCurrentLevel,
+  getNextLevel,
+} from '../../lib/bonus-config';
 
 interface ReferralTabProps {
   onOpenPartnerApplication?: () => void;
@@ -21,6 +27,9 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [showQR, setShowQR] = useState(false);
+  const [calcFriends, setCalcFriends] = useState(5);
+  const qrCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (!referralCode || !myTelegramId) { setLoading(false); return; }
@@ -29,7 +38,27 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
       setLoading(true);
       try {
         const s = await getReferralStats(referralCode, myTelegramId);
-        if (!cancelled) setStats(s);
+        if (cancelled) return;
+        setStats(s);
+
+        // Auto-grant level bonuses (idempotent via grant-bonus API + unique application_id)
+        for (const level of REFERRAL_LEVELS) {
+          if (level.bonus > 0 && s.totalReferrals >= level.minRefs) {
+            try {
+              await fetch('/api/grant-bonus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  telegram_id: myTelegramId,
+                  type: 'level',
+                  amount: level.bonus,
+                  description: `+${level.bonus}₽ за достижение уровня «${level.name}»`,
+                  application_id: `level_${level.id}_${myTelegramId}`,
+                }),
+              });
+            } catch (e) { console.warn('level bonus grant failed', e); }
+          }
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -38,35 +67,82 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   }, [referralCode, myTelegramId]);
 
   const link = `https://t.me/${BOT_USERNAME}?start=${referralCode}`;
+  const shareText = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке ты получишь 200₽ на первую визу: ${link}`;
 
-  const handleCopyLink = async () => {
+  const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      alert('Не удалось скопировать. Скопируйте вручную: ' + link);
+      alert('Не удалось скопировать. Скопируйте вручную:\n' + link);
     }
   };
 
-  const handleShare = async () => {
-    const text = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке: ${link}`;
-    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp;
-    if (tg?.openTelegramLink) {
-      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
-      return;
+  // Multi-channel sharing — opens corresponding social network share dialog
+  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'copy') => {
+    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void } } }).Telegram?.WebApp;
+    const open = (url: string) => {
+      if (channel === 'telegram' && tg?.openTelegramLink) tg.openTelegramLink(url);
+      else if (tg?.openLink) tg.openLink(url);
+      else window.open(url, '_blank');
+    };
+    switch (channel) {
+      case 'telegram':
+        open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
+        break;
+      case 'whatsapp':
+        open(`https://wa.me/?text=${encodeURIComponent(shareText)}`);
+        break;
+      case 'vk':
+        open(`https://vk.com/share.php?url=${encodeURIComponent(link)}&title=${encodeURIComponent('Visadel Agency')}&description=${encodeURIComponent(shareText)}`);
+        break;
+      case 'instagram':
+        navigator.clipboard.writeText(shareText).catch(() => {});
+        alert('Текст скопирован! Откройте Instagram и вставьте в сториз или сообщение.');
+        break;
+      case 'copy':
+        copyLink();
+        break;
     }
-    if (navigator.share) {
-      try { await navigator.share({ title: 'Visadel Agency', text }); return; } catch {/* user cancelled */}
-    }
-    await navigator.clipboard.writeText(text).catch(() => {});
-    alert('Текст для приглашения скопирован!');
   };
 
-  // Display amount per referral — partners see "%", regular users see fixed sum
-  const headlineRefBonus = isPartner
-    ? `до ${BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа`
-    : `+${BONUS_CONFIG.REFERRER_REGULAR}₽ за друга с оплаченной визой`;
+  const downloadQR = () => {
+    const canvas = qrCanvasRef.current;
+    if (!canvas) return;
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `visadel-referral-${referralCode}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 'image/png');
+  };
+
+  // Levels — derived from total referrals (всех приглашённых)
+  const refCount = stats.totalReferrals;
+  const currentLevel = getCurrentLevel(refCount);
+  const nextLevel = getNextLevel(refCount);
+  const progressPct = useMemo(() => {
+    if (!nextLevel) return 100;
+    const prevMin = currentLevel?.minRefs ?? 0;
+    const span = nextLevel.minRefs - prevMin;
+    const done = refCount - prevMin;
+    return Math.min(100, Math.max(0, Math.round((done / span) * 100)));
+  }, [refCount, currentLevel, nextLevel]);
+
+  // Calculator
+  const calcEarning = useMemo(() => {
+    if (isPartner) {
+      // partner: ~15% of avg visa price 4000₽ = 600 per friend
+      return calcFriends * 600;
+    }
+    return calcFriends * BONUS_CONFIG.REFERRER_REGULAR;
+  }, [calcFriends, isPartner]);
 
   if (!referralCode) {
     return (
@@ -77,124 +153,249 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   }
 
   return (
-    <div className="space-y-6">
-      {/* Hero Card */}
-      <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <Users className="w-8 h-8" />
-          <div>
-            <h3 className="text-xl">Реферальная программа</h3>
-            <p className="text-blue-100 text-sm">
-              {isPartner ? 'Статус: Партнёр 🌟' : 'Приглашай друзей'}
-            </p>
+    <div className="space-y-5">
+      {/* ── 1. Hero motivational header ─────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl p-5 text-white shadow-lg">
+        <div className="flex items-start gap-3 mb-3">
+          <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-2xl shrink-0">
+            {stats.totalEarnings > 0 ? '💰' : '🎁'}
           </div>
-        </div>
-
-        <div className="bg-white/20 rounded-lg p-4 mb-4 backdrop-blur-sm">
-          <p className="text-sm text-blue-100 mb-2">Ваш реферальный код:</p>
-          <div className="flex items-center gap-2">
-            <code className="flex-1 bg-white/30 px-3 py-2 rounded text-base break-all">{referralCode}</code>
-            <button
-              onClick={handleCopyLink}
-              className="p-2 bg-white/30 hover:bg-white/40 rounded transition flex items-center gap-1"
-              title="Скопировать ссылку"
-            >
-              <Copy className="w-5 h-5" />
-            </button>
+          <div className="flex-1 min-w-0">
+            {stats.totalEarnings > 0 ? (
+              <>
+                <p className="text-sm text-white/80">Вы заработали</p>
+                <p className="text-3xl font-bold">{stats.totalEarnings.toLocaleString('ru-RU')}₽</p>
+                <p className="text-sm text-white/80 mt-1">
+                  Пригласите ещё друзей — заработаете больше!
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold leading-tight">Пригласите первого друга</p>
+                <p className="text-2xl font-bold mt-1">и получите 500₽</p>
+                <p className="text-xs text-white/80 mt-1">Друг получит +200₽ при регистрации</p>
+              </>
+            )}
           </div>
-          {copied && <p className="text-xs text-blue-50 mt-2">✓ Ссылка скопирована</p>}
-        </div>
-
-        <button
-          onClick={handleShare}
-          className="w-full bg-white text-blue-600 py-3 rounded-lg hover:bg-blue-50 transition flex items-center justify-center gap-2 font-medium"
-        >
-          <Share2 className="w-5 h-5" /> Поделиться ссылкой
-        </button>
-
-        <div className="mt-4 space-y-1 text-sm text-blue-100">
-          <p>• {headlineRefBonus}</p>
-          {!isPartner && <p>• +{BONUS_CONFIG.NEW_USER_WELCOME}₽ новичку при первой оплате</p>}
-          {!isPartner && <p>• Можно оплатить до {BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR}₽ бонусами за один заказ</p>}
-          {isPartner && <p>• 100% оплата визы бонусами</p>}
-          {isPartner && <p>• Подробные проценты по каждой услуге — в партнёрском кабинете</p>}
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 gap-3">
-        <StatCard icon={<Users className="w-5 h-5 text-blue-600" />} label="Всего рефералов" value={stats.totalReferrals} loading={loading} />
-        <StatCard icon={<TrendingUp className="w-5 h-5 text-green-600" />} label="Оплатили визу" value={stats.paidReferrals} loading={loading} />
-        <StatCard icon={<Award className="w-5 h-5 text-purple-600" />} label="Заработано" value={`${stats.totalEarnings}₽`} loading={loading} fullWidth={!isPartner} />
-        {isPartner && (
-          <StatCard
-            icon={<span className="text-base">📈</span>}
-            label="Конверсия"
-            value={stats.totalReferrals > 0 ? `${Math.round((stats.paidReferrals / stats.totalReferrals) * 100)}%` : '—'}
-            loading={loading}
-          />
+      {/* ── 2. Multi-channel share buttons ──────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Share2 className="w-4 h-4 text-gray-500" />
+          <h4 className="text-sm font-semibold text-gray-700">Поделиться ссылкой</h4>
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          <ShareBtn label="Telegram" emoji="✈️" color="bg-blue-500" onClick={() => shareTo('telegram')} />
+          <ShareBtn label="WhatsApp" emoji="💬" color="bg-green-500" onClick={() => shareTo('whatsapp')} />
+          <ShareBtn label="VK" emoji="🅥" color="bg-blue-700" onClick={() => shareTo('vk')} />
+          <ShareBtn label="Instagram" emoji="📷" color="bg-gradient-to-br from-pink-500 to-orange-500" onClick={() => shareTo('instagram')} />
+          <ShareBtn label={copied ? 'Готово' : 'Копия'} emoji={copied ? '✓' : '🔗'} color="bg-gray-500" onClick={() => shareTo('copy')} />
+        </div>
+
+        {/* QR toggle */}
+        <button
+          onClick={() => setShowQR(s => !s)}
+          className="w-full mt-3 py-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl flex items-center justify-center gap-2 text-sm text-gray-700 transition"
+        >
+          <QrCode className="w-4 h-4" /> {showQR ? 'Скрыть' : 'Показать'} QR-код
+        </button>
+
+        {showQR && (
+          <div className="mt-3 bg-white border-2 border-gray-100 rounded-xl p-4 flex flex-col items-center gap-3">
+            <QRCodeCanvas
+              ref={qrCanvasRef}
+              value={link}
+              size={220}
+              level="H"
+              marginSize={2}
+            />
+            <button
+              onClick={downloadQR}
+              className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded-xl flex items-center gap-2 transition"
+            >
+              <Download className="w-4 h-4" /> Сохранить картинку
+            </button>
+            <p className="text-xs text-gray-400 text-center">
+              Покажите QR другу или сохраните для сториз
+            </p>
+          </div>
         )}
       </div>
 
-      {/* Referrals list */}
+      {/* ── 3. What friend will get ─────────────────────────────────────── */}
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-200 rounded-2xl p-4">
+        <h4 className="text-sm font-semibold text-emerald-900 mb-2 flex items-center gap-2">
+          <Sparkles className="w-4 h-4" /> Что вы оба получите
+        </h4>
+        <div className="space-y-1.5 text-sm">
+          <p className="text-emerald-900">🎁 <strong>Друг</strong> получит +{BONUS_CONFIG.NEW_USER_WELCOME}₽ сразу при регистрации</p>
+          {isPartner ? (
+            <p className="text-emerald-900">💰 <strong>Вы</strong> — до 20% с каждого его заказа</p>
+          ) : (
+            <p className="text-emerald-900">💰 <strong>Вы</strong> — +{BONUS_CONFIG.REFERRER_REGULAR}₽ когда друг оплатит первую визу</p>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4. Stats grid ───────────────────────────────────────────────── */}
+      <div className="grid grid-cols-3 gap-2">
+        <StatCard label="Приглашено" value={stats.totalReferrals} color="text-blue-600" loading={loading} />
+        <StatCard label="Оплатили" value={stats.paidReferrals} color="text-green-600" loading={loading} />
+        <StatCard label="Заработано" value={`${stats.totalEarnings}₽`} color="text-purple-600" loading={loading} />
+      </div>
+
+      {/* ── 5. Achievements / levels ────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Award className="w-4 h-4 text-gray-500" />
+          <h4 className="text-sm font-semibold text-gray-700">Уровни</h4>
+        </div>
+
+        {currentLevel && (
+          <div className={`bg-gradient-to-br ${currentLevel.gradient} rounded-xl p-4 text-white mb-3`}>
+            <div className="flex items-center gap-3">
+              <div className="text-4xl">{currentLevel.icon}</div>
+              <div className="flex-1">
+                <p className="text-xs text-white/80">Текущий уровень</p>
+                <p className="text-xl font-bold">{currentLevel.name}</p>
+                <p className="text-xs text-white/80">{refCount} рефералов</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {nextLevel && (
+          <div className="mb-3">
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span>До уровня «{nextLevel.name}»</span>
+              <span>{refCount} / {nextLevel.minRefs}</span>
+            </div>
+            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+              <div
+                className={`h-full bg-gradient-to-r ${nextLevel.gradient} transition-all`}
+                style={{ width: `${progressPct}%` }}
+              />
+            </div>
+            {nextLevel.bonus > 0 && (
+              <p className="text-xs text-gray-500 mt-1.5">
+                Награда за уровень: <span className="text-emerald-600 font-semibold">+{nextLevel.bonus}₽</span>
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Level list */}
+        <div className="space-y-1.5">
+          {REFERRAL_LEVELS.map((level) => {
+            const reached = refCount >= level.minRefs;
+            return (
+              <div
+                key={level.id}
+                className={`flex items-center gap-3 p-2 rounded-lg ${reached ? 'bg-emerald-50' : 'bg-gray-50'}`}
+              >
+                <div className="text-xl">{reached ? level.icon : '🔒'}</div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-sm font-medium ${reached ? 'text-gray-800' : 'text-gray-400'}`}>
+                    {level.name}
+                  </p>
+                  <p className="text-xs text-gray-400">{level.minRefs}+ рефералов</p>
+                </div>
+                {level.bonus > 0 && (
+                  <span className={`text-xs px-2 py-1 rounded-full ${reached ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {reached ? <Check className="w-3 h-3 inline" /> : <Lock className="w-3 h-3 inline" />} +{level.bonus}₽
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── 6. Earnings calculator ──────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Calculator className="w-4 h-4 text-gray-500" />
+          <h4 className="text-sm font-semibold text-gray-700">Калькулятор заработка</h4>
+        </div>
+        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl p-4">
+          <div className="text-center mb-3">
+            <p className="text-xs text-gray-500">Если пригласите</p>
+            <p className="text-3xl font-bold text-purple-600">{calcFriends} {pluralFriends(calcFriends)}</p>
+            <p className="text-xs text-gray-500 mt-1">вы заработаете</p>
+            <p className="text-3xl font-bold text-emerald-600">{calcEarning.toLocaleString('ru-RU')}₽</p>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={20}
+            value={calcFriends}
+            onChange={e => setCalcFriends(Number(e.target.value))}
+            className="w-full h-2 bg-gradient-to-r from-purple-200 to-pink-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+          />
+          <div className="flex justify-between text-xs text-gray-400 mt-1">
+            <span>1</span><span>10</span><span>20</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 7. Referrals list ───────────────────────────────────────────── */}
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-sm text-gray-400">
-          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем рефералов…
+        <div className="flex items-center justify-center py-8 text-sm text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем…
         </div>
       ) : stats.referrals.length > 0 ? (
-        <div>
-          <h3 className="text-lg text-gray-800 mb-3">Ваши рефералы</h3>
-          <div className="space-y-3">
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4 text-gray-500" /> Ваши рефералы ({stats.referrals.length})
+          </h4>
+          <div className="space-y-2">
             {stats.referrals.map((ref) => (
-              <div key={ref.telegram_id} className="bg-white rounded-xl shadow-md p-4">
-                <div className="flex items-center justify-between">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-gray-800 truncate">{ref.name}</p>
-                    {ref.username && <p className="text-xs text-blue-500">@{ref.username}</p>}
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {new Date(ref.joined_at).toLocaleDateString('ru-RU')}
-                    </p>
-                  </div>
-                  <div className="text-right ml-3">
-                    {ref.has_paid ? (
-                      <>
-                        <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full whitespace-nowrap">✓ Оплачено</span>
-                        {ref.earned_bonus > 0 && <p className="text-sm text-green-600 mt-1">+{ref.earned_bonus}₽</p>}
-                      </>
-                    ) : (
-                      <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full whitespace-nowrap">В ожидании</span>
-                    )}
-                  </div>
+              <div key={ref.telegram_id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm text-gray-800 truncate">{ref.name}</p>
+                  {ref.username && <p className="text-xs text-blue-500">@{ref.username}</p>}
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {new Date(ref.joined_at).toLocaleDateString('ru-RU')}
+                  </p>
+                </div>
+                <div className="text-right ml-2">
+                  {ref.has_paid ? (
+                    <>
+                      <span className="bg-green-100 text-green-700 text-xs px-2 py-0.5 rounded-full whitespace-nowrap">✓ Оплачено</span>
+                      {ref.earned_bonus > 0 && <p className="text-xs text-green-600 mt-0.5">+{ref.earned_bonus}₽</p>}
+                    </>
+                  ) : (
+                    <span className="bg-gray-200 text-gray-600 text-xs px-2 py-0.5 rounded-full whitespace-nowrap">В ожидании</span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         </div>
-      ) : (
-        <div className="bg-white rounded-xl border border-dashed border-gray-200 p-8 text-center">
-          <p className="text-gray-400 text-sm">Пока никто не пришёл по вашей ссылке</p>
-          <p className="text-gray-300 text-xs mt-1">Поделитесь ссылкой — за каждого друга будет бонус</p>
-        </div>
-      )}
+      ) : null}
 
-      {/* Become a partner CTA — only for regular users */}
+      {/* ── 8. Become a partner CTA — only for regular users ──────────── */}
       {!isPartner && (
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
-          <h4 className="text-gray-800 mb-2">Станьте партнёром! 🌟</h4>
-          <p className="text-sm text-gray-600 mb-3">
-            Если вы блогер или агент — зарабатывайте больше:
+        <div className="bg-gradient-to-r from-purple-500 to-pink-500 rounded-2xl p-5 text-white shadow-lg">
+          <h4 className="text-lg font-bold mb-2 flex items-center gap-2">
+            <span>🌟</span> Стать партнёром
+          </h4>
+          <p className="text-sm text-white/90 mb-3">
+            Если вы блогер или агент:
           </p>
-          <ul className="text-sm text-gray-700 space-y-1 mb-3">
-            <li>• До {BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа (визы, отели, билеты, страховки)</li>
+          <ul className="text-sm text-white/90 space-y-1 mb-4">
+            <li>• До 20% с каждого заказа</li>
             <li>• 100% оплата бонусами</li>
-            <li>• Статистика по каждому реферальному заказу</li>
-            <li>• Подробные проценты в партнёрском кабинете</li>
+            <li>• Подробная статистика</li>
+            <li>• Проценты по услугам в кабинете</li>
           </ul>
           <button
             onClick={onOpenPartnerApplication}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg hover:shadow-lg transition"
+            className="w-full bg-white text-purple-600 py-3 rounded-xl font-medium hover:bg-purple-50 transition flex items-center justify-center gap-2"
           >
-            Подать заявку на статус партнёра
+            <Send className="w-4 h-4" /> Подать заявку
           </button>
         </div>
       )}
@@ -202,18 +403,34 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   );
 }
 
-function StatCard({
-  icon, label, value, loading, fullWidth,
-}: { icon: React.ReactNode; label: string; value: string | number; loading: boolean; fullWidth?: boolean }) {
+function ShareBtn({ label, emoji, color, onClick }: { label: string; emoji: string; color: string; onClick: () => void }) {
   return (
-    <div className={`bg-white rounded-xl shadow-md p-4 ${fullWidth ? 'col-span-2' : ''}`}>
-      <div className="flex items-center gap-2 mb-2">
-        {icon}
-        <span className="text-sm text-gray-600">{label}</span>
-      </div>
-      <p className="text-2xl text-gray-800">
-        {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-300" /> : value}
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center gap-1 py-2 px-1 ${color} text-white rounded-xl hover:opacity-90 active:scale-95 transition`}
+    >
+      <span className="text-xl">{emoji}</span>
+      <span className="text-[10px] font-medium leading-tight text-center">{label}</span>
+    </button>
+  );
+}
+
+function StatCard({ label, value, color, loading }: { label: string; value: string | number; color: string; loading: boolean }) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm p-3 text-center">
+      <p className={`text-xl font-bold ${color}`}>
+        {loading ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : value}
       </p>
+      <p className="text-[10px] text-gray-500 mt-0.5">{label}</p>
     </div>
   );
+}
+
+function pluralFriends(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 14) return 'друзей';
+  if (mod10 === 1) return 'друга';
+  if (mod10 >= 2 && mod10 <= 4) return 'друзей';
+  return 'друзей';
 }
