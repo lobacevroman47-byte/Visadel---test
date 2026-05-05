@@ -12,6 +12,7 @@ import Step7Payment from './form-steps/Step7Payment';
 interface ApplicationFormProps {
   visa: VisaOption;
   urgent: boolean;
+  prefilledAddons?: { urgent: boolean; hotel: boolean; ticket: boolean };
   onBack: () => void;
   onContinueDraft?: (draft: any) => void;
 }
@@ -50,14 +51,14 @@ const STEPS = [
   'Оплата'
 ];
 
-export default function ApplicationForm({ visa, urgent, onBack, onContinueDraft }: ApplicationFormProps) {
+export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft }: ApplicationFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>({
     basicData: {},
     additionalDocs: {
-      hotelBooking: false,
-      returnTicket: false,
-      urgentProcessing: false,
+      hotelBooking: prefilledAddons?.hotel ?? false,
+      returnTicket: prefilledAddons?.ticket ?? false,
+      urgentProcessing: prefilledAddons?.urgent ?? false,
     },
     howHeard: [],
     contactInfo: {

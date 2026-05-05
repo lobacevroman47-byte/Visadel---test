@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { User, ChevronRight, Settings } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { User, ChevronRight, ChevronDown, Calculator, Check } from 'lucide-react';
 import type { VisaOption } from '../App';
 import logo from '../../assets/logo2.png';
 import { getReferralCount } from '../lib/db';
 
 interface HomeProps {
-  onVisaSelect: (visa: VisaOption, urgent?: boolean) => void;
+  onVisaSelect: (visa: VisaOption, urgent?: boolean, addons?: AddonsState) => void;
   onOpenProfile: () => void;
   onOpenExtension: (visa: VisaOption) => void;
   onOpenPartnerApplication?: () => void;
@@ -110,41 +110,187 @@ const COUNTRIES: Country[] = [
 ];
 
 // Unified Card Component
-interface VisaCardProps {
-  visa: VisaOption;
-  onSelect: () => void;
-  isUrgent?: boolean;
+export interface AddonsState {
+  urgent: boolean;
+  hotel: boolean;
+  ticket: boolean;
 }
 
-function VisaCard({ visa, onSelect, isUrgent = false }: VisaCardProps) {
+interface VisaCardProps {
+  visa: VisaOption;
+  onSelect: (addons: AddonsState) => void;
+  isUrgent?: boolean;
+  hideCalculator?: boolean;
+}
+
+function AddonToggle({ icon, label, hint, price, active, onToggle }: {
+  icon: string;
+  label: string;
+  hint?: string;
+  price: number;
+  active: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
+        active
+          ? 'bg-blue-50 border-[#2196F3] shadow-sm'
+          : 'bg-white border-gray-200 hover:border-gray-300'
+      }`}
+    >
+      <span className="text-xl shrink-0">{icon}</span>
+      <div className="flex-1 text-left min-w-0">
+        <div className={`text-sm font-medium ${active ? 'text-[#1976D2]' : 'text-gray-800'}`}>
+          {label}
+        </div>
+        {hint && <div className="text-xs text-gray-500 mt-0.5">{hint}</div>}
+      </div>
+      <div className="text-right shrink-0">
+        <div className={`text-sm font-semibold ${active ? 'text-[#2196F3]' : 'text-gray-600'}`}>
+          +{price.toLocaleString('ru-RU')}₽
+        </div>
+      </div>
+      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+        active ? 'bg-[#2196F3] border-[#2196F3]' : 'border-gray-300 bg-white'
+      }`}>
+        {active && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+      </div>
+    </button>
+  );
+}
+
+function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: VisaCardProps) {
+  const [showCalc, setShowCalc] = useState(false);
+  const [urgent, setUrgent] = useState(false);
+  const [hotel, setHotel] = useState(false);
+  const [ticket, setTicket] = useState(false);
+
+  // Vietnam already has dedicated urgent options, so no urgent toggle there
+  const isVietnam = visa.country === 'Вьетнам';
+  const urgentApplied = urgent && !isVietnam;
+
+  const addons = (urgentApplied ? 1000 : 0) + (hotel ? 1000 : 0) + (ticket ? 2000 : 0);
+  const total = visa.price + addons;
+  const hasAddons = urgentApplied || hotel || ticket;
+
+  const handleSubmit = () => {
+    onSelect({ urgent: urgentApplied, hotel, ticket });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-2xl p-5 shadow-md border border-gray-100"
     >
-      <div className="mb-3">
+      {/* Header */}
+      <div className="mb-4">
         <h3 className="text-[#212121] mb-1">{visa.type}</h3>
         {visa.description && (
-          <p className="text-sm text-[#616161] mb-1">({visa.description})</p>
+          <p className="text-sm text-[#616161] mb-1">{visa.description}</p>
         )}
         <p className="text-sm text-[#616161]">Готовность: {visa.readinessTime}</p>
       </div>
-      
-      <div className="flex justify-between items-center mb-4">
-        <span className="text-[#616161] text-sm">Стоимость:</span>
-        <span className="text-2xl text-[#2196F3]">{visa.price}₽</span>
+
+      {/* Price Block */}
+      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 mb-3 border border-blue-100">
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <div className="text-xs text-[#616161] mb-0.5">
+              {hasAddons ? 'Базовая цена' : 'Стоимость'}
+            </div>
+            <div className={`leading-none font-bold ${hasAddons ? 'text-xl text-gray-400 line-through' : 'text-3xl text-[#1976D2]'}`}>
+              {visa.price.toLocaleString('ru-RU')}<span className={hasAddons ? 'text-base' : 'text-xl'}>₽</span>
+            </div>
+          </div>
+          <AnimatePresence>
+            {hasAddons && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="text-right"
+              >
+                <div className="text-xs text-[#616161] mb-0.5">Итого</div>
+                <div className="text-3xl text-[#00C853] font-bold leading-none">
+                  {total.toLocaleString('ru-RU')}<span className="text-xl">₽</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
 
+      {/* Calculator Toggle */}
+      {!hideCalculator && (
+        <button
+          onClick={() => setShowCalc(!showCalc)}
+          className="w-full flex items-center justify-between py-2.5 px-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm mb-3 transition"
+        >
+          <span className="flex items-center gap-2 font-medium text-[#1976D2]">
+            <Calculator className="w-4 h-4" />
+            <span>{showCalc ? 'Свернуть калькулятор' : 'Калькулятор стоимости'}</span>
+          </span>
+          <ChevronDown className={`w-4 h-4 text-[#1976D2] transition-transform ${showCalc ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+
+      {/* Calculator Panel */}
+      <AnimatePresence initial={false}>
+        {showCalc && !hideCalculator && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-2 mb-3">
+              <p className="text-xs text-[#616161] px-1 mb-1">
+                Дополнительные услуги для усиления заявки:
+              </p>
+              {!isVietnam && (
+                <AddonToggle
+                  icon="⚡"
+                  label="Срочное оформление"
+                  hint="Приоритетная обработка заявки"
+                  price={1000}
+                  active={urgent}
+                  onToggle={() => setUrgent(!urgent)}
+                />
+              )}
+              <AddonToggle
+                icon="🏨"
+                label="Подтверждение проживания"
+                hint="Бронь отеля для визы"
+                price={1000}
+                active={hotel}
+                onToggle={() => setHotel(!hotel)}
+              />
+              <AddonToggle
+                icon="✈️"
+                label="Обратный билет"
+                hint="Подтверждение возвратного рейса"
+                price={2000}
+                active={ticket}
+                onToggle={() => setTicket(!ticket)}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <button
-        onClick={onSelect}
-        className={`w-full py-3.5 rounded-[16px] transition ${
+        onClick={handleSubmit}
+        className={`w-full py-3.5 rounded-[16px] transition font-medium ${
           isUrgent
             ? 'bg-red-600 hover:bg-red-700 text-white'
             : 'bg-[#2196F3] hover:bg-[#1E88E5] text-white'
         }`}
       >
-        Оформить
+        Оформить{hasAddons ? ` за ${total.toLocaleString('ru-RU')}₽` : ''}
       </button>
     </motion.div>
   );
@@ -321,6 +467,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
+                    hideCalculator
                     onSelect={() => onOpenExtension && onOpenExtension(visa)}
                   />
                 ))}
@@ -334,10 +481,10 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
-                    onSelect={() => onVisaSelect(visa)}
+                    onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}
-                
+
                 <button
                   onClick={() => setShowUrgentVietnam(true)}
                   className="w-full bg-gradient-to-r from-red-600 to-orange-500 text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
@@ -354,7 +501,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
-                    onSelect={() => onVisaSelect(visa, true)}
+                    onSelect={(addons) => onVisaSelect(visa, true, addons)}
                     isUrgent
                   />
                 ))}
@@ -368,7 +515,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
                   <VisaCard
                     key={visa.id}
                     visa={visa}
-                    onSelect={() => onVisaSelect(visa)}
+                    onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}
 

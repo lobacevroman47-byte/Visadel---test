@@ -63,6 +63,7 @@ function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
   const [selectedVisa, setSelectedVisa] = useState<VisaOption | null>(null);
   const [urgentVisa, setUrgentVisa] = useState(false);
+  const [prefilledAddons, setPrefilledAddons] = useState<{ urgent: boolean; hotel: boolean; ticket: boolean } | undefined>(undefined);
   const [initialProfileTab, setInitialProfileTab] = useState<'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews' | undefined>(undefined);
 
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
@@ -163,15 +164,17 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  const handleVisaSelect = (visa: VisaOption, urgent = false) => {
+  const handleVisaSelect = (visa: VisaOption, urgent = false, addons?: { urgent: boolean; hotel: boolean; ticket: boolean }) => {
     setSelectedVisa(visa);
     setUrgentVisa(urgent);
+    setPrefilledAddons(addons);
     setCurrentScreen('application');
   };
 
   const handleContinueDraft = (draft: { visa: VisaOption; urgent: boolean }) => {
     setSelectedVisa(draft.visa);
     setUrgentVisa(draft.urgent);
+    setPrefilledAddons(undefined);
     setCurrentScreen('application');
   };
 
@@ -179,6 +182,7 @@ function App() {
     setCurrentScreen('home');
     setSelectedVisa(null);
     setUrgentVisa(false);
+    setPrefilledAddons(undefined);
   };
 
   return (
@@ -198,6 +202,7 @@ function App() {
           <ApplicationForm
             visa={selectedVisa}
             urgent={urgentVisa}
+            prefilledAddons={prefilledAddons}
             onBack={handleBackToHome}
             onContinueDraft={handleContinueDraft}
           />
