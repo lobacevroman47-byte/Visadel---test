@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download } from 'lucide-react';
+import React, { useMemo, useState, useRef } from 'react';
+import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter } from 'lucide-react';
 import { statusLabels, statusColors } from '../data/mockData';
 import {
   useAdminApplications,
@@ -669,57 +669,148 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
 };
 
 // ── Applications List ─────────────────────────────────────────────────────────
+type SortField = 'date' | 'price' | 'country' | 'status';
+type SortDir = 'asc' | 'desc';
+
+function exportToCsv(rows: Application[]) {
+  const head = ['ID', 'Страна', 'Тип', 'Клиент', 'Telegram', 'Телефон', 'Email', 'Сумма', 'Бонусы', 'Статус', 'Дата', 'Срочно'];
+  const escape = (v: unknown) => {
+    const s = String(v ?? '').replace(/"/g, '""');
+    return /[,";\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [head.join(',')];
+  for (const a of rows) {
+    const tg = ((a.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? a.telegram ?? '').replace('@', '');
+    lines.push([
+      a.id, a.country, a.visaType, a.clientName, tg, a.phone, a.email,
+      a.cost, a.bonusesUsed, statusLabels[a.status],
+      new Date(a.date).toLocaleDateString('ru-RU'),
+      a.urgent ? 'да' : 'нет',
+    ].map(escape).join(','));
+  }
+  // Excel-friendly: BOM + CRLF
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `applications_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>(filter?.filter === 'in_progress' ? 'in_progress' : 'all');
   const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [urgentOnly, setUrgentOnly] = useState(false);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [sortField, setSortField] = useState<SortField>('date');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
 
   const { applications, loading, refetch } = useAdminApplications();
-  const countries = Array.from(new Set(applications.map(app => app.country)));
+  const countries = useMemo(() => Array.from(new Set(applications.map(app => app.country))), [applications]);
 
-  const filteredApplications = applications.filter(app => {
-    const tg = ((app.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? app.telegram ?? '').toLowerCase();
-    const matchesSearch =
-      app.clientName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      app.phone.includes(searchQuery) ||
-      app.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tg.includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || app.status === statusFilter;
-    const matchesCountry = countryFilter === 'all' || app.country === countryFilter;
-    return matchesSearch && matchesStatus && matchesCountry;
-  });
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 86_400_000 : null; // include "to" day
+    return applications.filter(app => {
+      if (statusFilter !== 'all' && app.status !== statusFilter) return false;
+      if (countryFilter !== 'all' && app.country !== countryFilter) return false;
+      if (urgentOnly && !app.urgent) return false;
+      const ts = new Date(app.date).getTime();
+      if (fromTs !== null && ts < fromTs) return false;
+      if (toTs !== null && ts >= toTs) return false;
+      if (q) {
+        const tg = ((app.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? app.telegram ?? '').toLowerCase();
+        const hay = `${app.clientName} ${app.phone} ${app.id} ${tg} ${app.email ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [applications, searchQuery, statusFilter, countryFilter, urgentOnly, dateFrom, dateTo]);
+
+  const sorted = useMemo(() => {
+    const arr = [...filtered];
+    arr.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'date':    cmp = new Date(a.date).getTime() - new Date(b.date).getTime(); break;
+        case 'price':   cmp = (a.cost - a.bonusesUsed) - (b.cost - b.bonusesUsed); break;
+        case 'country': cmp = a.country.localeCompare(b.country, 'ru'); break;
+        case 'status':  cmp = a.status.localeCompare(b.status); break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+    return arr;
+  }, [filtered, sortField, sortDir]);
+
+  const totalRevenue = useMemo(
+    () => sorted.filter(a => a.status !== 'draft').reduce((s, a) => s + (a.cost - a.bonusesUsed), 0),
+    [sorted]
+  );
+
+  const hasActiveFilters = searchQuery || statusFilter !== 'all' || countryFilter !== 'all' || urgentOnly || dateFrom || dateTo;
+  const resetFilters = () => {
+    setSearchQuery(''); setStatusFilter('all'); setCountryFilter('all');
+    setUrgentOnly(false); setDateFrom(''); setDateTo('');
+  };
+  const toggleSort = (f: SortField) => {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(f); setSortDir('desc'); }
+  };
+  const sortIcon = (f: SortField) =>
+    sortField !== f ? <ArrowUpDown className="w-3 h-3 inline ml-1 text-gray-400" /> :
+    sortDir === 'asc' ? <ArrowUp className="w-3 h-3 inline ml-1 text-blue-500" /> :
+    <ArrowDown className="w-3 h-3 inline ml-1 text-blue-500" />;
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1>Заявки</h1>
-        <div className="flex items-center gap-3">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div>
+          <h1>Заявки</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            {sorted.length} из {applications.length} · сумма: {totalRevenue.toLocaleString('ru-RU')} ₽
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button
+            onClick={() => exportToCsv(sorted)}
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition flex items-center gap-1.5 text-sm"
+            title="Экспорт CSV"
+          >
+            <FileDown size={16} /> CSV
+          </button>
           <button onClick={refetch} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
-          <div className="text-sm text-gray-600">Всего: {filteredApplications.length} из {applications.length}</div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="md:col-span-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Поиск по имени, Telegram, телефону, ID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              />
-            </div>
+      <div className="bg-white p-4 md:p-5 rounded-xl border border-gray-200 mb-5 space-y-3">
+        {/* Row 1: search + status + country */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="md:col-span-2 relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            <input
+              type="text"
+              placeholder="ID, имя, Telegram, телефон, email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
+                <X size={14} />
+              </button>
+            )}
           </div>
           <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]">
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3] text-sm">
             <option value="all">Все статусы</option>
             <option value="draft">Черновик</option>
             <option value="pending_payment">Ожидает оплаты</option>
@@ -728,10 +819,40 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
             <option value="completed">Готово</option>
           </select>
           <select value={countryFilter} onChange={(e) => setCountryFilter(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]">
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3] text-sm">
             <option value="all">Все страны</option>
             {countries.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+        </div>
+
+        {/* Row 2: date range + urgent toggle + reset */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 text-xs text-gray-500">
+            <Filter size={14} className="text-gray-400" /> Период:
+          </div>
+          <input
+            type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+            title="С"
+          />
+          <span className="text-gray-400 text-xs">—</span>
+          <input
+            type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+            title="По"
+          />
+          <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition text-sm ${urgentOnly ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
+            <input type="checkbox" checked={urgentOnly} onChange={e => setUrgentOnly(e.target.checked)} className="hidden" />
+            <Flame size={14} /> Только срочные
+          </label>
+          {hasActiveFilters && (
+            <button
+              onClick={resetFilters}
+              className="ml-auto px-3 py-1.5 bg-gray-50 hover:bg-gray-100 text-gray-600 rounded-lg text-xs transition flex items-center gap-1"
+            >
+              <X size={12} /> Сбросить
+            </button>
+          )}
         </div>
       </div>
 
@@ -741,27 +862,56 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
           <table className="w-full">
             <thead className="bg-[#F5F7FA]">
               <tr>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">ID</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Страна</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Клиент / Telegram</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Телефон</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Стоимость</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Бонусы</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Статус</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Дата</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Действия</th>
+                <th className="px-4 py-3 text-left text-xs text-gray-600">ID</th>
+                <th
+                  className="px-4 py-3 text-left text-xs text-gray-600 cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => toggleSort('country')}
+                >
+                  Страна {sortIcon('country')}
+                </th>
+                <th className="px-4 py-3 text-left text-xs text-gray-600">Клиент / Telegram</th>
+                <th className="px-4 py-3 text-left text-xs text-gray-600">Телефон</th>
+                <th
+                  className="px-4 py-3 text-left text-xs text-gray-600 cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => toggleSort('price')}
+                >
+                  Стоимость {sortIcon('price')}
+                </th>
+                <th className="px-4 py-3 text-left text-xs text-gray-600">Бонусы</th>
+                <th
+                  className="px-4 py-3 text-left text-xs text-gray-600 cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => toggleSort('status')}
+                >
+                  Статус {sortIcon('status')}
+                </th>
+                <th
+                  className="px-4 py-3 text-left text-xs text-gray-600 cursor-pointer select-none hover:bg-gray-100"
+                  onClick={() => toggleSort('date')}
+                >
+                  Дата {sortIcon('date')}
+                </th>
+                <th className="px-4 py-3 text-left text-xs text-gray-600 w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredApplications.map((app) => {
+              {sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-6 py-12 text-center text-gray-400 text-sm">
+                    {applications.length === 0 ? 'Заявок пока нет' : 'По выбранным фильтрам ничего не найдено'}
+                  </td>
+                </tr>
+              ) : sorted.map((app) => {
                 const tgUser = ((app.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? app.telegram ?? '').replace('@', '');
                 return (
-                  <tr key={app.id} className="hover:bg-[#F5F7FA]">
-                    <td className="px-6 py-4 text-sm">{app.id}</td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="mr-1">{app.countryFlag}</span>{app.country}
+                  <tr key={app.id} className={`hover:bg-[#F5F7FA] ${app.urgent ? 'bg-red-50/40' : ''}`}>
+                    <td className="px-4 py-3 text-sm font-mono text-gray-600">{app.id.slice(0, 8)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <div className="flex items-center gap-1.5">
+                        <span>{app.countryFlag}</span>{app.country}
+                        {app.urgent && <Flame className="w-3.5 h-3.5 text-red-500" />}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       <div>{app.clientName}</div>
                       {tgUser && (
                         <a href={`https://t.me/${tgUser}`} target="_blank" rel="noreferrer"
@@ -770,28 +920,28 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                         </a>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm">{app.phone}</td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">{app.phone}</td>
+                    <td className="px-4 py-3 text-sm">
                       <span className="font-semibold text-blue-600">{(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽</span>
                       {app.bonusesUsed > 0 && (
                         <span className="text-xs text-gray-400 block">из {app.cost.toLocaleString('ru-RU')} ₽</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-green-600">
+                    <td className="px-4 py-3 text-sm text-green-600">
                       {app.bonusesUsed > 0 ? `−${app.bonusesUsed} ₽` : '—'}
                     </td>
-                    <td className="px-6 py-4 text-sm">
-                      <span className="px-2 py-1 rounded text-xs text-white"
+                    <td className="px-4 py-3 text-sm">
+                      <span className="px-2 py-1 rounded text-xs text-white whitespace-nowrap"
                         style={{ backgroundColor: statusColors[app.status] }}>
                         {statusLabels[app.status]}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
                       {new Date(app.date).toLocaleDateString('ru-RU')}
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-3 text-sm">
                       <button onClick={() => setSelectedApp(app)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition" title="Просмотр заявки">
+                        className="p-2 hover:bg-gray-100 rounded-lg transition" title="Открыть заявку">
                         <Eye size={18} className="text-[#2196F3]" />
                       </button>
                     </td>
