@@ -357,23 +357,12 @@ function DateInput({
     }
   };
 
-  // Native picker via showPicker() — the 📅 emoji is now a real button that
-  // opens the OS calendar. The hidden <input type="date"> stays sr-only (no
-  // layout, no rendering) and is purely a target for showPicker. Manual
-  // typing in the visible text input keeps working as before.
-  const dateInputRef = useRef<HTMLInputElement>(null);
+  // Reliable iOS WebView pattern: a transparent native <input type="date">
+  // overlays the right edge where the 📅 icon sits. Tapping that area hits
+  // the native input directly → native picker opens. Manual typing in the
+  // visible text field still works because the date input is constrained to
+  // a narrow right strip and sits above the 📅 icon (which is pointer-events:none).
   const dateIsoValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
-
-  const openPicker = () => {
-    const el = dateInputRef.current;
-    if (!el) return;
-    // showPicker is the modern way; falls back to focus+click for older WebViews
-    if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
-      try { (el as HTMLInputElement & { showPicker: () => void }).showPicker(); return; } catch { /* fall through */ }
-    }
-    el.focus();
-    el.click();
-  };
 
   return (
     <div className="relative">
@@ -386,17 +375,12 @@ function DateInput({
         maxLength={10}
         className="form-input pr-12"
       />
-      <button
-        type="button"
-        onClick={openPicker}
-        aria-label="Открыть календарь"
-        className="absolute right-1 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center text-base rounded-md hover:bg-gray-100 active:bg-gray-200 transition select-none"
-      >
+      {/* 📅 icon — purely visual, taps pass through to the date input above */}
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base pointer-events-none select-none z-10">
         📅
-      </button>
-      {/* Visually hidden but interactable target for showPicker() */}
+      </span>
+      {/* Native date picker — invisible but interactable, occupies the icon area */}
       <input
-        ref={dateInputRef}
         type="date"
         value={dateIsoValue}
         onChange={(e) => {
@@ -404,9 +388,9 @@ function DateInput({
           onChange(iso);
           setDisplay(toDisplay(iso));
         }}
-        tabIndex={-1}
-        aria-hidden="true"
-        className="sr-only"
+        aria-label="Календарь"
+        className="absolute right-0 top-0 bottom-0 w-12 opacity-0 cursor-pointer z-20"
+        style={{ WebkitAppearance: 'none', appearance: 'none' }}
       />
     </div>
   );
