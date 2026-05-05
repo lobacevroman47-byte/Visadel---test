@@ -357,6 +357,12 @@ function DateInput({
     }
   };
 
+  // Native picker — click on the 📅 icon opens the OS calendar.
+  // Hidden input is overlaid only over the icon (pointer-events: auto), so
+  // manual typing in the visible text input is unaffected. Uses the native
+  // date picker, so no JS/calendar library — zero lag.
+  const dateIsoValue = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+
   return (
     <div className="relative">
       <input
@@ -368,9 +374,21 @@ function DateInput({
         maxLength={10}
         className="form-input pr-10"
       />
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none select-none text-base">
+      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 select-none text-base pointer-events-none">
         📅
       </span>
+      <input
+        type="date"
+        value={dateIsoValue}
+        onChange={(e) => {
+          const iso = e.target.value;
+          onChange(iso);
+          setDisplay(toDisplay(iso));
+        }}
+        aria-label="Открыть календарь"
+        title="Открыть календарь"
+        className="absolute right-1 top-1/2 -translate-y-1/2 w-8 h-8 opacity-0 cursor-pointer"
+      />
     </div>
   );
 }
