@@ -7,6 +7,7 @@ import {
   uploadVisaFile,
   type AdminApplication as Application,
 } from '../hooks/useAdminData';
+import { payReferralBonus } from '../../lib/db';
 
 interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
@@ -377,6 +378,12 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         visaUrl = url ?? undefined;
       }
       await updateApplicationStatus(application.id, status, visaUrl, application.telegramId, application.country, application.visaType);
+
+      // Pay referral bonus to the referrer when admin confirms payment (status -> in_progress).
+      // payReferralBonus has built-in checks: only first paid app counts, and uses bonus_logs for stats.
+      if (status === 'in_progress' && application.telegramId) {
+        payReferralBonus(application.telegramId).catch(e => console.warn('referral bonus error', e));
+      }
 
       // Send Telegram notification for all statuses except draft
       if (status !== 'draft' && application.telegramId) {

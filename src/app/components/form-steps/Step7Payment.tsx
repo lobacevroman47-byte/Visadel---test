@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
-import { saveApplication, uploadFile, updateUser, payReferralBonus } from '../../lib/db';
+import { saveApplication, uploadFile, updateUser } from '../../lib/db';
 import { haptic } from '../../lib/telegram';
+import { getMaxBonusUsage } from '../../lib/bonus-config';
 
 interface Step7Props {
   formData: FormData;
@@ -25,19 +26,22 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
   const telegramId: number = userData.telegramId ?? 0;
   const availableBonuses = userData.bonusBalance || 0;
   const isPartner = userData.isInfluencer || false;
+  const paidRefCount: number = userData.paidReferralsCount ?? 0;
+  // Level-based bonus usage limit (500/600/800/1000 by paid refs, null = 100% for partners)
+  const bonusLimit = getMaxBonusUsage(paidRefCount, isPartner);
 
   useEffect(() => {
     if (useBonuses && availableBonuses > 0) {
-      const max = isPartner
+      const max = bonusLimit == null
         ? Math.min(availableBonuses, totalPrice)
-        : Math.min(availableBonuses, 500, totalPrice);
+        : Math.min(availableBonuses, bonusLimit, totalPrice);
       setBonusAmount(max);
       setFinalPrice(totalPrice - max);
     } else {
       setBonusAmount(0);
       setFinalPrice(totalPrice);
     }
-  }, [useBonuses, availableBonuses, totalPrice, isPartner]);
+  }, [useBonuses, availableBonuses, totalPrice, bonusLimit]);
 
   const handleSaveDraft = () => {
     const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
@@ -147,10 +151,8 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
         }).catch(console.error);
       }
 
-      // 4. Pay referral bonus to referrer (500₽ on first application)
-      if (telegramId) {
-        payReferralBonus(telegramId).catch(console.error);
-      }
+      // 4. Referral bonus to the referrer is paid by admin when status moves to 'in_progress'
+      // (i.e. only after the payment is actually confirmed). See admin/Applications.tsx.
 
       // 5. Deduct bonuses from Supabase + localStorage
       if (useBonuses && bonusAmount > 0) {
@@ -219,7 +221,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
             <div>
               <h3 className="text-[#212121] text-sm mb-0.5">Использовать бонусы</h3>
               <p className="text-xs text-[#616161]">Доступно: <span className="text-[#FFC400] font-semibold">{availableBonuses}₽</span>
-                {!isPartner && ' · макс. 500₽'}{isPartner && ' · 🌟 до 100%'}
+                {bonusLimit != null && ` · макс. ${bonusLimit}₽`}{bonusLimit == null && ' · 🌟 до 100%'}
               </p>
             </div>
           </div>

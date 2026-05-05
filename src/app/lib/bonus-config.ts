@@ -16,9 +16,19 @@ export const BONUS_CONFIG = {
   PARTNER_COMMISSION_MAX_PCT: 20,        // marketing cap shown in UI ("до 20%")
 
   // ── Bonus usage limits at checkout ─────────────────────────────────────────
-  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — regular user can apply up to this per order
+  // Base limit; per-level limits unlocked via achievements (see getMaxBonusUsage)
+  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — base limit per order
   MAX_BONUS_USAGE_PARTNER: null as number | null, // null = 100% allowed for partners
 };
+
+// Maximum bonus usage per order, derived from PAID referrals count (level)
+export function getMaxBonusUsage(paidRefCount: number, isPartner: boolean): number | null {
+  if (isPartner) return null;          // 100% — no cap
+  if (paidRefCount >= 25) return 1000; // Легенда
+  if (paidRefCount >= 10) return 800;  // Амбассадор
+  if (paidRefCount >= 3)  return 600;  // Активист
+  return 500;                          // Базовый / Новичок
+}
 
 // Compute partner commission for a given product/order
 export function partnerCommission(orderPriceRub: number, productCommissionPct?: number | null): number {
@@ -35,13 +45,14 @@ export interface ReferralLevel {
   bonus: number;
   icon: string;
   gradient: string;
+  perk: string;
 }
 
 export const REFERRAL_LEVELS: ReferralLevel[] = [
-  { id: 1, name: 'Новичок',    minRefs: 1,  bonus: 0,    icon: '🥉', gradient: 'from-amber-400 to-amber-600' },
-  { id: 2, name: 'Активист',   minRefs: 3,  bonus: 500,  icon: '🥈', gradient: 'from-gray-400 to-gray-600' },
-  { id: 3, name: 'Амбассадор', minRefs: 10, bonus: 2000, icon: '🥇', gradient: 'from-yellow-400 to-yellow-600' },
-  { id: 4, name: 'Легенда',    minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-purple-500 to-pink-600' },
+  { id: 1, name: 'Новичок',    minRefs: 1,  bonus: 0,    icon: '🥉', gradient: 'from-amber-400 to-amber-600',  perk: 'Лимит оплаты бонусами 500₽' },
+  { id: 2, name: 'Активист',   minRefs: 3,  bonus: 500,  icon: '🥈', gradient: 'from-gray-400 to-gray-600',    perk: 'Лимит оплаты бонусами 600₽' },
+  { id: 3, name: 'Амбассадор', minRefs: 10, bonus: 2000, icon: '🥇', gradient: 'from-yellow-400 to-yellow-600', perk: 'Лимит оплаты бонусами 800₽' },
+  { id: 4, name: 'Легенда',    minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-purple-500 to-pink-600',   perk: 'Лимит оплаты бонусами 1000₽' },
 ];
 
 export function getCurrentLevel(refCount: number): ReferralLevel | null {

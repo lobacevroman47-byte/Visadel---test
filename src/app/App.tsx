@@ -121,6 +121,16 @@ function App() {
     // Upsert user in Supabase / localStorage
     if (tg) {
       const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;
+
+      // Track referral click (if user came via a referral link)
+      if (startParam) {
+        fetch('/api/track-click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ referral_code: startParam, telegram_id: tg.id }),
+        }).catch(() => {});
+      }
+
       upsertUser(tg, startParam)
         .then(async u => {
           setAppUser(u);

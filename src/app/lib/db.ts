@@ -486,10 +486,11 @@ export async function getReferralCount(referralCode: string): Promise<number> {
 
 // ─── Referral stats ────────────────────────────────────────────────────────
 export interface ReferralStats {
-  totalReferrals: number;     // людей пришло по ссылке
-  paidReferrals: number;      // из них оплатили хотя бы одну заявку
+  clicks: number;             // переходов по ссылке (из referral_clicks)
+  registered: number;         // людей зарегистрировалось через ссылку
+  paidReferrals: number;      // из них ОПЛАТИЛИ хотя бы одну заявку — официальный счётчик
   totalEarnings: number;      // суммарно заработано ₽ (из bonus_logs type='referral')
-  referrals: ReferralRow[];   // подробный список
+  referrals: ReferralRow[];   // подробный список зарегистрированных
 }
 
 export interface ReferralRow {
@@ -502,22 +503,43 @@ export interface ReferralRow {
 }
 
 export async function getReferralStats(referralCode: string, myTelegramId: number): Promise<ReferralStats> {
-  const empty: ReferralStats = { totalReferrals: 0, paidReferrals: 0, totalEarnings: 0, referrals: [] };
+  const empty: ReferralStats = { clicks: 0, registered: 0, paidReferrals: 0, totalEarnings: 0, referrals: [] };
   if (!isSupabaseConfigured() || !referralCode) return empty;
 
-  // 1. All users who came via my code
-  const { data: invitedUsers } = await supabase
-    .from('users')
-    .select('telegram_id, first_name, last_name, username, created_at')
-    .eq('referred_by', referralCode)
-    .order('created_at', { ascending: false });
-  const invited = (invitedUsers ?? []) as Array<{
+  // Run independent queries in parallel
+  const [usersRes, clicksRes, logsRes] = await Promise.all([
+    // 1. Users who registered with my code
+    supabase
+      .from('users')
+      .select('telegram_id, first_name, last_name, username, created_at')
+      .eq('referred_by', referralCode)
+      .order('created_at', { ascending: false }),
+    // 2. All clicks on my referral link
+    supabase
+      .from('referral_clicks')
+      .select('id', { count: 'exact', head: true })
+      .eq('referral_code', referralCode),
+    // 3. My referral earnings from bonus_logs
+    supabase
+      .from('bonus_logs')
+      .select('amount, description')
+      .eq('telegram_id', myTelegramId)
+      .eq('type', 'referral'),
+  ]);
+
+  const invited = (usersRes.data ?? []) as Array<{
     telegram_id: number; first_name: string; last_name: string | null;
     username: string | null; created_at: string;
   }>;
-  if (invited.length === 0) return empty;
+  const clicksCount = clicksRes.count ?? 0;
+  const logs = (logsRes.data ?? []) as Array<{ amount: number; description?: string }>;
+  const totalEarnings = logs.reduce((s, l) => s + (l.amount ?? 0), 0);
 
-  // 2. Which of them have paid applications (status >= in_progress)
+  if (invited.length === 0) {
+    return { ...empty, clicks: clicksCount };
+  }
+
+  // 4. Which invited users have paid applications (status in_progress or ready)
   const ids = invited.map(u => u.telegram_id);
   const { data: paidApps } = await supabase
     .from('applications')
@@ -526,19 +548,8 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
     .in('status', ['in_progress', 'ready']);
   const paidSet = new Set((paidApps ?? []).map((a: { user_telegram_id: number }) => a.user_telegram_id));
 
-  // 3. My referral earnings from bonus_logs
-  const { data: logs } = await supabase
-    .from('bonus_logs')
-    .select('amount, description')
-    .eq('telegram_id', myTelegramId)
-    .eq('type', 'referral');
-  const totalEarnings = (logs ?? []).reduce((s: number, l: { amount: number }) => s + (l.amount ?? 0), 0);
-
-  // 4. Per-referral earned: try to match in description (best-effort)
   const referrals: ReferralRow[] = invited.map(u => {
-    const logForUser = (logs ?? []).find((l: { description?: string }) =>
-      l.description?.includes(String(u.telegram_id))
-    ) as { amount?: number } | undefined;
+    const logForUser = logs.find(l => l.description?.includes(String(u.telegram_id)));
     return {
       telegram_id: u.telegram_id,
       name: `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}`,
@@ -550,62 +561,53 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
   });
 
   return {
-    totalReferrals: invited.length,
+    clicks: clicksCount,
+    registered: invited.length,
     paidReferrals: paidSet.size,
     totalEarnings,
     referrals,
   };
 }
 
-// Called when a referred user submits their first application — pays 500₽ to referrer.
-// Logs to bonus_logs for stats (with referee's telegram_id in description for per-referral attribution).
+// Pays referral bonus to the referrer once the admin confirms the referee's first payment.
+// Uses grant-bonus API which has dedup by application_id, so calling this multiple times
+// for the same referee is safe — bonus is granted exactly once.
 export async function payReferralBonus(refereeTelegramId: number): Promise<void> {
   if (!isSupabaseConfigured()) return;
 
-  // Get this user's referred_by code
+  // Find the referrer
   const { data: user } = await supabase
     .from('users')
     .select('referred_by')
     .eq('telegram_id', refereeTelegramId)
     .single();
-
   const referredBy = (user as { referred_by?: string } | null)?.referred_by;
   if (!referredBy) return;
 
-  // Check this is their first application
-  const { count } = await supabase
-    .from('applications')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_telegram_id', refereeTelegramId);
-  if ((count ?? 0) > 1) return; // already had applications before
-
-  // Find referrer by referral_code
   const { data: referrer } = await supabase
     .from('users')
-    .select('telegram_id, bonus_balance, is_influencer')
+    .select('telegram_id')
     .eq('referral_code', referredBy)
     .single();
   if (!referrer) return;
 
-  const r = referrer as { telegram_id: number; bonus_balance: number; is_influencer: boolean };
-  // Partners get percentage commission later (per-product); regular users get fixed amount.
-  // For now, partners also get the regular bonus until product-level commission lands.
+  const referrerId = (referrer as { telegram_id: number }).telegram_id;
   const REFERRER_REGULAR = 500;
-  const amount = REFERRER_REGULAR;
 
-  const newBalance = (r.bonus_balance ?? 0) + amount;
-  await supabase
-    .from('users')
-    .update({ bonus_balance: newBalance })
-    .eq('telegram_id', r.telegram_id);
-
-  // Log for stats (description must include refereeTelegramId for per-referral attribution)
-  await supabase.from('bonus_logs').insert({
-    telegram_id: r.telegram_id,
-    type: 'referral',
-    amount,
-    description: `+${amount}₽ за реферала ${refereeTelegramId} (первая оплаченная заявка)`,
-  });
+  // Idempotent grant via API (dedup key = unique referee id)
+  try {
+    await fetch('/api/grant-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: referrerId,
+        type: 'referral',
+        amount: REFERRER_REGULAR,
+        description: `+${REFERRER_REGULAR}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`,
+        application_id: `referral_${refereeTelegramId}`, // unique per referee = pays only once
+      }),
+    });
+  } catch (e) { console.warn('payReferralBonus error', e); }
 }
 
 export async function getReviewedAppIds(telegramId: number): Promise<Set<string>> {

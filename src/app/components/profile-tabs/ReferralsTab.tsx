@@ -24,7 +24,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   const myTelegramId = appUser?.telegram_id ?? 0;
 
   const [stats, setStats] = useState<ReferralStats>({
-    totalReferrals: 0, paidReferrals: 0, totalEarnings: 0, referrals: [],
+    clicks: 0, registered: 0, paidReferrals: 0, totalEarnings: 0, referrals: [],
   });
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
@@ -42,9 +42,16 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         if (cancelled) return;
         setStats(s);
 
-        // Auto-grant level bonuses (idempotent via grant-bonus API + unique application_id)
+        // Cache paid referrals count for Step7Payment to compute bonus usage limit
+        try {
+          const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+          ud.paidReferralsCount = s.paidReferrals;
+          localStorage.setItem('userData', JSON.stringify(ud));
+        } catch { /* ignore */ }
+
+        // Auto-grant level bonuses — based on PAID referrals only (idempotent)
         for (const level of REFERRAL_LEVELS) {
-          if (level.bonus > 0 && s.totalReferrals >= level.minRefs) {
+          if (level.bonus > 0 && s.paidReferrals >= level.minRefs) {
             try {
               await fetch('/api/grant-bonus', {
                 method: 'POST',
@@ -137,8 +144,8 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     }, 'image/png');
   };
 
-  // Levels — derived from total referrals (всех приглашённых)
-  const refCount = stats.totalReferrals;
+  // Levels — derived from PAID referrals only (officially counted)
+  const refCount = stats.paidReferrals;
   const currentLevel = getCurrentLevel(refCount);
   const nextLevel = getNextLevel(refCount);
   const progressPct = useMemo(() => {
@@ -262,11 +269,15 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
       </div>
 
       {/* ── 4. Stats grid ───────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
-        <StatCard label="Приглашено" value={stats.totalReferrals} color="text-blue-600" loading={loading} />
-        <StatCard label="Оплатили" value={stats.paidReferrals} color="text-green-600" loading={loading} />
+      <div className="grid grid-cols-2 gap-2">
+        <StatCard label="Переходов" value={stats.clicks} color="text-cyan-600" loading={loading} />
+        <StatCard label="Зарегистрировались" value={stats.registered} color="text-blue-600" loading={loading} />
+        <StatCard label="Оплатили визу" value={stats.paidReferrals} color="text-green-600" loading={loading} />
         <StatCard label="Заработано" value={`${stats.totalEarnings}₽`} color="text-purple-600" loading={loading} />
       </div>
+      <p className="text-xs text-gray-400 text-center -mt-2 px-2">
+        Реферал засчитывается только после оплаты визы
+      </p>
 
       {/* ── 5. Achievements / levels ────────────────────────────────────── */}
       <div className="bg-white rounded-2xl shadow-sm p-4">
@@ -315,20 +326,25 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             return (
               <div
                 key={level.id}
-                className={`flex items-center gap-3 p-2 rounded-lg ${reached ? 'bg-emerald-50' : 'bg-gray-50'}`}
+                className={`flex items-start gap-3 p-2.5 rounded-lg ${reached ? 'bg-emerald-50' : 'bg-gray-50'}`}
               >
-                <div className="text-xl">{reached ? level.icon : '🔒'}</div>
+                <div className="text-xl mt-0.5">{reached ? level.icon : '🔒'}</div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium ${reached ? 'text-gray-800' : 'text-gray-400'}`}>
-                    {level.name}
+                  <div className="flex items-center justify-between gap-2">
+                    <p className={`text-sm font-medium ${reached ? 'text-gray-800' : 'text-gray-400'}`}>
+                      {level.name}
+                    </p>
+                    {level.bonus > 0 && (
+                      <span className={`text-xs px-2 py-0.5 rounded-full whitespace-nowrap ${reached ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
+                        {reached ? <Check className="w-3 h-3 inline" /> : <Lock className="w-3 h-3 inline" />} +{level.bonus}₽
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{level.minRefs}+ оплативших друзей</p>
+                  <p className={`text-xs mt-0.5 ${reached ? 'text-emerald-700' : 'text-gray-400'}`}>
+                    💳 {level.perk}
                   </p>
-                  <p className="text-xs text-gray-400">{level.minRefs}+ рефералов</p>
                 </div>
-                {level.bonus > 0 && (
-                  <span className={`text-xs px-2 py-1 rounded-full ${reached ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-400'}`}>
-                    {reached ? <Check className="w-3 h-3 inline" /> : <Lock className="w-3 h-3 inline" />} +{level.bonus}₽
-                  </span>
-                )}
               </div>
             );
           })}
