@@ -34,6 +34,9 @@ export interface Application {
   payment_proof_url?: string;
   visa_file_url?: string;
   bonuses_used: number;
+  // Snapshot of USD→RUB rate for this specific application — used to compute
+  // cost-of-goods in finance reports. Editable by admin per application.
+  usd_rate_rub?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -270,6 +273,7 @@ export async function saveApplication(app: Application): Promise<Application> {
         form_data: app.form_data,
         payment_proof_url: app.payment_proof_url ?? null,
         bonuses_used: app.bonuses_used,
+        usd_rate_rub: app.usd_rate_rub ?? BONUS_CONFIG.USD_RATE_RUB,
       })
       .select()
       .single();
@@ -768,7 +772,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   // Apps query — only paid statuses count toward revenue
   let appsQ = supabase
     .from('applications')
-    .select('price, bonuses_used, visa_id, status, created_at, updated_at')
+    .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub')
     .in('status', ['in_progress', 'ready']);
   if (sinceISO) appsQ = appsQ.gte('updated_at', sinceISO);
 
@@ -784,16 +788,23 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
 
   const [appsRes, bonusRes, balanceRes, productsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ]);
 
-  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string }>;
+  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null }>;
   const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
   const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
   const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
 
-  const costByVisa = new Map<string, number>();
+  // USD cost (in dollars) per visa; converted to RUB per-app using each app's own usd_rate_rub
+  const usdCostByVisa = new Map<string, number>();
   for (const p of products) {
-    const usd = (p.cost_usd_fee ?? 0) + (p.cost_usd_commission ?? 0);
-    costByVisa.set(p.id, usd * BONUS_CONFIG.USD_RATE_RUB);
+    usdCostByVisa.set(p.id, (p.cost_usd_fee ?? 0) + (p.cost_usd_commission ?? 0));
   }
+
+  // Compute per-app cost in RUB using that app's snapshotted USD rate
+  const costForApp = (a: { visa_id: string; usd_rate_rub: number | null }) => {
+    const usd = usdCostByVisa.get(a.visa_id) ?? 0;
+    const rate = a.usd_rate_rub ?? BONUS_CONFIG.USD_RATE_RUB;
+    return usd * rate;
+  };
 
   let revenue = 0;
   let bonusesUsed = 0;
@@ -801,7 +812,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   for (const a of apps) {
     revenue += (a.price ?? 0) - (a.bonuses_used ?? 0);
     bonusesUsed += a.bonuses_used ?? 0;
-    costOfGoods += costByVisa.get(a.visa_id) ?? 0;
+    costOfGoods += costForApp(a);
   }
 
   const commissionsPaid = bonusLogs
@@ -823,7 +834,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
     for (const a of apps) {
       if (a.updated_at?.slice(0, 10) === key) {
         dayRev += (a.price ?? 0) - (a.bonuses_used ?? 0);
-        dayCost += costByVisa.get(a.visa_id) ?? 0;
+        dayCost += costForApp(a);
       }
     }
     const dayCommissions = bonusLogs

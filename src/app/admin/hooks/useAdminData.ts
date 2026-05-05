@@ -11,6 +11,7 @@ export interface AdminApplication {
   country: string;
   countryFlag: string;
   visaType: string;
+  visaId: string;
   cost: number;
   bonusesUsed: number;
   status: 'draft' | 'pending_payment' | 'pending_confirmation' | 'in_progress' | 'completed';
@@ -20,6 +21,7 @@ export interface AdminApplication {
   paymentProofUrl?: string;
   visaFileUrl?: string;
   telegramId: number;
+  usdRateRub: number;
 }
 
 export type AdminStaffRole = 'founder' | 'admin' | 'moderator';
@@ -67,6 +69,7 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
     country: row.country as string,
     countryFlag: FLAG_MAP[row.country as string] ?? '🌍',
     visaType: row.visa_type as string,
+    visaId: (row.visa_id as string) ?? '',
     cost: row.price as number,
     bonusesUsed: (row.bonuses_used as number) ?? 0,
     status: STATUS_MAP[row.status as string] ?? 'draft',
@@ -75,6 +78,7 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
     formData: fd,
     paymentProofUrl: row.payment_proof_url as string | undefined,
     visaFileUrl: row.visa_file_url as string | undefined,
+    usdRateRub: (row.usd_rate_rub as number) ?? 100,
   };
 }
 
@@ -122,18 +126,20 @@ export function useAdminApplications() {
           country: (a.visa as Record<string, unknown>)?.country as string ?? '',
           countryFlag: FLAG_MAP[(a.visa as Record<string, unknown>)?.country as string ?? ''] ?? '🌍',
           visaType: (a.visa as Record<string, unknown>)?.type as string ?? '',
+          visaId: ((a.visa as Record<string, unknown>)?.id as string) ?? '',
           cost: (a.totalPrice as number) ?? 0,
           bonusesUsed: (a.bonusesUsed as number) ?? 0,
           status: 'pending_confirmation',
           date: (a.createdAt as string) ?? new Date().toISOString(),
           urgent: Boolean(a.urgent),
           formData: (a.formData as Record<string, unknown>) ?? {},
+          usdRateRub: 100,
         }));
-        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {} }))]);
+        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100 }))]);
       }
     } catch (err) {
       console.error('Fetch applications error:', err);
-      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {} })));
+      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100 })));
     } finally {
       setLoading(false);
     }
@@ -203,6 +209,14 @@ export async function updateApplicationStatus(
   }
 
   // Notification is sent by the caller (Applications.tsx handleSave) to avoid double-send
+}
+
+// Allows admin to overwrite the USD rate snapshotted on the application.
+// Used when the rate at payment time differs from the default — the finance
+// dashboard will recalculate cost-of-goods using this per-app rate.
+export async function updateApplicationUsdRate(id: string, rate: number) {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('applications').update({ usd_rate_rub: rate }).eq('id', id);
 }
 
 // ─── Status log (audit trail) ──────────────────────────────────────────────
