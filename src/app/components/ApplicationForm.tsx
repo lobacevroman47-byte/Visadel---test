@@ -253,42 +253,47 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
-      {/* Compact Header */}
+      {/* Compact Header — VISADEL brand */}
       <div
         ref={headerRef}
-        className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white sticky top-0 z-10 shadow-md transition-all duration-200"
-        style={{ padding: keyboardOpen ? '6px 12px' : '8px 16px' }}
+        className="bg-white sticky top-0 z-10 border-b border-gray-100 transition-all duration-200"
+        style={{ padding: keyboardOpen ? '6px 12px' : '10px 16px' }}
       >
         <div className="max-w-2xl mx-auto">
-          {/* Top row: back / title / save */}
+          {/* Top row: back / brand / save */}
           <div className="flex items-center justify-between">
-            <button onClick={onBack} className="p-1.5 hover:bg-white/20 rounded-full transition">
-              <ChevronLeft className="w-5 h-5" />
+            <button onClick={onBack} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" aria-label="Назад">
+              <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="text-center leading-tight">
-              <span className="text-sm font-semibold">{visa.country} · {STEPS[currentStep]}</span>
+              <div className="flex items-center justify-center gap-1.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-[#0F2A36] font-extrabold text-[15px] tracking-tight">VISADEL</span>
+              </div>
               {!keyboardOpen && (
-                <span className="block text-xs text-blue-200">{calculateTotal()}₽{urgent && visa.country !== 'Вьетнам' ? ' (срочно)' : ''}</span>
+                <span className="block text-[11px] text-gray-500 mt-0.5">{visa.country} · {STEPS[currentStep]}</span>
               )}
             </div>
-            <button onClick={saveDraft} className="p-1.5 hover:bg-white/20 rounded-full transition" title="Сохранить черновик">
+            <button onClick={saveDraft} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" title="Сохранить черновик">
               <Save className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Progress bar + step counter — always visible (incl. when keyboard is open) */}
-          <div className="mt-1.5">
-            <div className="h-1 bg-white/25 rounded-full overflow-hidden">
+          {/* Progress bar + step counter — always visible */}
+          <div className="mt-2">
+            <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
               <motion.div
-                className="h-full bg-white"
+                className="h-full vd-grad rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: `${((currentStep + 1) / STEPS.length) * 100}%` }}
                 transition={{ duration: 0.3 }}
               />
             </div>
-            <div className="flex justify-between text-[10px] text-blue-200 mt-0.5">
-              <span>Шаг {currentStep + 1}/{STEPS.length}</span>
-              <span>{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
+            <div className="flex justify-between text-[10px] text-gray-500 mt-1 font-medium">
+              <span>Шаг {currentStep + 1}/{STEPS.length}{!keyboardOpen ? ` · ${calculateTotal().toLocaleString('ru-RU')} ₽${urgent && visa.country !== 'Вьетнам' ? ' (срочно)' : ''}` : ''}</span>
+              <span className="text-[#3B5BFF] font-bold">{Math.round(((currentStep + 1) / STEPS.length) * 100)}%</span>
             </div>
           </div>
         </div>

@@ -89,8 +89,10 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      <h2 className="text-2xl mb-6 text-gray-800">Основные данные</h2>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 1</p>
+      <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Основные данные</h2>
+      <p className="text-sm text-[#0F2A36]/60 mt-1 mb-6">Заполни как в загранпаспорте</p>
 
       {/* Universal name fields — рендерим только если их нет в БД (иначе будет дубль:
           DynamicForm рендерит свои firstName/lastName из visa_form_fields). */}
@@ -166,7 +168,7 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
 
       <button
         onClick={validateAndNext}
-        className="w-full mt-6 bg-[#2196F3] text-white py-4 rounded-[16px] hover:bg-[#1E88E5] transition flex items-center justify-center gap-2"
+        className="w-full mt-6 vd-grad text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold tracking-wide vd-shadow-cta flex items-center justify-center gap-2"
       >
         Далее
         <ChevronRight className="w-5 h-5" />

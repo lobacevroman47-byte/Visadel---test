@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
     <title>VISADEL AGENCY</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
       html, body {
@@ -12,8 +15,25 @@
         margin: 0;
         overscroll-behavior: none;
         -webkit-tap-highlight-color: transparent;
+        font-family: "Sora", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
       }
       #root { height: 100%; }
+
+      /* Visadel brand tokens */
+      :root {
+        --vd-navy:        #0F2A36;
+        --vd-navy-soft:   #1F3A48;
+        --vd-grad-from:   #74E1FF;
+        --vd-grad-mid:    #5C7BFF;
+        --vd-grad-to:     #4F2FE6;
+        --vd-brand:       #3B5BFF;
+        --vd-soft-bg:     #EAF1FF;
+        --vd-line:        #E1E5EC;
+      }
+      .vd-grad     { background: linear-gradient(120deg, var(--vd-grad-from) 0%, var(--vd-grad-mid) 70%, var(--vd-grad-to) 110%); }
+      .vd-grad-soft{ background: radial-gradient(120% 100% at 50% 0%, #DFFBFF 0%, #EAF1FF 60%, #F5F7FA 100%); }
+      .vd-grad-text{ background: linear-gradient(120deg, #5C7BFF, #4F2FE6); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .vd-shadow-cta{ box-shadow: 0 10px 30px -8px rgba(92,123,255,0.55); }
     </style>
   </head>
   <body>

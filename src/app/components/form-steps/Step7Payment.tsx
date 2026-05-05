@@ -217,18 +217,22 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
   return (
     <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
       <div className="mb-6">
-        <h2 className="text-2xl mb-1 text-[#212121]">Оплата</h2>
-        <p className="text-sm text-[#616161]">Переведите средства и загрузите скриншот</p>
+        <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Финал</p>
+        <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Оплата</h2>
+        <p className="text-sm text-[#0F2A36]/60 mt-1">Переведите средства и загрузите скриншот</p>
       </div>
 
       {/* Реквизиты */}
-      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100">
         <div className="flex items-start gap-3">
-          <CreditCard className="w-6 h-6 text-[#2196F3] flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="text-[#212121] mb-1">Реквизиты для оплаты</h3>
-            <p className="text-sm text-[#212121]"><span className="text-[#616161]">Номер карты:</span> 5536 9140 3834 6908</p>
-            <p className="text-xs text-[#616161] mt-2">После оплаты загрузите скриншот перевода</p>
+          <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+            <CreditCard className="w-5 h-5" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-[#0F2A36] font-bold text-sm">Реквизиты для оплаты</h3>
+            <p className="text-[10px] text-[#0F2A36]/60 mt-1.5 uppercase tracking-wider font-semibold">Номер карты</p>
+            <p className="text-[#0F2A36] font-mono text-[15px] mt-0.5 tracking-wide">5536 9140 3834 6908</p>
+            <p className="text-[11px] text-[#0F2A36]/60 mt-2">После оплаты загрузите скриншот перевода</p>
           </div>
         </div>
       </div>
@@ -258,25 +262,25 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       )}
 
       {/* Итого */}
-      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
-        <h3 className="text-[#212121] text-sm mb-3">Детали оплаты</h3>
+      <div className="vd-grad-soft rounded-2xl p-5 mb-4 border border-blue-100/60">
+        <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mb-3">Детали оплаты</p>
         <div className="space-y-2 mb-3">
           {breakdown.map((item, idx) => (
             <div key={idx} className="flex justify-between text-sm">
-              <span className="text-[#616161]">{item.label}</span>
-              <span className="text-[#212121]">{idx === 0 ? `${item.amount}₽` : `+${item.amount}₽`}</span>
+              <span className="text-[#0F2A36]/70">{item.label}</span>
+              <span className="text-[#0F2A36] font-semibold">{idx === 0 ? `${item.amount.toLocaleString('ru-RU')} ₽` : `+${item.amount.toLocaleString('ru-RU')} ₽`}</span>
             </div>
           ))}
           {useBonuses && bonusAmount > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-[#00C853]">Бонусы</span>
-              <span className="text-[#00C853]">−{bonusAmount}₽</span>
+              <span className="text-[#00C853] font-semibold">−{bonusAmount.toLocaleString('ru-RU')} ₽</span>
             </div>
           )}
         </div>
-        <div className="border-t pt-3 flex justify-between items-center">
-          <span className="text-[#212121] text-sm">Итого к оплате:</span>
-          <span className="text-2xl text-[#2196F3] font-semibold">{finalPrice}₽</span>
+        <div className="border-t border-blue-200/60 pt-3 flex justify-between items-center">
+          <span className="text-[#0F2A36] font-bold">Итого</span>
+          <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{finalPrice.toLocaleString('ru-RU')} ₽</span>
         </div>
       </div>
 
@@ -320,17 +324,17 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
         <button
           onClick={handlePaymentComplete}
           disabled={submitting}
-          className="w-full bg-[#00C853] text-white py-4 rounded-[16px] hover:bg-[#00E676] transition flex items-center justify-center gap-2 disabled:opacity-60"
+          className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.6)]"
         >
           {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
-          {submitting ? 'Отправляем...' : 'Оплатил — отправить заявку'}
+          {submitting ? 'Отправляем…' : 'Оплатил — отправить заявку'}
         </button>
 
-        <button onClick={handleSaveDraft} className="w-full bg-blue-50 text-blue-700 py-3 rounded-[16px] hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm">
+        <button onClick={handleSaveDraft} className="w-full vd-grad-soft text-[#3B5BFF] py-3 rounded-2xl hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm font-semibold border border-blue-100/60">
           <Save className="w-4 h-4" /> Сохранить черновик
         </button>
 
-        <button onClick={onPrev} className="w-full bg-gray-100 text-gray-600 py-3 rounded-[16px] hover:bg-gray-200 transition flex items-center justify-center gap-2 text-sm">
+        <button onClick={onPrev} className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl hover:bg-gray-200 transition flex items-center justify-center gap-2 text-sm font-medium">
           <ChevronLeft className="w-4 h-4" /> Назад
         </button>
       </div>

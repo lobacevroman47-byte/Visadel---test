@@ -154,24 +154,24 @@ function VisaCard({ visa, addonPrices, onSelect, isUrgent = false, hideCalculato
   };
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-100">
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
       {/* Header */}
       <div className="mb-4">
-        <h3 className="text-[#212121] mb-1">{visa.type}</h3>
+        <h3 className="text-[#0F2A36] font-bold tracking-tight mb-1">{visa.type}</h3>
         {visa.description && (
-          <p className="text-sm text-[#616161] mb-1">{visa.description}</p>
+          <p className="text-sm text-[#0F2A36]/60 mb-1">{visa.description}</p>
         )}
-        <p className="text-sm text-[#616161]">Готовность: {visa.readinessTime}</p>
+        <p className="text-xs text-[#0F2A36]/60 uppercase tracking-wider font-semibold">{visa.readinessTime}</p>
       </div>
 
       {/* Price Block */}
-      <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 mb-3 border border-blue-100">
+      <div className="vd-grad-soft rounded-xl p-4 mb-3 border border-blue-100/60">
         <div className="flex items-end justify-between gap-3">
           <div>
-            <div className="text-xs text-[#616161] mb-0.5">
+            <div className="text-[10px] text-[#0F2A36]/60 mb-0.5 uppercase tracking-wider font-semibold">
               {hasAddons ? 'Базовая цена' : 'Стоимость'}
             </div>
-            <div className={`leading-none font-bold ${hasAddons ? 'text-xl text-gray-400 line-through' : 'text-3xl text-[#1976D2]'}`}>
+            <div className={`leading-none font-extrabold tracking-tight ${hasAddons ? 'text-xl text-gray-400 line-through' : 'text-3xl vd-grad-text'}`}>
               {visa.price.toLocaleString('ru-RU')}<span className={hasAddons ? 'text-base' : 'text-xl'}>₽</span>
             </div>
           </div>
@@ -183,8 +183,8 @@ function VisaCard({ visa, addonPrices, onSelect, isUrgent = false, hideCalculato
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="text-right"
               >
-                <div className="text-xs text-[#616161] mb-0.5">Итого</div>
-                <div className="text-3xl text-[#00C853] font-bold leading-none">
+                <div className="text-[10px] text-[#0F2A36]/60 mb-0.5 uppercase tracking-wider font-semibold">Итого</div>
+                <div className="text-3xl text-[#00C853] font-extrabold leading-none tracking-tight">
                   {total.toLocaleString('ru-RU')}<span className="text-xl">₽</span>
                 </div>
               </motion.div>
@@ -254,13 +254,13 @@ function VisaCard({ visa, addonPrices, onSelect, isUrgent = false, hideCalculato
 
       <button
         onClick={handleSubmit}
-        className={`w-full py-3.5 rounded-[16px] transition font-medium ${
+        className={`w-full py-3.5 rounded-2xl transition font-bold tracking-wide active:scale-[0.98] vd-shadow-cta ${
           isUrgent
-            ? 'bg-red-600 hover:bg-red-700 text-white'
-            : 'bg-[#2196F3] hover:bg-[#1E88E5] text-white'
+            ? 'bg-gradient-to-r from-red-600 to-orange-500 text-white'
+            : 'vd-grad text-white'
         }`}
       >
-        Оформить{hasAddons ? ` за ${total.toLocaleString('ru-RU')}₽` : ''}
+        Оформить{hasAddons ? ` за ${total.toLocaleString('ru-RU')}₽` : ''} →
       </button>
     </div>
   );
@@ -410,52 +410,81 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
 
   return (
     <div ref={scrollRef} className="min-h-screen bg-[#F5F7FA] pb-20" style={{ overflowAnchor: 'none' }}>
-      {/* Header */}
-      <div className="bg-white sticky top-0 z-10 shadow-md border-b border-gray-100">
-        <div className="relative px-3 overflow-hidden" style={{ height: '110px' }}>
-          <img
-            src={logo}
-            alt="Visadel Agency"
-            style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover', objectPosition: 'top' }}
-          />
+      {/* ─── Brand Header (compact, premium) ─── */}
+      <div className="bg-white sticky top-0 z-10 border-b border-gray-100">
+        <div className="px-5 pt-3 pb-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
+          </div>
           <button
             onClick={onOpenProfile}
-            className="absolute right-2 top-2 w-10 h-10 flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-md transition"
+            className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition"
+            aria-label="Профиль"
           >
-            <User className="w-5 h-5" />
+            <User className="w-4 h-4" />
           </button>
         </div>
       </div>
 
       {!selectedCountry && <ReferralBanner onOpen={onOpenReferrals} />}
 
-      <div className="max-w-2xl mx-auto p-4">
+      <div className="max-w-2xl mx-auto">
+        {/* ─── Hero (визы) — только на главном экране списка стран ─── */}
+        {!selectedCountry && (
+          <div className="vd-grad-soft px-5 pt-7 pb-8">
+            <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36]">
+              Простой способ
+              <br/>
+              <span className="vd-grad-text">оформить визу</span>
+            </h1>
+            <div className="flex items-center justify-center gap-2 mt-3 text-xs text-[#0F2A36]/70">
+              <span className="text-emerald-500">★★★★★</span>
+              <span>4.9 / 8 200 отзывов</span>
+            </div>
+          </div>
+        )}
+
+        <div className="p-4">
         {/* Country Selection */}
         {!selectedCountry && (
           <div>
-            <h2 className="text-xl mb-4 text-gray-800">Выберите страну</h2>
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="text-[20px] font-extrabold tracking-tight text-[#0F2A36]">Все направления</h2>
+              <span className="text-[12px] text-gray-400">{countries.length} стран</span>
+            </div>
             {catalogLoading && countries.length === 0 && (
               <div className="flex justify-center items-center py-16">
                 <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
               </div>
             )}
             {!catalogLoading && countries.length === 0 && (
-              <div className="bg-white rounded-2xl p-8 text-center shadow-md border border-gray-100">
+              <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
                 <p className="text-gray-600">Каталог пока пуст</p>
                 <p className="text-sm text-gray-400 mt-1">Загляните позже</p>
               </div>
             )}
-            <div className="grid grid-cols-2 gap-4">
-              {countries.map((country) => (
-                <button
-                  key={country.name}
-                  onClick={() => handleCountryClick(country)}
-                  className="bg-white rounded-2xl p-6 shadow-md active:shadow-inner active:scale-95 transition-all border border-gray-100 flex flex-col items-center gap-3"
-                >
-                  <span className="text-5xl">{country.flag}</span>
-                  <span className="text-gray-800 text-center">{country.name}</span>
-                </button>
-              ))}
+            <div className="grid grid-cols-2 gap-3">
+              {countries.map((country) => {
+                const minPrice = Math.min(
+                  ...country.visaOptions.map(v => v.price),
+                  ...(country.urgentOptions ?? []).map(v => v.price),
+                  ...(country.extensionOptions ?? []).map(v => v.price),
+                );
+                return (
+                  <button
+                    key={country.name}
+                    onClick={() => handleCountryClick(country)}
+                    className="bg-white rounded-2xl p-4 border border-gray-100 hover:shadow-md active:scale-[0.98] transition-all text-left"
+                  >
+                    <span className="text-3xl block leading-none">{country.flag}</span>
+                    <p className="text-[#0F2A36] font-bold text-[14px] mt-2">{country.name}</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">от {minPrice.toLocaleString('ru-RU')} ₽</p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -465,20 +494,27 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
           <div>
             <button
               onClick={handleBackFromCountry}
-              className="mb-4 text-[#1976D2] hover:text-[#0D47A1] flex items-center gap-1"
+              className="mb-4 text-[#3B5BFF] hover:text-[#4F2FE6] flex items-center gap-1 text-sm font-medium"
             >
               ← Назад
             </button>
 
-            <div className="bg-white rounded-2xl p-6 shadow-md mb-6">
+            <div className="vd-grad-soft rounded-2xl p-6 mb-6 border border-blue-100/50">
               <div className="flex items-center gap-4">
-                <span className="text-6xl">{selectedCountry.flag}</span>
+                <span className="text-6xl leading-none">{selectedCountry.flag}</span>
                 <div>
-                  <h2 className="text-2xl text-gray-800">{selectedCountry.name}</h2>
-                  <p className="text-gray-600 text-sm">
+                  <h2 className="text-2xl font-extrabold tracking-tight text-[#0F2A36]">{selectedCountry.name}</h2>
+                  <p className="text-[#0F2A36]/60 text-sm mt-0.5">
                     {showExtensions ? 'Продление визы' : showUrgentVietnam ? 'Срочное оформление' : 'Выберите тип визы'}
                   </p>
                 </div>
+              </div>
+              <div className="flex items-center gap-3 mt-4 text-[11px] text-[#0F2A36]/70 uppercase tracking-wider font-semibold">
+                <span>1–3 дня</span>
+                <span className="text-[#5C7BFF]">·</span>
+                <span>99% одобрений</span>
+                <span className="text-[#5C7BFF]">·</span>
+                <span>SSL</span>
               </div>
             </div>
 
@@ -561,6 +597,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
             )}
           </div>
         )}
+        </div>
       </div>
     </div>
   );
