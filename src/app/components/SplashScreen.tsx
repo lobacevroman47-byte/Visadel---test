@@ -1,33 +1,35 @@
-import { motion } from 'motion/react';
-import logo from '../../assets/logo.png';
-
 export default function SplashScreen() {
   return (
-    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ duration: 0.6, ease: 'easeOut' }}
-        className="w-full flex justify-center px-8"
-      >
-        <img src={logo} alt="Visadel Agency" className="w-80 object-contain" />
-      </motion.div>
+    <div className="fixed inset-0 bg-white flex flex-col items-center justify-center vd-splash">
+      <div className="flex items-center gap-3 vd-splash-logo">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        <span className="text-[#0F2A36] font-extrabold text-[40px] tracking-tight">VISADEL</span>
+      </div>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8, duration: 0.5 }}
-        className="absolute bottom-12 flex gap-2"
-      >
-        {[0, 0.2, 0.4].map((delay) => (
-          <motion.div
-            key={delay}
-            animate={{ scale: [1, 1.3, 1], opacity: [0.4, 1, 0.4] }}
-            transition={{ duration: 1, repeat: Infinity, delay }}
-            className="w-2 h-2 bg-blue-500 rounded-full"
-          />
-        ))}
-      </motion.div>
+      <div className="absolute bottom-12 flex gap-2 vd-splash-dots">
+        <span className="w-2 h-2 bg-[#3B5BFF] rounded-full" style={{ animationDelay: '0s' }} />
+        <span className="w-2 h-2 bg-[#3B5BFF] rounded-full" style={{ animationDelay: '0.2s' }} />
+        <span className="w-2 h-2 bg-[#3B5BFF] rounded-full" style={{ animationDelay: '0.4s' }} />
+      </div>
+
+      <style>{`
+        .vd-splash-logo {
+          animation: vd-pop 0.6s ease-out;
+        }
+        .vd-splash-dots > span {
+          animation: vd-pulse 1s ease-in-out infinite;
+        }
+        @keyframes vd-pop {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes vd-pulse {
+          0%, 100% { transform: scale(1); opacity: 0.4; }
+          50% { transform: scale(1.3); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

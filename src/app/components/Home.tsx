@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
 import type { VisaOption } from '../App';
-import logo from '../../assets/logo2.png';
 import {
   getReferralStats, getVisaProducts, getAdditionalServices,
   type VisaProduct, type AdditionalService,

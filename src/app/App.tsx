@@ -1,14 +1,16 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
 import SplashScreen from './components/SplashScreen';
 import Home from './components/Home';
-import ApplicationForm from './components/ApplicationForm';
-import UserProfile from './components/UserProfile';
-import SriLankaExtensionForm from './components/SriLankaExtensionForm';
-import PartnerApplicationForm from './components/PartnerApplicationForm';
 import BottomNav, { type MainTab } from './components/BottomNav';
 import ComingSoon from './components/ComingSoon';
-import { AdminApp } from './admin/AdminApp';
 import { initializeUserData } from './utils/userData';
+
+// Heavy on-demand routes — split into separate chunks so the home screen loads fast
+const ApplicationForm        = lazy(() => import('./components/ApplicationForm'));
+const UserProfile            = lazy(() => import('./components/UserProfile'));
+const SriLankaExtensionForm  = lazy(() => import('./components/SriLankaExtensionForm'));
+const PartnerApplicationForm = lazy(() => import('./components/PartnerApplicationForm'));
+const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
 import {
   getTelegramUser,
   initTelegramApp,
@@ -252,36 +254,46 @@ function App() {
           </>
         )}
         {currentScreen === 'application' && selectedVisa && (
-          <ApplicationForm
-            visa={selectedVisa}
-            urgent={urgentVisa}
-            prefilledAddons={prefilledAddons}
-            onBack={handleBackToHome}
-            onContinueDraft={handleContinueDraft}
-          />
+          <Suspense fallback={<SplashScreen />}>
+            <ApplicationForm
+              visa={selectedVisa}
+              urgent={urgentVisa}
+              prefilledAddons={prefilledAddons}
+              onBack={handleBackToHome}
+              onContinueDraft={handleContinueDraft}
+            />
+          </Suspense>
         )}
         {currentScreen === 'profile' && (
-          <UserProfile
-            onBack={handleBackToHome}
-            onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
-            onContinueDraft={handleContinueDraft}
-            onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
-            initialTab={initialProfileTab}
-          />
+          <Suspense fallback={<SplashScreen />}>
+            <UserProfile
+              onBack={handleBackToHome}
+              onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
+              onContinueDraft={handleContinueDraft}
+              onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
+              initialTab={initialProfileTab}
+            />
+          </Suspense>
         )}
 
         {currentScreen === 'extension' && selectedVisa && (
-          <SriLankaExtensionForm
-            visa={selectedVisa}
-            onBack={handleBackToHome}
-            onComplete={handleBackToHome}
-          />
+          <Suspense fallback={<SplashScreen />}>
+            <SriLankaExtensionForm
+              visa={selectedVisa}
+              onBack={handleBackToHome}
+              onComplete={handleBackToHome}
+            />
+          </Suspense>
         )}
         {currentScreen === 'partner_application' && (
-          <PartnerApplicationForm onBack={handleBackToHome} onSubmit={handleBackToHome} />
+          <Suspense fallback={<SplashScreen />}>
+            <PartnerApplicationForm onBack={handleBackToHome} onSubmit={handleBackToHome} />
+          </Suspense>
         )}
         {currentScreen === 'admin' && (
-          <AdminApp onBackToApp={handleBackToHome} />
+          <Suspense fallback={<SplashScreen />}>
+            <AdminApp onBackToApp={handleBackToHome} />
+          </Suspense>
         )}
       </div>
     </TelegramCtx.Provider>
