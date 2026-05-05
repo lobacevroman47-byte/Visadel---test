@@ -7,11 +7,12 @@ interface Step6Props {
   visa: VisaOption;
   urgent: boolean;
   totalPrice: number;
+  addonPrices: { urgent: number; hotel: number; ticket: number };
   onNext: () => void;
   onPrev: () => void;
 }
 
-export default function Step6Review({ formData, visa, urgent, totalPrice, onNext, onPrev }: Step6Props) {
+export default function Step6Review({ formData, visa, urgent, totalPrice, addonPrices, onNext, onPrev }: Step6Props) {
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <div className="mb-6">
@@ -73,13 +74,13 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, onNext
               {formData.additionalDocs.hotelBooking && (
                 <div className="flex items-center gap-2 text-gray-800">
                   <span className="text-green-600">✓</span>
-                  Подтверждение проживания (+1000₽)
+                  Подтверждение проживания (+{addonPrices.hotel}₽)
                 </div>
               )}
               {formData.additionalDocs.returnTicket && (
                 <div className="flex items-center gap-2 text-gray-800">
                   <span className="text-green-600">✓</span>
-                  Подтверждение обратного билета (+2000₽)
+                  Подтверждение обратного билета (+{addonPrices.ticket}₽)
                 </div>
               )}
             </div>
@@ -146,19 +147,19 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, onNext
             {formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам' && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Срочное оформление:</span>
-                <span className="text-gray-800">+1000₽</span>
+                <span className="text-gray-800">+{addonPrices.urgent}₽</span>
               </div>
             )}
             {formData.additionalDocs.hotelBooking && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Подтверждение бронирования жилья:</span>
-                <span className="text-gray-800">+1000₽</span>
+                <span className="text-gray-800">+{addonPrices.hotel}₽</span>
               </div>
             )}
             {formData.additionalDocs.returnTicket && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Бронирование авиабилета:</span>
-                <span className="text-gray-800">+2000₽</span>
+                <span className="text-gray-800">+{addonPrices.ticket}₽</span>
               </div>
             )}
           </div>

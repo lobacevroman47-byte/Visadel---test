@@ -345,6 +345,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
               visa={visa}
               urgent={urgent}
               totalPrice={calculateTotal()}
+              addonPrices={addonPrices}
               onNext={goToNextStep}
               onPrev={goToPrevStep}
             />
