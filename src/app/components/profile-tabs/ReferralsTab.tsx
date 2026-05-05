@@ -16,6 +16,7 @@ interface ReferralTabProps {
 }
 
 const BOT_USERNAME = 'Visadel_test_bot';
+const MINI_APP_SHORT_NAME = 'app'; // Direct Link Mini App short name (set in BotFather)
 
 export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabProps) {
   const { appUser } = useTelegram();
@@ -74,9 +75,8 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     return () => { cancelled = true; };
   }, [referralCode, myTelegramId]);
 
-  // Use ?startapp= so the MiniApp opens directly with start_param.
-  // ?start= would only open bot chat — start_param wouldn't reach the MiniApp.
-  const link = `https://t.me/${BOT_USERNAME}?startapp=${referralCode}`;
+  // Direct Link Mini App: opens MiniApp immediately with start_param available.
+  const link = `https://t.me/${BOT_USERNAME}/${MINI_APP_SHORT_NAME}?startapp=${referralCode}`;
   const shareText = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке ты получишь 200₽ на первую визу: ${link}`;
 
   const copyLink = async () => {
