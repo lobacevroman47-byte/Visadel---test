@@ -507,18 +507,18 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
   if (!isSupabaseConfigured() || !referralCode) return empty;
 
   // Run independent queries in parallel
-  const [usersRes, clicksRes, logsRes] = await Promise.all([
+  const [usersRes, clicksCount, logsRes] = await Promise.all([
     // 1. Users who registered with my code
     supabase
       .from('users')
       .select('telegram_id, first_name, last_name, username, created_at')
       .eq('referred_by', referralCode)
       .order('created_at', { ascending: false }),
-    // 2. All clicks on my referral link
-    supabase
-      .from('referral_clicks')
-      .select('id', { count: 'exact', head: true })
-      .eq('referral_code', referralCode),
+    // 2. Clicks count — via server-side API (bypasses RLS)
+    fetch(`/api/referral-clicks-count?code=${encodeURIComponent(referralCode)}`)
+      .then(r => r.ok ? r.json() : { count: 0 })
+      .then((d: { count?: number }) => d.count ?? 0)
+      .catch(() => 0),
     // 3. My referral earnings from bonus_logs
     supabase
       .from('bonus_logs')
@@ -531,12 +531,11 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
     telegram_id: number; first_name: string; last_name: string | null;
     username: string | null; created_at: string;
   }>;
-  const clicksCount = clicksRes.count ?? 0;
   const logs = (logsRes.data ?? []) as Array<{ amount: number; description?: string }>;
   const totalEarnings = logs.reduce((s, l) => s + (l.amount ?? 0), 0);
 
   if (invited.length === 0) {
-    return { ...empty, clicks: clicksCount };
+    return { ...empty, clicks: clicksCount as number };
   }
 
   // 4. Which invited users have paid applications (status in_progress or ready)
@@ -561,7 +560,7 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
   });
 
   return {
-    clicks: clicksCount,
+    clicks: clicksCount as number,
     registered: invited.length,
     paidReferrals: paidSet.size,
     totalEarnings,
