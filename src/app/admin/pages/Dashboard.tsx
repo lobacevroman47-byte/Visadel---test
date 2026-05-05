@@ -95,64 +95,67 @@ const FinanceSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Top metrics — 3 cards: Revenue / Profit / Bonuses outstanding */}
+      {/* Hero metrics — Revenue / Profit / Bonuses owed */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-        {/* Revenue */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-5 rounded-xl text-white">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Выручка</p>
             <TrendingUp size={16} className="opacity-70" />
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.revenue ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">{stats?.paidApplicationsCount ?? 0} оплачено · после списанных бонусов</p>
+          <p className="text-xs opacity-75 mt-1">{stats?.paidApplicationsCount ?? 0} оплачено · после скидок бонусами</p>
         </div>
 
-        {/* Profit */}
         <div className={`p-5 rounded-xl text-white bg-gradient-to-br ${(stats?.profit ?? 0) >= 0 ? 'from-emerald-500 to-emerald-700' : 'from-red-500 to-red-700'}`}>
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Прибыль</p>
             <PiggyBank size={16} className="opacity-70" />
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.profit ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">маржа {margin}% · −себест. −комиссии</p>
+          <p className="text-xs opacity-75 mt-1">маржа {margin}% · выручка − себест. − налог − партнёрам</p>
         </div>
 
-        {/* Bonuses outstanding */}
         <div className="bg-gradient-to-br from-amber-500 to-amber-700 p-5 rounded-xl text-white">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Бонусы у юзеров</p>
             <Coins size={16} className="opacity-70" />
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.bonusesOutstanding ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">текущий долг (на балансах)</p>
+          <p className="text-xs opacity-75 mt-1">текущий долг (на балансах юзеров)</p>
         </div>
       </div>
 
-      {/* Breakdown row — все компоненты прибыли */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-5">
+      {/* Cost breakdown — что реально вычитается из прибыли */}
+      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2 mt-2">Расходы (вычитаются из прибыли)</p>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
+        <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
+          <p className="text-xs text-red-600">Себестоимость виз</p>
+          <p className="text-lg font-semibold text-red-800">−{fmtRub(stats?.costOfGoods ?? 0)}</p>
+        </div>
+        <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
+          <p className="text-xs text-red-600">Налог</p>
+          <p className="text-lg font-semibold text-red-800">−{fmtRub(stats?.taxes ?? 0)}</p>
+        </div>
+        <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
+          <p className="text-xs text-red-600">Партнёрам (профит-шеринг)</p>
+          <p className="text-lg font-semibold text-red-800">−{fmtRub(stats?.commissionsPaid ?? 0)}</p>
+        </div>
+      </div>
+
+      {/* Bonus journal — информационно: как двигались балансы юзеров */}
+      <p className="text-xs uppercase tracking-wider text-gray-500 mb-2">Журнал бонусов <span className="text-gray-400 normal-case tracking-normal">(информация — не влияет на прибыль)</span></p>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Себестоимость</p>
-          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.costOfGoods ?? 0)}</p>
+          <p className="text-xs text-gray-500">Welcome (+200₽ за реф.)</p>
+          <p className="text-lg font-semibold text-gray-700">+{fmtRub(stats?.welcomeBonusesPaid ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Налог</p>
-          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.taxes ?? 0)}</p>
+          <p className="text-xs text-gray-500">Прочие (daily/admin/…)</p>
+          <p className="text-lg font-semibold text-gray-700">+{fmtRub(stats?.otherBonusesPaid ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Партнёрам</p>
-          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.commissionsPaid ?? 0)}</p>
-        </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Новичкам по реф.</p>
-          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.welcomeBonusesPaid ?? 0)}</p>
-        </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Прочие бонусы</p>
-          <p className="text-lg font-semibold text-gray-800">−{fmtRub(stats?.otherBonusesPaid ?? 0)}</p>
-        </div>
-        <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-gray-500">Списано клиентами</p>
-          <p className="text-lg font-semibold text-gray-800">{fmtRub(stats?.bonusesUsed ?? 0)}</p>
+          <p className="text-xs text-gray-500">Списано клиентами при оплате</p>
+          <p className="text-lg font-semibold text-gray-700">−{fmtRub(stats?.bonusesUsed ?? 0)}</p>
         </div>
       </div>
 

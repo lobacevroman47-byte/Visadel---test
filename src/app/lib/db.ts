@@ -752,15 +752,16 @@ export interface FinanceStats {
   revenue: number;          // Выручка = Σ (price − bonuses_used) по оплаченным заявкам
   costOfGoods: number;      // Себестоимость = Σ (cost_usd_fee + cost_usd_commission) × app.usd_rate_rub
   taxes: number;            // Налог = Σ (price × app.tax_pct / 100)
-  commissionsPaid: number;  // Партнёрам = Σ bonus_logs WHERE type='referral'
-  welcomeBonusesPaid: number; // Новичкам = Σ bonus_logs WHERE type='welcome' (200₽ за переход по ссылке)
-  otherBonusesPaid: number; // Прочее = Σ bonus_logs WHERE type IN ('review','level','daily', …)
-  bonusesIssued: number;    // Σ всех начислений (welcomeBonusesPaid + commissionsPaid + otherBonusesPaid)
-  bonusesUsed: number;      // Σ bonuses_used — клиенты применили как скидку (уже учтено в выручке)
-  bonusesOutstanding: number; // Текущий долг: Σ users.bonus_balance
-  profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid − welcomeBonusesPaid − otherBonusesPaid
+  commissionsPaid: number;  // Партнёрам = Σ bonus_logs WHERE type='referral' (реальное профит-шеринг)
+  // ── Информационно (НЕ вычитается из прибыли — это ещё не cash-out, а лишь обязательство):
+  welcomeBonusesPaid: number; // Новичкам по реф. ссылке — Σ bonus_logs WHERE type='welcome'
+  otherBonusesPaid: number;   // Прочее (daily/weekly/review/level/admin_*) — Σ bonus_logs остальных типов
+  bonusesIssued: number;    // Σ всех начислений за период
+  bonusesUsed: number;      // Σ bonuses_used (уже учтено в выручке)
+  bonusesOutstanding: number; // Текущий долг компании: Σ users.bonus_balance
+  profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid
   paidApplicationsCount: number;
-  series: { date: string; revenue: number; profit: number }[]; // ежедневная динамика
+  series: { date: string; revenue: number; profit: number }[];
 }
 
 // Period in days; 0 means "all time"
@@ -843,7 +844,12 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   const bonusesIssued = commissionsPaid + welcomeBonusesPaid + otherBonusesPaid;
   const bonusesOutstanding = balances.reduce((s, b) => s + (b.bonus_balance ?? 0), 0);
 
-  const profit = revenue - costOfGoods - taxes - commissionsPaid - welcomeBonusesPaid - otherBonusesPaid;
+  // Profit subtracts only direct cash-equivalent outflows: cost-of-goods, tax,
+  // and partner commissions (real profit-sharing). Welcome / daily / admin
+  // bonuses are user-balance liabilities that turn into cost only when the
+  // user redeems them on a visa — which already shows up via bonuses_used in
+  // the revenue line, so adding them here would double-count.
+  const profit = revenue - costOfGoods - taxes - commissionsPaid;
 
   // Build daily series — buckets only for displayed period (cap at 90 days for chart density)
   const seriesDays = periodDays > 0 ? Math.min(periodDays, 90) : 30;
@@ -860,10 +866,10 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
         dayTax += taxForApp(a);
       }
     }
-    const dayBonusOuts = bonusLogs
-      .filter(b => b.created_at?.slice(0, 10) === key)
+    const dayCommissions = bonusLogs
+      .filter(b => b.type === 'referral' && b.created_at?.slice(0, 10) === key)
       .reduce((s, b) => s + (b.amount ?? 0), 0);
-    series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayTax - dayBonusOuts });
+    series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayTax - dayCommissions });
   }
 
   return {
