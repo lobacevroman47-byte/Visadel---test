@@ -80,21 +80,29 @@ export const FormBuilder: React.FC = () => {
     [allPhotos, selectedCountry]
   );
 
+  // Seed runs without confirm() — iOS Telegram WebView often blocks native confirm
+  // dialogs and the click silently no-ops. The button itself is an explicit click,
+  // and the result is reported via the setSeedResult banner below.
+  const [seedResult, setSeedResult] = useState<{ ok: boolean; text: string } | null>(null);
+
   const handleSeed = async () => {
-    if (!confirm('Импортировать поля анкет и фото-требования из кода в БД?\n\nЕсли в БД уже есть записи — операция пропустится.')) return;
     setSeeding(true);
+    setSeedResult(null);
+    console.log('[seed] starting, countries:', countriesVisaData.length);
     try {
       const r = await seedFormFieldsFromCode({ countriesVisaData }, countryPhotoRequirements);
+      console.log('[seed] result:', r);
       if (r.error) {
-        alert(`Ошибка импорта:\n${r.error}\n\nВозможные причины:\n— Таблицы visa_form_fields / visa_photo_requirements не созданы в Supabase\n— RLS блокирует запись\n\nЗапусти SQL миграцию из инструкции и попробуй снова.`);
+        setSeedResult({ ok: false, text: `Ошибка: ${r.error}\n\nПричины: таблицы visa_form_fields / visa_photo_requirements не созданы, или RLS блокирует запись. Запусти SQL миграцию.` });
       } else if (r.skipped) {
-        alert('В БД уже есть записи — импорт пропущен. Удали их вручную в SQL Editor если хочешь переимпортировать.');
+        setSeedResult({ ok: true, text: 'В БД уже есть записи — импорт пропущен. Если хочешь переимпортировать, очисти таблицы в SQL Editor (DELETE FROM visa_form_fields; DELETE FROM visa_photo_requirements;) и нажми снова.' });
       } else {
-        alert(`✅ Импортировано:\n— Полей анкет: ${r.insertedFields}\n— Фото-требований: ${r.insertedPhotos}`);
+        setSeedResult({ ok: true, text: `Импортировано: полей анкет ${r.insertedFields}, фото-требований ${r.insertedPhotos}.` });
       }
       await load();
     } catch (e) {
-      alert(`Не удалось импортировать:\n${e instanceof Error ? e.message : String(e)}`);
+      console.error('[seed] exception:', e);
+      setSeedResult({ ok: false, text: `Исключение: ${e instanceof Error ? e.message : String(e)}` });
     } finally { setSeeding(false); }
   };
 
@@ -138,11 +146,19 @@ export const FormBuilder: React.FC = () => {
             type="button"
             onClick={handleSeed}
             disabled={seeding}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg inline-flex items-center gap-2"
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg inline-flex items-center gap-2 select-none"
           >
             {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} />}
             {seeding ? 'Импортируем…' : 'Импортировать из кода'}
           </button>
+        </div>
+      )}
+
+      {seedResult && (
+        <div className={`mb-5 p-4 rounded-xl border whitespace-pre-line text-sm ${
+          seedResult.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-red-50 border-red-200 text-red-900'
+        }`}>
+          {seedResult.ok ? '✅ ' : '⚠️ '}{seedResult.text}
         </div>
       )}
 
