@@ -704,6 +704,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               {/* Resend notification for already-completed apps */}
               {application.status === 'completed' && (
                 <button
+                  type="button"
                   onClick={async () => {
                     setNotifying(true);
                     try {
@@ -716,10 +717,17 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                     }
                   }}
                   disabled={notifying}
-                  className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl transition font-medium flex items-center justify-center gap-2 disabled:opacity-60"
+                  aria-busy={notifying}
+                  className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none"
                 >
-                  {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : '📨'}
-                  {notifying ? 'Отправка...' : 'Отправить уведомление повторно'}
+                  {notifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Отправка…</span>
+                    </>
+                  ) : (
+                    <span>📨 Отправить уведомление повторно</span>
+                  )}
                 </button>
               )}
 
