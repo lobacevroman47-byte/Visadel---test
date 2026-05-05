@@ -74,7 +74,34 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
   return (
     <div className="bg-white rounded-2xl shadow-lg p-6">
       <h2 className="text-2xl mb-6 text-gray-800">Основные данные</h2>
-      
+
+      {/* Universal name fields — на латинице, как в загранпаспорте.
+          Сохраняются на каждую заявку для поиска в админке. */}
+      <div className="space-y-4 mb-6 pb-6 border-b border-gray-100">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <FormField label="Имя (на английском)" required hint="как в загранпаспорте" error={errors.firstName}>
+            <input
+              type="text"
+              value={formData.firstName || ''}
+              onChange={(e) => updateField('firstName', e.target.value.toUpperCase())}
+              placeholder="IVAN"
+              className="form-input uppercase"
+              autoComplete="given-name"
+            />
+          </FormField>
+          <FormField label="Фамилия (на английском)" required hint="как в загранпаспорте" error={errors.lastName}>
+            <input
+              type="text"
+              value={formData.lastName || ''}
+              onChange={(e) => updateField('lastName', e.target.value.toUpperCase())}
+              placeholder="IVANOV"
+              className="form-input uppercase"
+              autoComplete="family-name"
+            />
+          </FormField>
+        </div>
+      </div>
+
       {country === 'Индия' && <IndiaForm formData={formData} updateField={updateField} errors={errors} />}
       {country === 'Вьетнам' && <VietnamForm formData={formData} updateField={updateField} errors={errors} />}
       {country === 'Шри-Ланка' && <SriLankaForm formData={formData} updateField={updateField} errors={errors} />}
@@ -143,7 +170,9 @@ function getRequiredFields(country: string): string[] {
                   'firstTimePhilippines'],
   };
 
-  return commonFields[country] || [];
+  // Universal name fields apply to every country
+  const universal = ['firstName', 'lastName'];
+  return [...universal, ...(commonFields[country] || [])];
 }
 
 // ─── Reusable Select Components ────────────────────────────────────────────

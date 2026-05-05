@@ -60,10 +60,15 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
   const fd = (row.form_data as Record<string, unknown>) ?? {};
   const contact = (fd.contactInfo as Record<string, string>) ?? {};
   const basic = (fd.basicData as Record<string, string>) ?? {};
+  // Pull from form_data root first (new universal firstName/lastName fields),
+  // then fall back to legacy basicData.fullName, then to telegram ID.
+  const fdAny = fd as Record<string, string>;
+  const universalName = [fdAny.firstName, fdAny.lastName].filter(Boolean).join(' ').trim();
+  const clientName = universalName || basic.fullName || basic.lastName || `ID ${row.user_telegram_id}`;
   return {
     id: row.id as string,
     telegramId: row.user_telegram_id as number,
-    clientName: basic.fullName ?? basic.lastName ?? `ID ${row.user_telegram_id}`,
+    clientName,
     phone: contact.phone ?? '',
     email: contact.email ?? '',
     telegram: contact.telegram ?? '',
