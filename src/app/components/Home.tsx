@@ -180,11 +180,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="bg-white rounded-2xl p-5 shadow-md border border-gray-100"
-    >
+    <div className="bg-white rounded-2xl p-5 shadow-md border border-gray-100">
       {/* Header */}
       <div className="mb-4">
         <h3 className="text-[#212121] mb-1">{visa.type}</h3>
@@ -292,7 +288,7 @@ function VisaCard({ visa, onSelect, isUrgent = false, hideCalculator = false }: 
       >
         Оформить{hasAddons ? ` за ${total.toLocaleString('ru-RU')}₽` : ''}
       </button>
-    </motion.div>
+    </div>
   );
 }
 
@@ -413,33 +409,40 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
       {!selectedCountry && <ReferralBanner />}
 
       <div className="max-w-2xl mx-auto p-4">
+        <AnimatePresence mode="wait">
         {/* Country Selection */}
         {!selectedCountry && (
-          <>
+          <motion.div
+            key="country-grid"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+          >
             <h2 className="text-xl mb-4 text-gray-800">Выберите страну</h2>
             <div className="grid grid-cols-2 gap-4">
-              {COUNTRIES.map((country, index) => (
-                <motion.button
+              {COUNTRIES.map((country) => (
+                <button
                   key={country.name}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
                   onClick={() => handleCountryClick(country)}
-                  className="bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-all border border-gray-100 flex flex-col items-center gap-3"
+                  className="bg-white rounded-2xl p-6 shadow-md active:shadow-inner active:scale-95 transition-all border border-gray-100 flex flex-col items-center gap-3"
                 >
                   <span className="text-5xl">{country.flag}</span>
                   <span className="text-gray-800 text-center">{country.name}</span>
-                </motion.button>
+                </button>
               ))}
             </div>
-          </>
+          </motion.div>
         )}
 
         {/* Visa Type Selection */}
         {selectedCountry && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            key="visa-list"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
           >
             <button
               onClick={handleBackFromCountry}
@@ -533,6 +536,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
             )}
           </motion.div>
         )}
+        </AnimatePresence>
       </div>
     </div>
   );
