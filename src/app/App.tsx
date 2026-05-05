@@ -203,6 +203,7 @@ function App() {
           <Home
             onVisaSelect={handleVisaSelect}
             onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+            onOpenReferrals={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
             onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
             onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
             onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
