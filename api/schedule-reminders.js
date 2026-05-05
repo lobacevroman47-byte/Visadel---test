@@ -1,7 +1,7 @@
 // Vercel Serverless — schedule draft / payment abandonment reminders
 // POST { telegram_id, draft_key, country, visa_type, type: 'draft'|'payment' }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 
 function headers(extra = {}) {

@@ -6,7 +6,7 @@
 //   2. notification_dedup table INSERT (unique index per minute, atomic across instances)
 //   3. applications row UPDATE with WHERE filter (atomic, requires last_notified_* columns if present)
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 
 const STATUS_MESSAGES = {

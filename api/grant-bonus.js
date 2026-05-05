@@ -2,7 +2,7 @@
 // Also handles referral bonus automatically when type === 'payment'
 // POST body: { telegram_id, type, amount, description, application_id? }
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 
 function headers(extra = {}) {

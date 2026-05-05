@@ -2,7 +2,7 @@
 // Runs every 5 minutes via vercel.json crons config
 // GET /api/process-reminders
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 const BOT_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const APP_URL      = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL;
