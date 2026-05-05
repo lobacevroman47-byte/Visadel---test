@@ -270,10 +270,7 @@ function ReferralBanner({ onOpen }: { onOpen?: () => void }) {
   const userData = JSON.parse(localStorage.getItem('userData') || '{}');
   const referralCode = userData.referralCode ?? '';
   const telegramId = userData.telegramId ?? 0;
-  const botUsername = 'Visadel_test_bot';
-  const miniAppShortName = 'app';
   const [earnings, setEarnings] = useState(0);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (referralCode && telegramId) {
@@ -281,66 +278,36 @@ function ReferralBanner({ onOpen }: { onOpen?: () => void }) {
     }
   }, [referralCode, telegramId]);
 
-  const referralUrl = `https://t.me/${botUsername}/${miniAppShortName}?startapp=${referralCode}`;
-
-  const handleShare = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const text = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке ты получишь 200₽ на первую визу: ${referralUrl}`;
-    const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(referralUrl)}&text=${encodeURIComponent(text)}`;
-    window.Telegram?.WebApp?.openTelegramLink(shareUrl);
-  };
-
-  const handleCopy = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    try { await navigator.clipboard.writeText(referralUrl); } catch { /* no-op */ }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   if (!referralCode) return null;
 
+  const hasEarnings = earnings > 0;
+
   return (
-    <div
+    <button
+      type="button"
       onClick={onOpen}
-      className="mx-4 mb-4 bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 rounded-2xl p-4 text-white shadow-lg active:scale-[0.99] transition cursor-pointer"
+      className="w-full vd-grad rounded-2xl px-4 py-3 text-left text-white shadow-md vd-shadow-cta active:scale-[0.99] transition flex items-center gap-3"
     >
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-11 h-11 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-2xl shrink-0">
-          {earnings > 0 ? '💰' : '🎁'}
-        </div>
-        <div className="flex-1 min-w-0">
-          {earnings > 0 ? (
-            <>
-              <p className="text-xs text-white/80">Вы заработали</p>
-              <p className="text-2xl font-bold leading-tight">{earnings.toLocaleString('ru-RU')}₽</p>
-              <p className="text-xs text-white/80 mt-0.5">Пригласите ещё — заработаете больше</p>
-            </>
-          ) : (
-            <>
-              <p className="text-base font-semibold leading-tight">Пригласите первого друга</p>
-              <p className="text-xl font-bold mt-0.5">и получите 500₽</p>
-              <p className="text-xs text-white/80 mt-0.5">Друг получит +200₽ при регистрации</p>
-            </>
-          )}
-        </div>
+      <div className="w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center text-xl shrink-0">
+        {hasEarnings ? '💰' : '🎁'}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleCopy}
-          className="flex-1 bg-white/20 hover:bg-white/30 active:scale-95 transition rounded-lg px-3 py-1.5 flex items-center justify-center gap-1.5"
-        >
-          <span className="text-white text-xs">{copied ? '✓' : '🔗'}</span>
-          <span className="text-white text-xs font-medium">{copied ? 'Скопировано' : 'Скопировать ссылку'}</span>
-        </button>
-        <button
-          onClick={handleShare}
-          className="bg-white/20 hover:bg-white/30 active:scale-95 transition rounded-lg px-3 py-1.5 flex items-center gap-1.5"
-        >
-          <span className="text-white text-xs">📤</span>
-          <span className="text-white text-xs font-medium">Поделиться</span>
-        </button>
+      <div className="flex-1 min-w-0">
+        {hasEarnings ? (
+          <>
+            <p className="text-[13px] font-bold leading-tight truncate">
+              Вы заработали {earnings.toLocaleString('ru-RU')}₽
+            </p>
+            <p className="text-[11px] text-white/80 mt-0.5 truncate">Пригласите ещё друзей и заработайте больше</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[13px] font-bold leading-tight truncate">Пригласи друга — получи 500₽</p>
+            <p className="text-[11px] text-white/80 mt-0.5 truncate">Другу +200₽ при регистрации</p>
+          </>
+        )}
       </div>
-    </div>
+      <span className="text-white/90 text-base shrink-0">→</span>
+    </button>
   );
 }
 
@@ -429,8 +396,6 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
         </div>
       </div>
 
-      {!selectedCountry && <ReferralBanner onOpen={onOpenReferrals} />}
-
       <div className="max-w-2xl mx-auto">
         {/* ─── Hero (визы) — только на главном экране списка стран ─── */}
         {!selectedCountry && (
@@ -440,10 +405,9 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
               <br/>
               <span className="vd-grad-text">оформить визу</span>
             </h1>
-            <div className="flex items-center justify-center gap-2 mt-3 text-xs text-[#0F2A36]/70">
-              <span className="text-emerald-500">★★★★★</span>
-              <span>4.9 / 8 200 отзывов</span>
-            </div>
+            <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
+              Заполни анкету за 5 минут — <span className="text-[#0F2A36] font-semibold">мы сделаем остальное</span>
+            </p>
           </div>
         )}
 
@@ -485,6 +449,10 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-5">
+              <ReferralBanner onOpen={onOpenReferrals} />
             </div>
           </div>
         )}

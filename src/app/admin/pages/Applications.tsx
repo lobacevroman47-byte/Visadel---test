@@ -530,7 +530,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
       <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
 
         {/* Header */}
@@ -737,7 +737,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 onClick={handleSave}
                 disabled={saving}
                 aria-busy={saving}
-                className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none"
+                className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none transition-colors"
               >
                 {saving ? (
                   <>

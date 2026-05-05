@@ -61,7 +61,7 @@ export const Settings: React.FC = () => {
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg flex items-center gap-2 select-none"
+            className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg flex items-center gap-2 select-none"
           >
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
             {saving ? 'Сохраняем…' : 'Сохранить'}

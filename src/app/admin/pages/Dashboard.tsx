@@ -216,7 +216,7 @@ const FinanceSection: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs text-gray-600">Выручка / Прибыль по дням</p>
           <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-blue-500 rounded-sm" /> Выручка</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 bg-[#3B5BFF] rounded-sm" /> Выручка</span>
             <span className="flex items-center gap-1"><span className="w-2 h-2 bg-emerald-500 rounded-sm" /> Прибыль</span>
           </div>
         </div>
@@ -234,7 +234,7 @@ const FinanceSection: React.FC = () => {
                   className="flex-1 relative flex items-end"
                   title={`${dateLabel}: выручка ${fmtRub(d.revenue)} · прибыль ${fmtRub(d.profit)}`}
                 >
-                  <div className="absolute bottom-0 left-0 right-0 bg-blue-500/40 rounded-t" style={{ height: `${revH}%` }} />
+                  <div className="absolute bottom-0 left-0 right-0 bg-[#3B5BFF]/40 rounded-t" style={{ height: `${revH}%` }} />
                   <div className="absolute bottom-0 left-0 right-0 bg-emerald-500 rounded-t" style={{ height: `${profH}%` }} />
                 </div>
               );

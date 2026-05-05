@@ -94,7 +94,7 @@ export const Countries: React.FC = () => {
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
           <button
             onClick={() => setAdding(true)}
-            className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition flex items-center gap-1.5 text-sm"
+            className="px-3 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg transition flex items-center gap-1.5 text-sm"
           >
             <Plus size={16} /> Добавить
           </button>
@@ -135,7 +135,7 @@ export const Countries: React.FC = () => {
           <button
             onClick={handleSeed}
             disabled={seeding}
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 mx-auto disabled:opacity-60"
+            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg flex items-center gap-2 mx-auto disabled:opacity-60"
           >
             {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} />}
             {seeding ? 'Импортируем...' : 'Импортировать из кода'}
@@ -247,7 +247,7 @@ const ProductFormModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -378,7 +378,7 @@ const ProductFormModal: React.FC<{
             </button>
             <button
               type="submit" disabled={saving}
-              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-xl flex items-center justify-center gap-2 font-medium"
+              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl flex items-center justify-center gap-2 font-medium"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
               {saving ? 'Сохраняем...' : 'Сохранить'}

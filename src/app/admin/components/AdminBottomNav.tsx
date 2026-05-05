@@ -1,24 +1,25 @@
+import React from 'react';
 import { FileText, Calendar, Plane, Hotel, Shield } from 'lucide-react';
 
-export type MainTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance';
+export type AdminProductTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance';
 
-const TABS: { id: MainTab; label: string; Icon: typeof FileText }[] = [
-  { id: 'visas',     label: 'Визы',       Icon: FileText },
-  { id: 'bookings',  label: 'Брони',      Icon: Calendar },
-  { id: 'flights',   label: 'Билеты',     Icon: Plane },
-  { id: 'hotels',    label: 'Отели',      Icon: Hotel },
-  { id: 'insurance', label: 'Страховки',  Icon: Shield },
+const TABS: { id: AdminProductTab; label: string; Icon: typeof FileText }[] = [
+  { id: 'visas',     label: 'Визы',      Icon: FileText },
+  { id: 'bookings',  label: 'Брони',     Icon: Calendar },
+  { id: 'flights',   label: 'Билеты',    Icon: Plane },
+  { id: 'hotels',    label: 'Отели',     Icon: Hotel },
+  { id: 'insurance', label: 'Страховки', Icon: Shield },
 ];
 
-interface BottomNavProps {
-  active: MainTab;
-  onChange: (tab: MainTab) => void;
+interface AdminBottomNavProps {
+  active: AdminProductTab;
+  onChange: (tab: AdminProductTab) => void;
 }
 
-export default function BottomNav({ active, onChange }: BottomNavProps) {
+export const AdminBottomNav: React.FC<AdminBottomNavProps> = ({ active, onChange }) => {
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30"
+      className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 z-30"
       style={{ paddingBottom: 'env(safe-area-inset-bottom, 8px)' }}
     >
       <div className="max-w-2xl mx-auto flex justify-around px-2 pt-2 pb-2">
@@ -27,6 +28,7 @@ export default function BottomNav({ active, onChange }: BottomNavProps) {
           return (
             <button
               key={id}
+              type="button"
               onClick={() => onChange(id)}
               className={`flex flex-col items-center gap-0.5 px-2 py-1.5 rounded-xl transition-all min-w-[58px] ${
                 isActive ? 'vd-grad text-white shadow-md vd-shadow-cta' : 'text-[#5C7BFF]/55 hover:text-[#3B5BFF]'
@@ -43,4 +45,4 @@ export default function BottomNav({ active, onChange }: BottomNavProps) {
       </div>
     </nav>
   );
-}
+};
