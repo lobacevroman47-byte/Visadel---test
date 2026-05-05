@@ -101,7 +101,7 @@ const FinanceSection: React.FC = () => {
       {/* Hero metrics — Revenue / Profit / Bonuses owed */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
         {/* Revenue */}
-        <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-5 rounded-xl text-white">
+        <div className="vd-grad p-5 rounded-2xl text-white vd-shadow-cta">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Выручка</p>
             <button
