@@ -226,7 +226,9 @@ const ProductFormModal: React.FC<{
     product ?? {
       id: '', country: '', flag: '🌍', name: '',
       price: 0, processing_time: '', description: '',
-      partner_commission_pct: 15, enabled: true, sort_order: 0,
+      partner_commission_pct: 15,
+      cost_usd_fee: 0, cost_usd_commission: 0,
+      enabled: true, sort_order: 0,
     }
   );
   const [saving, setSaving] = useState(false);
@@ -330,6 +332,29 @@ const ProductFormModal: React.FC<{
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
             />
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+            <p className="text-xs font-medium text-gray-600 uppercase tracking-wider">Себестоимость (для расчёта прибыли)</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-700 mb-1">Сбор $</label>
+                <input
+                  type="number" value={form.cost_usd_fee} step="0.01" min={0}
+                  onChange={e => set('cost_usd_fee', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-700 mb-1">Комиссия $</label>
+                <input
+                  type="number" value={form.cost_usd_commission} step="0.01" min={0}
+                  onChange={e => set('cost_usd_commission', parseFloat(e.target.value) || 0)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-gray-400">Используется в разделе «Финансы» для расчёта прибыли (по курсу из bonus-config.ts).</p>
           </div>
 
           <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">

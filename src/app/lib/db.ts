@@ -499,6 +499,9 @@ export interface VisaProduct {
   processing_time: string | null;
   description: string | null;
   partner_commission_pct: number;
+  // Costs (in USD) — used for profit calculation in finance dashboard
+  cost_usd_fee: number;          // консульский сбор / госпошлина
+  cost_usd_commission: number;   // комиссия платёжной системы / посредника
   enabled: boolean;
   sort_order: number;
   created_at?: string;
@@ -555,6 +558,8 @@ export async function seedVisaProductsFromCode(force = false, dataset?: { countr
         processing_time: v.processingTime,
         description: v.description ?? null,
         partner_commission_pct: 15,
+        cost_usd_fee: 0,
+        cost_usd_commission: 0,
         enabled: true,
         sort_order: ci * 100 + vi,
       });
@@ -731,6 +736,113 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
       }),
     });
   } catch (e) { console.warn('payReferralBonus error', e); }
+}
+
+// ─── Finance / Analytics ──────────────────────────────────────────────────────
+
+export interface FinanceStats {
+  revenue: number;          // Выручка: Σ (price − bonuses_used) по оплаченным заявкам
+  costOfGoods: number;      // Себестоимость: Σ (cost_usd_fee + cost_usd_commission) × USD_RATE
+  commissionsPaid: number;  // Комиссии: Σ выплат партнёрам и обычным реферрерам (bonus_logs type='referral')
+  bonusesIssued: number;    // Бонусы выдано всего: welcome + referral + review (bonus_logs)
+  bonusesUsed: number;      // Бонусы списано клиентами при оплате (применены как скидка)
+  bonusesOutstanding: number; // Долг: текущая сумма на балансах всех юзеров
+  profit: number;           // Прибыль = revenue − costOfGoods − commissionsPaid
+  paidApplicationsCount: number;
+  series: { date: string; revenue: number; profit: number }[]; // ежедневная динамика
+}
+
+// Period in days; 0 means "all time"
+export async function getFinanceStats(periodDays: number): Promise<FinanceStats> {
+  const empty: FinanceStats = {
+    revenue: 0, costOfGoods: 0, commissionsPaid: 0,
+    bonusesIssued: 0, bonusesUsed: 0, bonusesOutstanding: 0,
+    profit: 0, paidApplicationsCount: 0, series: [],
+  };
+  if (!isSupabaseConfigured()) return empty;
+
+  const sinceISO = periodDays > 0
+    ? new Date(Date.now() - periodDays * 86400_000).toISOString()
+    : null;
+
+  // Apps query — only paid statuses count toward revenue
+  let appsQ = supabase
+    .from('applications')
+    .select('price, bonuses_used, visa_id, status, created_at, updated_at')
+    .in('status', ['in_progress', 'ready']);
+  if (sinceISO) appsQ = appsQ.gte('updated_at', sinceISO);
+
+  // Bonus logs — paid out commissions and total issued
+  let bonusQ = supabase.from('bonus_logs').select('type, amount, created_at');
+  if (sinceISO) bonusQ = bonusQ.gte('created_at', sinceISO);
+
+  // Outstanding balance — sum of all current bonus_balance values (snapshot, not period-bound)
+  const balanceQ = supabase.from('users').select('bonus_balance');
+
+  // Product cost lookup
+  const productsQ = supabase.from('visa_products').select('id, cost_usd_fee, cost_usd_commission');
+
+  const [appsRes, bonusRes, balanceRes, productsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ]);
+
+  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string }>;
+  const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
+  const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
+  const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
+
+  const costByVisa = new Map<string, number>();
+  for (const p of products) {
+    const usd = (p.cost_usd_fee ?? 0) + (p.cost_usd_commission ?? 0);
+    costByVisa.set(p.id, usd * BONUS_CONFIG.USD_RATE_RUB);
+  }
+
+  let revenue = 0;
+  let bonusesUsed = 0;
+  let costOfGoods = 0;
+  for (const a of apps) {
+    revenue += (a.price ?? 0) - (a.bonuses_used ?? 0);
+    bonusesUsed += a.bonuses_used ?? 0;
+    costOfGoods += costByVisa.get(a.visa_id) ?? 0;
+  }
+
+  const commissionsPaid = bonusLogs
+    .filter(b => b.type === 'referral')
+    .reduce((s, b) => s + (b.amount ?? 0), 0);
+  const bonusesIssued = bonusLogs.reduce((s, b) => s + (b.amount ?? 0), 0);
+  const bonusesOutstanding = balances.reduce((s, b) => s + (b.bonus_balance ?? 0), 0);
+
+  const profit = revenue - costOfGoods - commissionsPaid;
+
+  // Build daily series — buckets only for displayed period (cap at 90 days for chart density)
+  const seriesDays = periodDays > 0 ? Math.min(periodDays, 90) : 30;
+  const series: { date: string; revenue: number; profit: number }[] = [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  for (let i = seriesDays - 1; i >= 0; i--) {
+    const d = new Date(today); d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    let dayRev = 0, dayCost = 0;
+    for (const a of apps) {
+      if (a.updated_at?.slice(0, 10) === key) {
+        dayRev += (a.price ?? 0) - (a.bonuses_used ?? 0);
+        dayCost += costByVisa.get(a.visa_id) ?? 0;
+      }
+    }
+    const dayCommissions = bonusLogs
+      .filter(b => b.type === 'referral' && b.created_at?.slice(0, 10) === key)
+      .reduce((s, b) => s + (b.amount ?? 0), 0);
+    series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayCommissions });
+  }
+
+  return {
+    revenue,
+    costOfGoods,
+    commissionsPaid,
+    bonusesIssued,
+    bonusesUsed,
+    bonusesOutstanding,
+    profit,
+    paidApplicationsCount: apps.length,
+    series,
+  };
 }
 
 export async function getReviewedAppIds(telegramId: number): Promise<Set<string>> {

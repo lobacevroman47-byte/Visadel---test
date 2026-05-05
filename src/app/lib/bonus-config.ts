@@ -19,6 +19,9 @@ export const BONUS_CONFIG = {
   // Base limit; per-level limits unlocked via achievements (see getMaxBonusUsage)
   MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — base limit per order
   MAX_BONUS_USAGE_PARTNER: null as number | null, // null = 100% allowed for partners
+
+  // ── Finance ────────────────────────────────────────────────────────────────
+  USD_RATE_RUB: 100,                     // используется для расчёта себестоимости (cost_usd_fee + cost_usd_commission) в рубли
 };
 
 // Maximum bonus usage per order, derived from PAID referrals count (level)
