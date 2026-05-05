@@ -131,13 +131,9 @@ export default function ProfileTab() {
             <span className="text-sm text-gray-700">30 дней подряд</span>
             <span className="text-green-600">+10₽</span>
           </div>
-          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-            <span className="text-sm text-gray-700">Получена виза</span>
-            <span className="text-blue-600">+100₽</span>
-          </div>
           <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
             <span className="text-sm text-gray-700">Отзыв на страну</span>
-            <span className="text-purple-600">100₽ скидка</span>
+            <span className="text-purple-600">+200₽</span>
           </div>
         </div>
       </div>

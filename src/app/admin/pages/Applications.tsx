@@ -378,23 +378,6 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
       }
       await updateApplicationStatus(application.id, status, visaUrl, application.telegramId, application.country, application.visaType);
 
-      // ── Payment bonus: give +100₽ when visa enters 'in_progress' ──────────
-      if (status === 'in_progress' && application.telegramId) {
-        try {
-          await fetch('/api/grant-bonus', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: application.telegramId,
-              type: 'payment',
-              amount: 100,
-              description: `+100₽ за оплату визы ${application.country} (${application.id})`,
-              application_id: application.id,
-            }),
-          });
-        } catch (e) { console.error('payment bonus error', e); }
-      }
-
       // Send Telegram notification for all statuses except draft
       if (status !== 'draft' && application.telegramId) {
         try {

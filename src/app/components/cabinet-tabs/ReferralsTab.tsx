@@ -116,7 +116,7 @@ export default function ReferralsTab() {
               <h4 className="text-gray-900 mb-1">Обычные пользователи</h4>
               <ul className="text-sm text-gray-600 space-y-1">
                 <li>• +300₽ за друга с оплаченной визой</li>
-                <li>• +100₽ после получения своей визы</li>
+                <li>• +200₽ за оставленный отзыв</li>
                 <li>• Можно оплатить до 1000₽ бонусами</li>
               </ul>
             </div>

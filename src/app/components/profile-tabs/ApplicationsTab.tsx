@@ -115,7 +115,7 @@ function ReviewModal({ app, onClose, onSubmitted }: {
       // sync bonus locally
       try {
         const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-        ud.bonusBalance = (ud.bonusBalance ?? 0) + 100;
+        ud.bonusBalance = (ud.bonusBalance ?? 0) + 200;
         localStorage.setItem('userData', JSON.stringify(ud));
       } catch {}
       onSubmitted();
@@ -162,7 +162,7 @@ function ReviewModal({ app, onClose, onSubmitted }: {
           </div>
           {/* Bonus hint */}
           <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-            <p className="text-sm text-green-700">🎁 За отзыв вы получите <strong>100 ₽</strong> на бонусный счёт</p>
+            <p className="text-sm text-green-700">🎁 За отзыв вы получите <strong>200 ₽</strong> на бонусный счёт</p>
           </div>
           <button
             onClick={handleSubmit}
@@ -302,7 +302,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
         username,
       });
 
-      // Grant +100₽ review bonus via service-key API (with dedup)
+      // Grant +200₽ review bonus via service-key API (with dedup)
       if (telegramId) {
         try {
           const res = await fetch('/api/grant-bonus', {
@@ -311,8 +311,8 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
             body: JSON.stringify({
               telegram_id: telegramId,
               type: 'review',
-              amount: 100,
-              description: `+100₽ за отзыв о визе ${app.country} (${app.id})`,
+              amount: 200,
+              description: `+200₽ за отзыв о визе ${app.country} (${app.id})`,
               application_id: app.id,
             }),
           });

@@ -181,10 +181,10 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
 
     // Add bonus
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
-    userData.bonusBalance = (userData.bonusBalance || 0) + 100;
+    userData.bonusBalance = (userData.bonusBalance || 0) + 200;
     localStorage.setItem('userData', JSON.stringify(userData));
 
-    alert('✅ Спасибо за отзыв! На ваш счет начислено 100₽');
+    alert('✅ Спасибо за отзыв! На ваш счет начислено 200₽');
     setShowReviewModal(false);
     setReviewRating(0);
     setReviewComment('');
@@ -337,7 +337,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                         className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2196F3] text-white rounded-lg hover:bg-[#1E88E5] transition-colors"
                       >
                         <MessageSquare className="w-4 h-4" />
-                        Оставить отзыв (получить 100₽)
+                        Оставить отзыв (получить 200₽)
                       </button>
                     ) : (
                       <div className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-50 text-green-700 rounded-lg border border-green-200">
@@ -427,7 +427,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
 
             <div className="bg-blue-50 rounded-lg p-3 mb-4">
               <p className="text-sm text-blue-900">
-                🎁 За отзыв вы получите <strong>100₽</strong> на бонусный счет
+                🎁 За отзыв вы получите <strong>200₽</strong> на бонусный счет
               </p>
             </div>
 
@@ -460,7 +460,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
           <li>• Черновики хранятся 30 дней</li>
           <li>• После готовности визы вы получите уведомление</li>
           <li>• Можно использовать данные предыдущих заявок</li>
-          <li>• За отзыв к готовой визе вы получите +100₽</li>
+          <li>• За отзыв к готовой визе вы получите +200₽</li>
         </ul>
       </div>
     </div>

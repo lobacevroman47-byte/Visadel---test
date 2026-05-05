@@ -130,7 +130,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
 
         <div className="mt-4 space-y-1 text-sm text-blue-100">
           <p>• +{bonusPerReferral}₽ за каждого друга с оплаченной визой</p>
-          {!isInfluencer && <p>• +100₽ после получения своей визы</p>}
+          {!isInfluencer && <p>• +200₽ за оставленный отзыв</p>}
           {!isInfluencer && <p>• Можно оплатить до 1000₽ бонусами</p>}
           {isInfluencer && <p>• Полная оплата бонусами для инфлюенсеров</p>}
         </div>
