@@ -788,26 +788,37 @@ export interface VisaPhotoRequirement {
   updated_at?: string;
 }
 
-// Returns fields applicable to (country, visaId): visa-specific take priority,
-// otherwise country-level (visa_id IS NULL).
+// Returns fields applicable to (country, visaId).
+// Country-level fields (visa_id IS NULL) are ALWAYS included.
+// Visa-specific fields are added on top, overriding country-level by field_key.
+// This way an admin can add one extra field for a specific visa without making
+// all the country-level fields disappear.
 export async function getFormFields(country: string, visaId?: string): Promise<VisaFormField[]> {
   if (!isSupabaseConfigured()) return [];
-  if (visaId) {
-    const { data } = await supabase
-      .from('visa_form_fields')
-      .select('*')
-      .eq('visa_id', visaId)
-      .order('sort_order', { ascending: true });
-    const list = (data as VisaFormField[]) ?? [];
-    if (list.length > 0) return list;
-  }
-  const { data } = await supabase
+
+  const { data: countryData } = await supabase
     .from('visa_form_fields')
     .select('*')
     .eq('country', country)
     .is('visa_id', null)
     .order('sort_order', { ascending: true });
-  return (data as VisaFormField[]) ?? [];
+  let result: VisaFormField[] = (countryData as VisaFormField[]) ?? [];
+
+  if (visaId) {
+    const { data: visaData } = await supabase
+      .from('visa_form_fields')
+      .select('*')
+      .eq('visa_id', visaId)
+      .order('sort_order', { ascending: true });
+    const visaList = (visaData as VisaFormField[]) ?? [];
+    if (visaList.length > 0) {
+      const overrideKeys = new Set(visaList.map(f => f.field_key));
+      result = [...result.filter(f => !overrideKeys.has(f.field_key)), ...visaList];
+      result.sort((a, b) => a.sort_order - b.sort_order);
+    }
+  }
+
+  return result;
 }
 
 export async function getAllFormFields(): Promise<VisaFormField[]> {
@@ -833,24 +844,34 @@ export async function deleteFormField(id: string): Promise<void> {
   await supabase.from('visa_form_fields').delete().eq('id', id);
 }
 
+// Same merge logic as getFormFields: country-level always included,
+// visa-specific overrides by field_key.
 export async function getPhotoRequirements(country: string, visaId?: string): Promise<VisaPhotoRequirement[]> {
   if (!isSupabaseConfigured()) return [];
-  if (visaId) {
-    const { data } = await supabase
-      .from('visa_photo_requirements')
-      .select('*')
-      .eq('visa_id', visaId)
-      .order('sort_order', { ascending: true });
-    const list = (data as VisaPhotoRequirement[]) ?? [];
-    if (list.length > 0) return list;
-  }
-  const { data } = await supabase
+
+  const { data: countryData } = await supabase
     .from('visa_photo_requirements')
     .select('*')
     .eq('country', country)
     .is('visa_id', null)
     .order('sort_order', { ascending: true });
-  return (data as VisaPhotoRequirement[]) ?? [];
+  let result: VisaPhotoRequirement[] = (countryData as VisaPhotoRequirement[]) ?? [];
+
+  if (visaId) {
+    const { data: visaData } = await supabase
+      .from('visa_photo_requirements')
+      .select('*')
+      .eq('visa_id', visaId)
+      .order('sort_order', { ascending: true });
+    const visaList = (visaData as VisaPhotoRequirement[]) ?? [];
+    if (visaList.length > 0) {
+      const overrideKeys = new Set(visaList.map(p => p.field_key));
+      result = [...result.filter(p => !overrideKeys.has(p.field_key)), ...visaList];
+      result.sort((a, b) => a.sort_order - b.sort_order);
+    }
+  }
+
+  return result;
 }
 
 export async function getAllPhotoRequirements(): Promise<VisaPhotoRequirement[]> {
