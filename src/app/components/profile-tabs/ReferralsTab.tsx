@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Users, Award, Share2, Loader2, Download, QrCode, Send, Calculator, Sparkles, Lock, Check, Link2 } from 'lucide-react';
-import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram } from 'react-icons/fa';
+import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
@@ -81,7 +81,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   };
 
   // Multi-channel sharing — opens corresponding social network share dialog
-  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'max' | 'copy') => {
+  const shareTo = (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'tiktok' | 'max' | 'copy') => {
     const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void } } }).Telegram?.WebApp;
     const open = (url: string) => {
       if (channel === 'telegram' && tg?.openTelegramLink) tg.openTelegramLink(url);
@@ -102,10 +102,17 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         navigator.clipboard.writeText(shareText).catch(() => {});
         alert('Текст скопирован! Откройте Instagram и вставьте в сториз или сообщение.');
         break;
-      case 'max':
-        // MAX (мессенджер от VK) — нет универсального share URL, копируем текст
+      case 'tiktok':
         navigator.clipboard.writeText(shareText).catch(() => {});
-        open('https://max.ru/');
+        alert('Текст скопирован! Откройте TikTok и вставьте в описание видео или сообщение.');
+        // Открываем приложение/сайт TikTok если установлено — universal link
+        open('https://www.tiktok.com/');
+        break;
+      case 'max':
+        // MAX мессенджер от VK — пробуем открыть через универсальный линк max.me/share
+        // Если приложение установлено — iOS/Android откроют его через universal link
+        navigator.clipboard.writeText(shareText).catch(() => {});
+        open(`https://max.ru/share?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
         break;
       case 'copy':
         copyLink();
@@ -192,14 +199,21 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           <Share2 className="w-4 h-4 text-gray-500" />
           <h4 className="text-sm font-semibold text-gray-700">Поделиться ссылкой</h4>
         </div>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2 mb-2">
           <ShareBtn label="Telegram" icon={<FaTelegramPlane className="w-6 h-6" />} color="bg-[#229ED9]" onClick={() => shareTo('telegram')} />
           <ShareBtn label="WhatsApp" icon={<FaWhatsapp className="w-6 h-6" />} color="bg-[#25D366]" onClick={() => shareTo('whatsapp')} />
           <ShareBtn label="VK" icon={<FaVk className="w-6 h-6" />} color="bg-[#0077FF]" onClick={() => shareTo('vk')} />
           <ShareBtn label="Instagram" icon={<FaInstagram className="w-6 h-6" />} color="bg-gradient-to-br from-[#FEDA75] via-[#FA7E1E] to-[#D62976]" onClick={() => shareTo('instagram')} />
+          <ShareBtn label="TikTok" icon={<FaTiktok className="w-6 h-6" />} color="bg-black" onClick={() => shareTo('tiktok')} />
           <ShareBtn label="MAX" icon={<MaxIcon className="w-6 h-6" />} color="bg-gradient-to-br from-[#0077FF] to-[#0048AA]" onClick={() => shareTo('max')} />
-          <ShareBtn label={copied ? 'Скопировано' : 'Копировать'} icon={copied ? <Check className="w-6 h-6" /> : <Link2 className="w-6 h-6" />} color="bg-gray-700" onClick={() => shareTo('copy')} />
         </div>
+        {/* Copy link — wide button, secondary action */}
+        <button
+          onClick={() => shareTo('copy')}
+          className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 active:scale-[0.98] rounded-xl flex items-center justify-center gap-2 text-sm text-gray-700 font-medium transition"
+        >
+          {copied ? <><Check className="w-4 h-4 text-green-600" /> Скопировано</> : <><Link2 className="w-4 h-4" /> Скопировать ссылку</>}
+        </button>
 
         {/* QR toggle */}
         <button
