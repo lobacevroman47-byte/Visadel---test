@@ -365,7 +365,7 @@ const pakistanVisaTypes: VisaType[] = [
   {
     id: 'pakistan-90d',
     name: 'E-VISA до 90 дней',
-    price: 2490,
+    price: 6490,
     processingTime: '1–3 дня',
     formFields: pakistanFormFields
   }
