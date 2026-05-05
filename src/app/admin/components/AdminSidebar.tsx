@@ -128,6 +128,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
+          icon={<Globe size={20} />}
+          label="Каталог продуктов"
+          active={activeSection === 'countries'}
+          onClick={() => onSectionChange('countries')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
           icon={<Shield size={20} />}
           label="Администраторы"
           active={activeSection === 'administrators'}

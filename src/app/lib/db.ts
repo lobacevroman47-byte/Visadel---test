@@ -487,6 +487,86 @@ export async function submitReview(params: {
   }).catch(() => { /* no-op */ });
 }
 
+// ─── Visa Products Catalog ─────────────────────────────────────────────────
+
+export interface VisaProduct {
+  id: string;
+  country: string;
+  flag: string | null;
+  name: string;
+  price: number;
+  processing_time: string | null;
+  description: string | null;
+  partner_commission_pct: number;
+  enabled: boolean;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export async function getVisaProducts(): Promise<VisaProduct[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data, error } = await supabase
+    .from('visa_products')
+    .select('*')
+    .order('country', { ascending: true })
+    .order('sort_order', { ascending: true });
+  if (error) { console.warn('getVisaProducts error', error); return []; }
+  return (data as VisaProduct[]) ?? [];
+}
+
+export async function upsertVisaProduct(p: Omit<VisaProduct, 'created_at' | 'updated_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_products').upsert(
+    { ...p, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  );
+}
+
+export async function deleteVisaProduct(id: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_products').delete().eq('id', id);
+}
+
+export async function toggleVisaProductEnabled(id: string, enabled: boolean): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_products')
+    .update({ enabled, updated_at: new Date().toISOString() })
+    .eq('id', id);
+}
+
+// Seed catalog from hardcoded countriesData.ts on first install / reset
+export async function seedVisaProductsFromCode(force = false): Promise<{ inserted: number; skipped: number }> {
+  if (!isSupabaseConfigured()) return { inserted: 0, skipped: 0 };
+  const existing = await getVisaProducts();
+  if (existing.length > 0 && !force) return { inserted: 0, skipped: existing.length };
+
+  // Lazy-import to avoid bundling admin data unless this seed is called
+  const { countriesVisaData } = await import('../admin/data/countriesData');
+  const rows: Omit<VisaProduct, 'created_at' | 'updated_at'>[] = [];
+  countriesVisaData.forEach((country, ci) => {
+    country.visaTypes.forEach((v, vi) => {
+      rows.push({
+        id: v.id,
+        country: country.name,
+        flag: country.flag,
+        name: v.name,
+        price: v.price,
+        processing_time: v.processingTime,
+        description: v.description ?? null,
+        partner_commission_pct: 15,
+        enabled: true,
+        sort_order: ci * 100 + vi,
+      });
+    });
+  });
+
+  if (rows.length === 0) return { inserted: 0, skipped: 0 };
+  const { error } = await supabase.from('visa_products').upsert(rows, { onConflict: 'id' });
+  if (error) { console.error('seed error', error); return { inserted: 0, skipped: 0 }; }
+  return { inserted: rows.length, skipped: 0 };
+}
+
 export async function getReferralCount(referralCode: string): Promise<number> {
   if (!isSupabaseConfigured()) return 0;
   const { count } = await supabase
