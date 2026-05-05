@@ -748,6 +748,235 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   } catch (e) { console.warn('payReferralBonus error', e); }
 }
 
+// ─── Visa Form Fields (per-country anketa) ───────────────────────────────────
+
+export type FormFieldType =
+  | 'text' | 'email' | 'tel' | 'date' | 'file'
+  | 'select' | 'textarea' | 'radio'
+  | 'citizenship' | 'countries-multi' | 'south-asia-visits';
+
+export interface VisaFormField {
+  id: string;
+  country: string;
+  visa_id: string | null;          // NULL = applies to all visas of country
+  field_key: string;               // 'citizenship', 'birthCity'
+  label: string;
+  field_type: FormFieldType;
+  required: boolean;
+  placeholder: string | null;
+  comment: string | null;          // hint shown under the input
+  options: string[] | null;        // for select/radio
+  warning: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VisaPhotoRequirement {
+  id: string;
+  country: string;
+  visa_id: string | null;
+  field_key: string;
+  label: string;
+  required: boolean;
+  requirements: string | null;
+  formats: string | null;
+  max_size: string | null;
+  hide_if_service_selected: string | null;
+  sort_order: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Returns fields applicable to (country, visaId): visa-specific take priority,
+// otherwise country-level (visa_id IS NULL).
+export async function getFormFields(country: string, visaId?: string): Promise<VisaFormField[]> {
+  if (!isSupabaseConfigured()) return [];
+  if (visaId) {
+    const { data } = await supabase
+      .from('visa_form_fields')
+      .select('*')
+      .eq('visa_id', visaId)
+      .order('sort_order', { ascending: true });
+    const list = (data as VisaFormField[]) ?? [];
+    if (list.length > 0) return list;
+  }
+  const { data } = await supabase
+    .from('visa_form_fields')
+    .select('*')
+    .eq('country', country)
+    .is('visa_id', null)
+    .order('sort_order', { ascending: true });
+  return (data as VisaFormField[]) ?? [];
+}
+
+export async function getAllFormFields(): Promise<VisaFormField[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data } = await supabase
+    .from('visa_form_fields')
+    .select('*')
+    .order('country', { ascending: true })
+    .order('sort_order', { ascending: true });
+  return (data as VisaFormField[]) ?? [];
+}
+
+export async function upsertFormField(f: Omit<VisaFormField, 'created_at' | 'updated_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_form_fields').upsert(
+    { ...f, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  );
+}
+
+export async function deleteFormField(id: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_form_fields').delete().eq('id', id);
+}
+
+export async function getPhotoRequirements(country: string, visaId?: string): Promise<VisaPhotoRequirement[]> {
+  if (!isSupabaseConfigured()) return [];
+  if (visaId) {
+    const { data } = await supabase
+      .from('visa_photo_requirements')
+      .select('*')
+      .eq('visa_id', visaId)
+      .order('sort_order', { ascending: true });
+    const list = (data as VisaPhotoRequirement[]) ?? [];
+    if (list.length > 0) return list;
+  }
+  const { data } = await supabase
+    .from('visa_photo_requirements')
+    .select('*')
+    .eq('country', country)
+    .is('visa_id', null)
+    .order('sort_order', { ascending: true });
+  return (data as VisaPhotoRequirement[]) ?? [];
+}
+
+export async function getAllPhotoRequirements(): Promise<VisaPhotoRequirement[]> {
+  if (!isSupabaseConfigured()) return [];
+  const { data } = await supabase
+    .from('visa_photo_requirements')
+    .select('*')
+    .order('country', { ascending: true })
+    .order('sort_order', { ascending: true });
+  return (data as VisaPhotoRequirement[]) ?? [];
+}
+
+export async function upsertPhotoRequirement(p: Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_photo_requirements').upsert(
+    { ...p, updated_at: new Date().toISOString() },
+    { onConflict: 'id' }
+  );
+}
+
+export async function deletePhotoRequirement(id: string): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from('visa_photo_requirements').delete().eq('id', id);
+}
+
+// One-shot: import all hardcoded fields and photo requirements from countriesData.
+// Skips if any rows already exist (unless force=true).
+export async function seedFormFieldsFromCode(
+  dataset: {
+    countriesVisaData: Array<{
+      id: string; name: string;
+      visaTypes: Array<{
+        id: string;
+        formFields?: Array<{
+          id: string; key: string; label: string;
+          type: string; required: boolean;
+          placeholder?: string; comment?: string;
+          options?: string[]; warning?: string;
+        }>;
+      }>;
+    }>;
+  },
+  photoRequirementsByCountryId: Record<string, Array<{
+    id: string; key: string; label: string; required: boolean;
+    requirements?: string; formats?: string; maxSize?: string;
+    hideIfServiceSelected?: string;
+  }>>,
+  force = false
+): Promise<{ insertedFields: number; insertedPhotos: number; skipped: boolean; error?: string }> {
+  if (!isSupabaseConfigured()) return { insertedFields: 0, insertedPhotos: 0, skipped: false, error: 'Supabase не настроен' };
+
+  const existing = await getAllFormFields();
+  if (existing.length > 0 && !force) {
+    return { insertedFields: 0, insertedPhotos: 0, skipped: true };
+  }
+
+  const fieldRows: Omit<VisaFormField, 'created_at' | 'updated_at'>[] = [];
+  const photoRows: Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>[] = [];
+
+  let countryIdx = 0;
+  for (const country of dataset.countriesVisaData) {
+    // Group visas by formFields reference equality
+    const sets: Array<{ ref: NonNullable<typeof country.visaTypes[number]['formFields']>; visaIds: string[] }> = [];
+    for (const v of country.visaTypes) {
+      const fields = v.formFields ?? [];
+      const found = sets.find(s => s.ref === fields);
+      if (found) found.visaIds.push(v.id);
+      else sets.push({ ref: fields, visaIds: [v.id] });
+    }
+
+    // First set → country-level; rest → per-visa
+    sets.forEach((set, setIdx) => {
+      const isCountryLevel = setIdx === 0;
+      const targetVisaIds = isCountryLevel ? [null] : set.visaIds;
+      for (const visaId of targetVisaIds) {
+        set.ref.forEach((f, i) => {
+          fieldRows.push({
+            id: `${visaId ?? country.name}__${f.id}`,
+            country: country.name,
+            visa_id: visaId,
+            field_key: f.key,
+            label: f.label,
+            field_type: (f.type as FormFieldType),
+            required: f.required,
+            placeholder: f.placeholder ?? null,
+            comment: f.comment ?? null,
+            options: f.options ?? null,
+            warning: f.warning ?? null,
+            sort_order: countryIdx * 1000 + setIdx * 100 + i,
+          });
+        });
+      }
+    });
+
+    const photos = photoRequirementsByCountryId[country.id] ?? [];
+    photos.forEach((p, i) => {
+      photoRows.push({
+        id: `${country.name}__${p.id}`,
+        country: country.name,
+        visa_id: null,
+        field_key: p.key,
+        label: p.label,
+        required: p.required,
+        requirements: p.requirements ?? null,
+        formats: p.formats ?? null,
+        max_size: p.maxSize ?? null,
+        hide_if_service_selected: p.hideIfServiceSelected ?? null,
+        sort_order: i,
+      });
+    });
+
+    countryIdx++;
+  }
+
+  if (fieldRows.length > 0) {
+    const { error } = await supabase.from('visa_form_fields').upsert(fieldRows, { onConflict: 'id' });
+    if (error) return { insertedFields: 0, insertedPhotos: 0, skipped: false, error: error.message };
+  }
+  if (photoRows.length > 0) {
+    const { error } = await supabase.from('visa_photo_requirements').upsert(photoRows, { onConflict: 'id' });
+    if (error) return { insertedFields: fieldRows.length, insertedPhotos: 0, skipped: false, error: error.message };
+  }
+
+  return { insertedFields: fieldRows.length, insertedPhotos: photoRows.length, skipped: false };
+}
+
 // ─── App Settings (single-row config) ────────────────────────────────────────
 
 export interface AppSettings {

@@ -4,6 +4,7 @@ import { Dashboard } from '../pages/Dashboard';
 import { Applications } from '../pages/Applications';
 import { Users } from '../pages/Users';
 import { Countries } from '../pages/Countries';
+import { FormBuilder } from '../pages/FormBuilder';
 import { Administrators } from '../pages/Administrators';
 import { Settings } from '../pages/Settings';
 import { AdditionalServices } from '../pages/AdditionalServices';
@@ -50,6 +51,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       case 'countries':
         return hasPermission(['owner', 'admin']) ? (
           <Countries />
+        ) : (
+          <PermissionDenied />
+        );
+      case 'form-builder':
+        return hasPermission(['owner', 'admin']) ? (
+          <FormBuilder />
         ) : (
           <PermissionDenied />
         );

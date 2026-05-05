@@ -1,345 +1,472 @@
-import React, { useState } from 'react';
-import { Plus, GripVertical, Edit, Trash2, Save, Settings, Image } from 'lucide-react';
-import { countriesVisaData, FormField, VisaType, CountryVisaData, PhotoRequirement } from '../data/countriesData';
-import { defaultAdditionalServices, AdditionalService } from '../data/additionalServices';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  FileEdit, Image as ImageIcon, Plus, Edit2, Trash2, X, Save, Loader2,
+  RefreshCw, Database, AlertCircle,
+} from 'lucide-react';
+import {
+  getVisaProducts,
+  getAllFormFields, upsertFormField, deleteFormField,
+  getAllPhotoRequirements, upsertPhotoRequirement, deletePhotoRequirement,
+  seedFormFieldsFromCode,
+  type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
+} from '../../lib/db';
+import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
 
-const PhotoEditor: React.FC<{
-  photo: PhotoRequirement | null;
-  onSave: (photo: PhotoRequirement) => void;
-  onCancel: () => void;
-}> = ({ photo, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<PhotoRequirement>(
-    photo || {
-      id: `photo-${Date.now()}`,
-      label: '',
-      key: '',
-      required: false,
-      requirements: '',
-      formats: 'JPG/PNG/PDF',
-      maxSize: '5MB'
-    }
-  );
+const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
+  text: 'Текст',
+  email: 'Email',
+  tel: 'Телефон',
+  date: 'Дата',
+  file: 'Файл',
+  select: 'Выпадающий список',
+  textarea: 'Многострочный',
+  radio: 'Радио-кнопки',
+  citizenship: 'Гражданство',
+  'countries-multi': 'Список стран',
+  'south-asia-visits': 'Визиты в Юж. Азию',
+};
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSave(formData);
+export const FormBuilder: React.FC = () => {
+  const [products, setProducts] = useState<VisaProduct[]>([]);
+  const [allFields, setAllFields] = useState<VisaFormField[]>([]);
+  const [allPhotos, setAllPhotos] = useState<VisaPhotoRequirement[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
+  const [tab, setTab] = useState<'fields' | 'photos'>('fields');
+  const [editingField, setEditingField] = useState<VisaFormField | null>(null);
+  const [addingField, setAddingField] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState<VisaPhotoRequirement | null>(null);
+  const [addingPhoto, setAddingPhoto] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [p, f, ph] = await Promise.all([
+        getVisaProducts(),
+        getAllFormFields(),
+        getAllPhotoRequirements(),
+      ]);
+      setProducts(p);
+      setAllFields(f);
+      setAllPhotos(ph);
+      setSelectedCountry(prev => {
+        if (prev) return prev;
+        const first = Array.from(new Set(p.map(x => x.country)))[0];
+        return first ?? null;
+      });
+    } finally { setLoading(false); }
   };
 
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const countries = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const p of products) if (!map.has(p.country)) map.set(p.country, p.flag);
+    return Array.from(map.entries()).map(([name, flag]) => ({ name, flag }));
+  }, [products]);
+
+  const visasOfSelected = useMemo(
+    () => products.filter(p => p.country === selectedCountry),
+    [products, selectedCountry]
+  );
+  const fieldsOfSelected = useMemo(
+    () => allFields.filter(f => f.country === selectedCountry).sort((a, b) => a.sort_order - b.sort_order),
+    [allFields, selectedCountry]
+  );
+  const photosOfSelected = useMemo(
+    () => allPhotos.filter(p => p.country === selectedCountry).sort((a, b) => a.sort_order - b.sort_order),
+    [allPhotos, selectedCountry]
+  );
+
+  const handleSeed = async () => {
+    if (!confirm('Импортировать поля анкет и фото-требования из кода в БД?\n\nЕсли в БД уже есть записи — операция пропустится.')) return;
+    setSeeding(true);
+    try {
+      const r = await seedFormFieldsFromCode({ countriesVisaData }, countryPhotoRequirements);
+      if (r.error) {
+        alert(`Ошибка импорта:\n${r.error}\n\nВозможные причины:\n— Таблицы visa_form_fields / visa_photo_requirements не созданы в Supabase\n— RLS блокирует запись\n\nЗапусти SQL миграцию из инструкции и попробуй снова.`);
+      } else if (r.skipped) {
+        alert('В БД уже есть записи — импорт пропущен. Удали их вручную в SQL Editor если хочешь переимпортировать.');
+      } else {
+        alert(`✅ Импортировано:\n— Полей анкет: ${r.insertedFields}\n— Фото-требований: ${r.insertedPhotos}`);
+      }
+      await load();
+    } catch (e) {
+      alert(`Не удалось импортировать:\n${e instanceof Error ? e.message : String(e)}`);
+    } finally { setSeeding(false); }
+  };
+
+  const handleDeleteField = async (f: VisaFormField) => {
+    if (!confirm(`Удалить поле «${f.label}»?\n\nЭто пропадёт из анкеты на странице визы.`)) return;
+    await deleteFormField(f.id);
+    setAllFields(prev => prev.filter(x => x.id !== f.id));
+  };
+
+  const handleDeletePhoto = async (p: VisaPhotoRequirement) => {
+    if (!confirm(`Удалить фото-требование «${p.label}»?`)) return;
+    await deletePhotoRequirement(p.id);
+    setAllPhotos(prev => prev.filter(x => x.id !== p.id));
+  };
+
+  const isEmpty = allFields.length === 0 && allPhotos.length === 0;
+
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <h2>{photo ? 'Редактировать фотографию' : 'Добавить фотографию'}</h2>
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div>
+          <h1>Конструктор анкет</h1>
+          <p className="text-xs text-gray-500 mt-1">
+            Поля анкеты и фото-требования по странам · {allFields.length} полей · {allPhotos.length} фото
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg" title="Обновить">
+            <RefreshCw size={16} className="text-gray-500" />
+          </button>
+        </div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Название поля *</label>
-            <input
-              type="text"
-              value={formData.label}
-              onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Фото лица"
-              required
-            />
-          </div>
+      {!loading && isEmpty && (
+        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-10 text-center mb-6">
+          <Database className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+          <h3 className="text-gray-700 mb-2">Конструктор пустой</h3>
+          <p className="text-sm text-gray-500 mb-4">Импортируй текущие анкеты из кода — это разовая операция</p>
+          <button
+            type="button"
+            onClick={handleSeed}
+            disabled={seeding}
+            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 text-white rounded-lg inline-flex items-center gap-2"
+          >
+            {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} />}
+            {seeding ? 'Импортируем…' : 'Импортировать из кода'}
+          </button>
+        </div>
+      )}
 
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Ключ (для базы данных) *</label>
-            <input
-              type="text"
-              value={formData.key}
-              onChange={(e) => setFormData({ ...formData, key: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="face_photo"
-              required
-            />
-          </div>
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 flex items-start gap-3">
+        <AlertCircle className="text-amber-600 mt-0.5 shrink-0" size={18} />
+        <p className="text-sm text-amber-900">
+          Юзеры на главной пока заполняют формы из кода. Сейчас здесь — административное хранилище.
+          На следующем шаге переключим юзерский рендер на этот источник, и изменения станут видны клиентам сразу.
+        </p>
+      </div>
 
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Требования / Описание</label>
-            <textarea
-              value={formData.requirements || ''}
-              onChange={(e) => setFormData({ ...formData, requirements: e.target.value })}
-              rows={3}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Светлый фон, можно на телефон, ~80% лица, без очков"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">Форматы файлов</label>
-              <input
-                type="text"
-                value={formData.formats || ''}
-                onChange={(e) => setFormData({ ...formData, formats: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="JPG/PNG/PDF"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">Макс. размер</label>
-              <input
-                type="text"
-                value={formData.maxSize || ''}
-                onChange={(e) => setFormData({ ...formData, maxSize: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="5MB"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Скрывать при выборе услуги (ID)</label>
-            <input
-              type="text"
-              value={formData.hideIfServiceSelected || ''}
-              onChange={(e) => setFormData({ ...formData, hideIfServiceSelected: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="hotel-booking"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Если заполнено, поле скрывается при выборе указанной дополнительной услуги
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="photo-required"
-              checked={formData.required}
-              onChange={(e) => setFormData({ ...formData, required: e.target.checked })}
-              className="w-4 h-4 text-[#2196F3] rounded focus:ring-[#2196F3]"
-            />
-            <label htmlFor="photo-required" className="text-sm text-gray-700 cursor-pointer">
-              Обязательное поле
-            </label>
-          </div>
-
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
+      {countries.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-5 bg-white p-2 rounded-xl border border-gray-200">
+          {countries.map(c => (
             <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
+              key={c.name}
+              type="button"
+              onClick={() => setSelectedCountry(c.name)}
+              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition ${
+                selectedCountry === c.name ? 'bg-blue-500 text-white shadow-sm' : 'text-gray-700 hover:bg-gray-100'
+              }`}
             >
-              Сохранить
+              <span className="text-base">{c.flag ?? '🌍'}</span>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {selectedCountry && (
+        <>
+          <div className="flex gap-2 mb-4">
+            <button
+              type="button"
+              onClick={() => setTab('fields')}
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                tab === 'fields' ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <FileEdit size={16} />
+              Поля анкеты ({fieldsOfSelected.length})
             </button>
             <button
               type="button"
-              onClick={onCancel}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              onClick={() => setTab('photos')}
+              className={`px-4 py-2 rounded-lg text-sm flex items-center gap-2 ${
+                tab === 'photos' ? 'bg-gray-800 text-white' : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+              }`}
             >
-              Отмена
+              <ImageIcon size={16} />
+              Фото-требования ({photosOfSelected.length})
             </button>
+            <div className="ml-auto">
+              {tab === 'fields' ? (
+                <button
+                  type="button"
+                  onClick={() => setAddingField(true)}
+                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 text-sm"
+                >
+                  <Plus size={16} /> Добавить поле
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAddingPhoto(true)}
+                  className="px-3 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-1.5 text-sm"
+                >
+                  <Plus size={16} /> Добавить фото
+                </button>
+              )}
+            </div>
           </div>
-        </form>
-      </div>
+
+          {tab === 'fields' && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {fieldsOfSelected.length === 0 ? (
+                <div className="p-10 text-center text-sm text-gray-400">Полей пока нет — добавь первое</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {fieldsOfSelected.map(f => (
+                    <div key={f.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-[200px]">
+                        <p className="text-gray-800 font-medium">{f.label} {f.required && <span className="text-red-500">*</span>}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
+                          <span className="font-mono">{f.field_key}</span>
+                          <span className="px-1.5 py-0.5 bg-gray-100 rounded">{FIELD_TYPE_LABELS[f.field_type]}</span>
+                          {f.visa_id ? (
+                            <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded">только {f.visa_id}</span>
+                          ) : (
+                            <span className="px-1.5 py-0.5 bg-gray-50 text-gray-500 rounded">все визы</span>
+                          )}
+                          {f.options && <span className="text-gray-400">опций: {f.options.length}</span>}
+                        </div>
+                        {f.comment && <p className="text-xs text-gray-400 mt-0.5 italic">{f.comment}</p>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setEditingField(f)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg" title="Редактировать">
+                          <Edit2 size={16} />
+                        </button>
+                        <button onClick={() => handleDeleteField(f)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Удалить">
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'photos' && (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              {photosOfSelected.length === 0 ? (
+                <div className="p-10 text-center text-sm text-gray-400">Фото-требований пока нет</div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {photosOfSelected.map(p => (
+                    <div key={p.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex-1 min-w-[200px]">
+                        <p className="text-gray-800 font-medium">{p.label} {p.required && <span className="text-red-500">*</span>}</p>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
+                          <span className="font-mono">{p.field_key}</span>
+                          {p.formats && <span>{p.formats}</span>}
+                          {p.max_size && <span>≤{p.max_size}</span>}
+                        </div>
+                        {p.requirements && <p className="text-xs text-gray-500 mt-0.5">{p.requirements}</p>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => setEditingPhoto(p)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Edit2 size={16} /></button>
+                        <button onClick={() => handleDeletePhoto(p)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {(editingField || addingField) && selectedCountry && (
+        <FieldFormModal
+          country={selectedCountry}
+          field={editingField}
+          visasOfCountry={visasOfSelected}
+          onClose={() => { setEditingField(null); setAddingField(false); }}
+          onSaved={async (saved) => {
+            await upsertFormField(saved);
+            setEditingField(null); setAddingField(false);
+            load();
+          }}
+        />
+      )}
+      {(editingPhoto || addingPhoto) && selectedCountry && (
+        <PhotoFormModal
+          country={selectedCountry}
+          photo={editingPhoto}
+          visasOfCountry={visasOfSelected}
+          onClose={() => { setEditingPhoto(null); setAddingPhoto(false); }}
+          onSaved={async (saved) => {
+            await upsertPhotoRequirement(saved);
+            setEditingPhoto(null); setAddingPhoto(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 };
 
-const FieldEditor: React.FC<{
-  field: FormField | null;
-  onSave: (field: FormField) => void;
-  onCancel: () => void;
-}> = ({ field, onSave, onCancel }) => {
-  const [formData, setFormData] = useState<FormField>(
-    field || {
-      id: `field-${Date.now()}`,
-      label: '',
-      key: '',
-      type: 'text',
-      required: false,
-      placeholder: '',
-      comment: ''
+// ─── Field Form Modal ─────────────────────────────────────────────────────────
+const FieldFormModal: React.FC<{
+  country: string;
+  field: VisaFormField | null;
+  visasOfCountry: VisaProduct[];
+  onClose: () => void;
+  onSaved: (f: Omit<VisaFormField, 'created_at' | 'updated_at'>) => Promise<void>;
+}> = ({ country, field, visasOfCountry, onClose, onSaved }) => {
+  const [form, setForm] = useState<Omit<VisaFormField, 'created_at' | 'updated_at'>>(
+    field ?? {
+      id: '', country, visa_id: null,
+      field_key: '', label: '', field_type: 'text',
+      required: false, placeholder: null, comment: null,
+      options: null, warning: null, sort_order: 999,
     }
   );
+  const [optionsText, setOptionsText] = useState((form.options ?? []).join('\n'));
+  const [saving, setSaving] = useState(false);
 
-  const [optionInput, setOptionInput] = useState('');
+  const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(p => ({ ...p, [k]: v }));
+  const needsOptions = form.field_type === 'select' || form.field_type === 'radio';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
-  };
-
-  const handleAddOption = () => {
-    if (optionInput.trim()) {
-      setFormData({
-        ...formData,
-        options: [...(formData.options || []), optionInput.trim()]
-      });
-      setOptionInput('');
+    if (!form.field_key.trim() || !form.label.trim()) {
+      alert('Заполни ключ поля и название');
+      return;
     }
-  };
-
-  const handleRemoveOption = (index: number) => {
-    setFormData({
-      ...formData,
-      options: formData.options?.filter((_, i) => i !== index)
-    });
+    const id = field?.id || `${form.visa_id ?? country}__${form.field_key}-${Date.now()}`;
+    const options = needsOptions ? optionsText.split('\n').map(s => s.trim()).filter(Boolean) : null;
+    setSaving(true);
+    try { await onSaved({ ...form, id, options }); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-200">
-          <h2>{field ? 'Редактировать поле' : 'Добавить поле'}</h2>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <FileEdit className="w-5 h-5 text-blue-500" />
+            {field ? 'Редактировать поле' : 'Добавить поле'} · {country}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Название поля *</label>
-            <input
-              type="text"
-              value={formData.label}
-              onChange={(e) => setFormData({ ...formData, label: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Например: Гражданство:"
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-700 mb-2">Ключ поля *</label>
+              <label className="block text-sm text-gray-700 mb-1">Ключ (для form_data) *</label>
               <input
-                type="text"
-                value={formData.key}
-                onChange={(e) => setFormData({ ...formData, key: e.target.value.replace(/\s/g, '_') })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="field_name"
+                type="text" value={form.field_key} onChange={e => set('field_key', e.target.value)}
+                disabled={!!field}
+                placeholder="citizenship"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm"
                 required
               />
+              <p className="text-xs text-gray-400 mt-1">Английский ключ — нельзя менять после создания</p>
             </div>
-
             <div>
-              <label className="block text-sm text-gray-700 mb-2">Тип поля *</label>
+              <label className="block text-sm text-gray-700 mb-1">Тип поля *</label>
               <select
-                value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as FormField['type'] })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+                value={form.field_type}
+                onChange={e => set('field_type', e.target.value as FormFieldType)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               >
-                <option value="text">Текст</option>
-                <option value="email">Email</option>
-                <option value="tel">Телефон</option>
-                <option value="date">Дата</option>
-                <option value="file">Файл</option>
-                <option value="select">Выбор из списка (select)</option>
-                <option value="radio">Переключатель (radio)</option>
-                <option value="textarea">Многострочный текст</option>
+                {Object.entries(FIELD_TYPE_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
               </select>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Название поля (видит юзер) *</label>
             <input
-              type="checkbox"
-              id="required"
-              checked={formData.required}
-              onChange={(e) => setFormData({ ...formData, required: e.target.checked })}
-              className="w-4 h-4 text-[#2196F3] rounded focus:ring-[#2196F3]"
+              type="text" value={form.label} onChange={e => set('label', e.target.value)}
+              placeholder="Гражданство"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
             />
-            <label htmlFor="required" className="text-sm text-gray-700 cursor-pointer">
-              Обязательное поле
-            </label>
           </div>
 
-          {formData.type !== 'file' && formData.type !== 'select' && formData.type !== 'radio' && (
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Подсказка (под полем)</label>
+            <input
+              type="text" value={form.comment ?? ''} onChange={e => set('comment', e.target.value || null)}
+              placeholder="например: 'если СССР, пишите Россия'"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Placeholder (внутри поля)</label>
+            <input
+              type="text" value={form.placeholder ?? ''} onChange={e => set('placeholder', e.target.value || null)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          {needsOptions && (
             <div>
-              <label className="block text-sm text-gray-700 mb-2">Placeholder</label>
-              <input
-                type="text"
-                value={formData.placeholder || ''}
-                onChange={(e) => setFormData({ ...formData, placeholder: e.target.value })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                placeholder="Подсказка для пользователя"
+              <label className="block text-sm text-gray-700 mb-1">Варианты (по одному на строке) *</label>
+              <textarea
+                value={optionsText} onChange={e => setOptionsText(e.target.value)}
+                rows={4}
+                placeholder="Да&#10;Нет"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm resize-none"
               />
             </div>
           )}
 
           <div>
-            <label className="block text-sm text-gray-700 mb-2">Комментарий / Подсказка</label>
-            <textarea
-              value={formData.comment || ''}
-              onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-              rows={2}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Дополнительная информация для пользователя"
-            />
+            <label className="block text-sm text-gray-700 mb-1">Применяется к</label>
+            <select
+              value={form.visa_id ?? ''}
+              onChange={e => set('visa_id', e.target.value || null)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Все визы страны</option>
+              {visasOfCountry.map(v => (
+                <option key={v.id} value={v.id}>Только: {v.name} ({v.id})</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              «Все визы» — поле появится в анкете для каждой визы этой страны.
+              Если выбрана конкретная виза — появится только в ней (полезно для продлений).
+            </p>
           </div>
 
-          <div>
-            <label className="block text-sm text-gray-700 mb-2">Предупреждение (если требуется)</label>
-            <textarea
-              value={formData.warning || ''}
-              onChange={(e) => setFormData({ ...formData, warning: e.target.value })}
-              rows={2}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-              placeholder="Например: ❗Важное предупреждение для пользователя"
-            />
-          </div>
-
-          {(formData.type === 'select' || formData.type === 'radio') && (
-            <div>
-              <label className="block text-sm text-gray-700 mb-2">Варианты выбора</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={optionInput}
-                  onChange={(e) => setOptionInput(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddOption();
-                    }
-                  }}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
-                  placeholder="Введите вариант"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddOption}
-                  className="px-4 py-2 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-                >
-                  Добавить
-                </button>
-              </div>
-              <div className="space-y-1">
-                {formData.options?.map((option, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-2 bg-[#F5F7FA] rounded"
-                  >
-                    <span className="text-sm">{option}</span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveOption(index)}
-                      className="p-1 hover:bg-red-100 rounded transition-colors"
-                    >
-                      <Trash2 size={14} className="text-red-500" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-700">Обязательное</p>
+              <input
+                type="checkbox" checked={form.required}
+                onChange={e => set('required', e.target.checked)}
+                className="w-5 h-5 accent-emerald-500"
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Порядок</label>
+              <input
+                type="number" value={form.sort_order} min={0}
+                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
 
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button
-              type="submit"
-              className="flex-1 px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-            >
-              Сохранить
-            </button>
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Отмена
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl">Отмена</button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+              {saving ? 'Сохраняем…' : 'Сохранить'}
             </button>
           </div>
         </form>
@@ -348,521 +475,132 @@ const FieldEditor: React.FC<{
   );
 };
 
-export const FormBuilder: React.FC = () => {
-  const [countries, setCountries] = useState<CountryVisaData[]>(countriesVisaData);
-  const [selectedCountry, setSelectedCountry] = useState(countriesVisaData[0]);
-  const [selectedVisaType, setSelectedVisaType] = useState<VisaType>(countriesVisaData[0].visaTypes[0]);
-  const [editingField, setEditingField] = useState<FormField | null>(null);
-  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
-  const [editingPhoto, setEditingPhoto] = useState<PhotoRequirement | null>(null);
-  const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
-  const [photoRequirements, setPhotoRequirements] = useState<PhotoRequirement[]>(
-    countryPhotoRequirements[selectedCountry.id] || []
+// ─── Photo Form Modal ─────────────────────────────────────────────────────────
+const PhotoFormModal: React.FC<{
+  country: string;
+  photo: VisaPhotoRequirement | null;
+  visasOfCountry: VisaProduct[];
+  onClose: () => void;
+  onSaved: (p: Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>) => Promise<void>;
+}> = ({ country, photo, visasOfCountry, onClose, onSaved }) => {
+  const [form, setForm] = useState<Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>>(
+    photo ?? {
+      id: '', country, visa_id: null,
+      field_key: '', label: '', required: false,
+      requirements: null, formats: 'JPG/PNG/PDF', max_size: '5MB',
+      hide_if_service_selected: null, sort_order: 999,
+    }
   );
+  const [saving, setSaving] = useState(false);
 
-  const currentFields = selectedVisaType.formFields;
+  const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(p => ({ ...p, [k]: v }));
 
-  const handleSaveField = (field: FormField) => {
-    setCountries(prevCountries =>
-      prevCountries.map(country => {
-        if (country.id === selectedCountry.id) {
-          return {
-            ...country,
-            visaTypes: country.visaTypes.map(visa => {
-              if (visa.id === selectedVisaType.id) {
-                const existingIndex = visa.formFields.findIndex(f => f.id === field.id);
-                let newFields;
-                
-                if (existingIndex >= 0) {
-                  // Update existing field
-                  newFields = [...visa.formFields];
-                  newFields[existingIndex] = field;
-                } else {
-                  // Add new field
-                  newFields = [...visa.formFields, field];
-                }
-                
-                const updatedVisa = { ...visa, formFields: newFields };
-                
-                // Update selectedVisaType
-                setSelectedVisaType(updatedVisa);
-                
-                return updatedVisa;
-              }
-              return visa;
-            })
-          };
-        }
-        return country;
-      })
-    );
-    
-    setEditingField(null);
-  };
-
-  const handleDeleteField = (fieldId: string) => {
-    if (confirm('Вы уверены, что хотите удалить это поле?')) {
-      setCountries(prevCountries =>
-        prevCountries.map(country => {
-          if (country.id === selectedCountry.id) {
-            return {
-              ...country,
-              visaTypes: country.visaTypes.map(visa => {
-                if (visa.id === selectedVisaType.id) {
-                  const newFields = visa.formFields.filter(f => f.id !== fieldId);
-                  const updatedVisa = { ...visa, formFields: newFields };
-                  setSelectedVisaType(updatedVisa);
-                  return updatedVisa;
-                }
-                return visa;
-              })
-            };
-          }
-          return country;
-        })
-      );
-    }
-  };
-
-  const handleDragStart = (index: number) => {
-    setDraggedIndex(index);
-  };
-
-  const handleDragOver = (e: React.DragEvent, index: number) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (draggedIndex === null || draggedIndex === index) return;
-
-    setCountries(prevCountries =>
-      prevCountries.map(country => {
-        if (country.id === selectedCountry.id) {
-          return {
-            ...country,
-            visaTypes: country.visaTypes.map(visa => {
-              if (visa.id === selectedVisaType.id) {
-                const newFields = [...visa.formFields];
-                const draggedField = newFields[draggedIndex];
-                
-                // Remove from old position
-                newFields.splice(draggedIndex, 1);
-                
-                // Insert at new position
-                newFields.splice(index, 0, draggedField);
-                
-                const updatedVisa = { ...visa, formFields: newFields };
-                setSelectedVisaType(updatedVisa);
-                
-                return updatedVisa;
-              }
-              return visa;
-            })
-          };
-        }
-        return country;
-      })
-    );
-    
-    setDraggedIndex(index);
-  };
-
-  const handleDragEnd = () => {
-    setDraggedIndex(null);
-  };
-
-  const handleCountryChange = (country: CountryVisaData) => {
-    setSelectedCountry(country);
-    setSelectedVisaType(country.visaTypes[0]);
-    setPhotoRequirements(countryPhotoRequirements[country.id] || []);
-  };
-
-  const handleVisaTypeChange = (visa: VisaType) => {
-    setSelectedVisaType(visa);
-  };
-
-  const handleSavePhoto = (photo: PhotoRequirement) => {
-    const existingIndex = photoRequirements.findIndex(p => p.id === photo.id);
-    
-    if (existingIndex >= 0) {
-      // Update existing photo
-      const newPhotos = [...photoRequirements];
-      newPhotos[existingIndex] = photo;
-      setPhotoRequirements(newPhotos);
-    } else {
-      // Add new photo
-      setPhotoRequirements([...photoRequirements, photo]);
-    }
-    
-    setEditingPhoto(null);
-  };
-
-  const handleDeletePhoto = (photoId: string) => {
-    if (confirm('Вы уверены, что хотите удалить это требование к фотографии?')) {
-      setCountries(prevCountries =>
-        prevCountries.map(country => {
-          if (country.id === selectedCountry.id) {
-            return {
-              ...country,
-              visaTypes: country.visaTypes.map(visa => {
-                if (visa.id === selectedVisaType.id) {
-                  const newPhotos = visa.photoRequirements.filter(p => p.id !== photoId);
-                  const updatedVisa = { ...visa, photoRequirements: newPhotos };
-                  setSelectedVisaType(updatedVisa);
-                  return updatedVisa;
-                }
-                return visa;
-              })
-            };
-          }
-          return country;
-        })
-      );
-    }
-  };
-
-  const handlePhotoDragStart = (index: number) => {
-    setDraggedPhotoIndex(index);
-  };
-
-  const handlePhotoDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    
-    if (draggedPhotoIndex === null || draggedPhotoIndex === index) return;
-
-    setPhotoRequirements(prevPhotos => {
-      const newPhotos = [...prevPhotos];
-      const draggedPhoto = newPhotos[draggedPhotoIndex];
-      
-      // Remove from old position
-      newPhotos.splice(draggedPhotoIndex, 1);
-      
-      // Insert at new position
-      newPhotos.splice(index, 0, draggedPhoto);
-      
-      return newPhotos;
-    });
-    
-    setDraggedPhotoIndex(index);
-  };
-
-  const handlePhotoDragEnd = () => {
-    setDraggedPhotoIndex(null);
+    if (!form.field_key.trim() || !form.label.trim()) { alert('Заполни ключ и название'); return; }
+    const id = photo?.id || `${form.visa_id ?? country}__${form.field_key}-${Date.now()}`;
+    setSaving(true);
+    try { await onSaved({ ...form, id }); }
+    finally { setSaving(false); }
   };
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1>Конструктор анкет</h1>
-        <button
-          onClick={() => alert('Все изменения сохранены!')}
-          className="px-6 py-3 bg-[#00C853] hover:bg-[#00A344] text-white rounded-lg transition-colors flex items-center gap-2"
-        >
-          <Save size={20} />
-          Сохранить все изменения
-        </button>
-      </div>
-
-      {/* Country Selector */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 mb-6">
-        <h3 className="mb-4">Выберите страну</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {countries.map((country) => (
-            <button
-              key={country.id}
-              onClick={() => handleCountryChange(country)}
-              className={`p-4 rounded-lg border-2 transition-all ${
-                selectedCountry.id === country.id
-                  ? 'border-[#2196F3] bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">{country.flag}</span>
-                <span className="text-sm">{country.name}</span>
-              </div>
-            </button>
-          ))}
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <ImageIcon className="w-5 h-5 text-blue-500" />
+            {photo ? 'Редактировать фото' : 'Добавить фото'} · {country}
+          </h2>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
         </div>
-      </div>
 
-      {/* Visa Type Selector */}
-      <div className="bg-white p-6 rounded-xl border border-gray-200 mb-6">
-        <h3 className="mb-4">Выберите тип визы</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {selectedCountry.visaTypes.map((visa) => (
-            <button
-              key={visa.id}
-              onClick={() => handleVisaTypeChange(visa)}
-              className={`p-4 rounded-lg border-2 transition-all text-left ${
-                selectedVisaType.id === visa.id
-                  ? 'border-[#2196F3] bg-blue-50'
-                  : 'border-gray-200 hover:border-gray-300'
-              }`}
-            >
-              <p className="text-sm mb-1">{visa.name}</p>
-              <p className="text-xs text-gray-600">{visa.price.toLocaleString('ru-RU')} ₽</p>
-              <p className="text-xs text-gray-500 mt-1">{visa.formFields.length} полей</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Form Fields */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <h3>Поля анкеты: {selectedCountry.flag} {selectedCountry.name}</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              {selectedVisaType.name} • Перетаскивайте поля для изменения порядка
-            </p>
+            <label className="block text-sm text-gray-700 mb-1">Ключ *</label>
+            <input
+              type="text" value={form.field_key} onChange={e => set('field_key', e.target.value)}
+              disabled={!!photo}
+              placeholder="passportPhoto"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 font-mono text-sm" required
+            />
           </div>
-          <button
-            onClick={() => setEditingField({
-              id: `field-${Date.now()}`,
-              label: '',
-              key: '',
-              type: 'text',
-              required: false
-            })}
-            className="px-4 py-2 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Добавить поле
-          </button>
-        </div>
-
-        <div className="p-6">
-          {currentFields.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="mb-4">Нет полей в анкете</p>
-              <button
-                onClick={() => setEditingField({
-                  id: `field-${Date.now()}`,
-                  label: '',
-                  key: '',
-                  type: 'text',
-                  required: false
-                })}
-                className="px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-              >
-                Добавить первое поле
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {currentFields.map((field, index) => (
-                <div
-                  key={field.id}
-                  draggable
-                  onDragStart={() => handleDragStart(index)}
-                  onDragOver={(e) => handleDragOver(e, index)}
-                  onDragEnd={handleDragEnd}
-                  className={`p-4 bg-[#F5F7FA] rounded-lg flex items-start gap-4 cursor-move hover:bg-gray-100 transition-colors ${
-                    draggedIndex === index ? 'opacity-50' : ''
-                  }`}
-                >
-                  <GripVertical size={20} className="text-gray-400 flex-shrink-0 mt-1" />
-                  
-                  <div className="flex-1">
-                    <div className="flex items-start gap-2 mb-2">
-                      <div className="flex-1">
-                        <p className="text-sm mb-1">{field.label}</p>
-                        {field.required && (
-                          <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded mr-2">
-                            Обязательное поле
-                          </span>
-                        )}
-                        <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded">
-                          {field.type}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-1 text-xs text-gray-600">
-                      {field.comment && (
-                        <p className="bg-blue-50 px-2 py-1 rounded">💡 {field.comment}</p>
-                      )}
-                      {field.warning && (
-                        <p className="bg-yellow-50 px-2 py-1 rounded">⚠️ {field.warning}</p>
-                      )}
-                      {field.placeholder && (
-                        <p className="bg-white px-2 py-1 rounded">Placeholder: {field.placeholder}</p>
-                      )}
-                      {field.options && field.options.length > 0 && (
-                        <p className="bg-white px-2 py-1 rounded">
-                          Варианты: {field.options.join(', ')}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => setEditingField(field)}
-                      className="p-2 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Edit size={18} className="text-[#2196F3]" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteField(field.id)}
-                      className="p-2 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} className="text-red-500" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Photo Requirements Section */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Image size={24} className="text-[#2196F3]" />
-              <h3>Требования к фотографиям: {selectedCountry.flag} {selectedCountry.name}</h3>
-            </div>
-            <p className="text-sm text-gray-600">
-              Управление обязательными и дополнительными фотографиями • Перетаскивайте для изменения порядка
-            </p>
+            <label className="block text-sm text-gray-700 mb-1">Название *</label>
+            <input
+              type="text" value={form.label} onChange={e => set('label', e.target.value)}
+              placeholder="Главная страница загранпаспорта"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+            />
           </div>
-          <button
-            onClick={() => setEditingPhoto({
-              id: `photo-${Date.now()}`,
-              label: '',
-              key: '',
-              required: false,
-              requirements: '',
-              formats: 'JPG/PNG/PDF',
-              maxSize: '5MB'
-            })}
-            className="px-4 py-2 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors flex items-center gap-2"
-          >
-            <Plus size={20} />
-            Добавить фото
-          </button>
-        </div>
-
-        <div className="p-6">
-          {photoRequirements.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              <p className="mb-4">Нет требований к фотографиям</p>
-              <button
-                onClick={() => setEditingPhoto({
-                  id: `photo-${Date.now()}`,
-                  label: '',
-                  key: '',
-                  required: false,
-                  requirements: '',
-                  formats: 'JPG/PNG/PDF',
-                  maxSize: '5MB'
-                })}
-                className="px-6 py-3 bg-[#2196F3] hover:bg-[#1E88E5] text-white rounded-lg transition-colors"
-              >
-                Добавить первое требование
-              </button>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Требования к фото</label>
+            <textarea
+              value={form.requirements ?? ''} onChange={e => set('requirements', e.target.value || null)}
+              rows={2} placeholder="без бликов, чёткое, со всеми углами"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Форматы</label>
+              <input
+                type="text" value={form.formats ?? ''} onChange={e => set('formats', e.target.value || null)}
+                placeholder="JPG/PNG/PDF"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
             </div>
-          ) : (
-            <div className="space-y-3">
-              {photoRequirements.map((photo, index) => (
-                <div
-                  key={photo.id}
-                  draggable
-                  onDragStart={() => handlePhotoDragStart(index)}
-                  onDragOver={(e) => handlePhotoDragOver(e, index)}
-                  onDragEnd={handlePhotoDragEnd}
-                  className={`p-4 bg-[#F5F7FA] rounded-lg flex items-start gap-4 cursor-move hover:bg-gray-100 transition-colors ${
-                    draggedPhotoIndex === index ? 'opacity-50' : ''
-                  }`}
-                >
-                  <GripVertical size={20} className="text-gray-400 flex-shrink-0 mt-1" />
-                  
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <p className="text-sm font-medium">{photo.label}</p>
-                      {photo.required && (
-                        <span className="text-xs text-red-500 bg-red-50 px-2 py-0.5 rounded">
-                          Обязательное
-                        </span>
-                      )}
-                      {photo.hideIfServiceSelected && (
-                        <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded">
-                          Условное
-                        </span>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-1 text-xs text-gray-600">
-                      {photo.requirements && (
-                        <p className="bg-blue-50 px-2 py-1 rounded">📋 {photo.requirements}</p>
-                      )}
-                      <div className="flex gap-2">
-                        {photo.formats && (
-                          <span className="bg-white px-2 py-1 rounded">Форматы: {photo.formats}</span>
-                        )}
-                        {photo.maxSize && (
-                          <span className="bg-white px-2 py-1 rounded">Макс: {photo.maxSize}</span>
-                        )}
-                      </div>
-                      {photo.hideIfServiceSelected && (
-                        <p className="bg-orange-50 px-2 py-1 rounded">
-                          ⚠️ Скрывается при услуге: {photo.hideIfServiceSelected}
-                        </p>
-                      )}
-                    </div>
-                  </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Макс. размер</label>
+              <input
+                type="text" value={form.max_size ?? ''} onChange={e => set('max_size', e.target.value || null)}
+                placeholder="5MB"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
 
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => setEditingPhoto(photo)}
-                      className="p-2 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Edit size={18} className="text-[#2196F3]" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm('Удалить это требование к фотографии?')) {
-                          setPhotoRequirements(photoRequirements.filter(p => p.id !== photo.id));
-                        }
-                      }}
-                      className="p-2 hover:bg-white rounded-lg transition-colors"
-                    >
-                      <Trash2 size={18} className="text-red-500" />
-                    </button>
-                  </div>
-                </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Применяется к</label>
+            <select
+              value={form.visa_id ?? ''}
+              onChange={e => set('visa_id', e.target.value || null)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Все визы страны</option>
+              {visasOfCountry.map(v => (
+                <option key={v.id} value={v.id}>Только: {v.name}</option>
               ))}
-            </div>
-          )}
-
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-sm text-blue-800">
-              <strong>💡 Автоматическая синхронизация:</strong> Все изменения требований к фотографиям автоматически отображаются 
-              в пользовательском интерфейсе при заполнении анкеты. Условные поля автоматически скрываются при выборе соответствующих услуг.
-            </p>
+            </select>
           </div>
-        </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+              <p className="text-sm font-medium text-gray-700">Обязательное</p>
+              <input type="checkbox" checked={form.required}
+                onChange={e => set('required', e.target.checked)}
+                className="w-5 h-5 accent-emerald-500" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Порядок</label>
+              <input
+                type="number" value={form.sort_order} min={0}
+                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl">Отмена</button>
+            <button type="submit" disabled={saving}
+              className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
+              {saving ? 'Сохраняем…' : 'Сохранить'}
+            </button>
+          </div>
+        </form>
       </div>
-
-      {/* Field Editor Modal */}
-      {editingField !== null && (
-        <FieldEditor
-          field={editingField}
-          onSave={handleSaveField}
-          onCancel={() => setEditingField(null)}
-        />
-      )}
-
-      {/* Photo Editor Modal */}
-      {editingPhoto !== null && (
-        <PhotoEditor
-          photo={editingPhoto}
-          onSave={handleSavePhoto}
-          onCancel={() => setEditingPhoto(null)}
-        />
-      )}
     </div>
   );
 };

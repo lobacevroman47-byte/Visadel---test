@@ -4,6 +4,7 @@ import {
   FileText,
   Users,
   Globe,
+  FileEdit,
   Shield,
   Settings,
   LogOut,
@@ -138,6 +139,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="Доп. услуги"
           active={activeSection === 'additional-services'}
           onClick={() => onSectionChange('additional-services')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<FileEdit size={20} />}
+          label="Конструктор анкет"
+          active={activeSection === 'form-builder'}
+          onClick={() => onSectionChange('form-builder')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
