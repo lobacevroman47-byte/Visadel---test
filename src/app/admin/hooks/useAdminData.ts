@@ -22,6 +22,8 @@ export interface AdminApplication {
   telegramId: number;
 }
 
+export type AdminStaffRole = 'founder' | 'admin' | 'moderator';
+
 export interface AdminUser {
   id: string;
   telegramId: number;
@@ -31,6 +33,8 @@ export interface AdminUser {
   email: string;
   bonusBalance: number;
   status: 'regular' | 'partner';
+  // Admin-panel role layered on top of status. Takes display priority over status when set.
+  adminRole?: AdminStaffRole;
   registeredAt: string;
   applicationsCount: number;
 }
@@ -234,6 +238,12 @@ export async function uploadVisaFile(file: File): Promise<string | null> {
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
+// Founders come from VITE_ADMIN_TELEGRAM_IDS env var, not from any DB table
+const FOUNDER_TELEGRAM_IDS = new Set(
+  (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
+    .split(',').map((s: string) => s.trim()).filter(Boolean).map(Number)
+);
+
 export function useAdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -242,15 +252,34 @@ export function useAdminUsers() {
     setLoading(true);
     try {
       if (isSupabaseConfigured()) {
-        const { data: usersData, error } = await supabase.from('users').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        const { data: appsData } = await supabase.from('applications').select('user_telegram_id');
+        const [usersRes, appsRes, adminsRes] = await Promise.all([
+          supabase.from('users').select('*').order('created_at', { ascending: false }),
+          supabase.from('applications').select('user_telegram_id'),
+          supabase.from('admin_users').select('telegram_id, role'),
+        ]);
+        if (usersRes.error) throw usersRes.error;
+
         const appCounts: Record<number, number> = {};
-        (appsData ?? []).forEach((a: Record<string, unknown>) => {
+        (appsRes.data ?? []).forEach((a: Record<string, unknown>) => {
           const tid = a.user_telegram_id as number;
           appCounts[tid] = (appCounts[tid] ?? 0) + 1;
         });
-        setUsers((usersData as Record<string, unknown>[]).map(u => rowToUser(u, appCounts[u.telegram_id as number] ?? 0)));
+
+        const adminRoleMap = new Map<number, AdminStaffRole>();
+        (adminsRes.data ?? []).forEach((a: Record<string, unknown>) => {
+          adminRoleMap.set(a.telegram_id as number, a.role as AdminStaffRole);
+        });
+
+        const mapped = (usersRes.data as Record<string, unknown>[]).map(u => {
+          const tid = u.telegram_id as number;
+          const base = rowToUser(u, appCounts[tid] ?? 0);
+          // Founder env var trumps admin_users; otherwise use admin_users role if present
+          const adminRole: AdminStaffRole | undefined = FOUNDER_TELEGRAM_IDS.has(tid)
+            ? 'founder'
+            : adminRoleMap.get(tid);
+          return adminRole ? { ...base, adminRole } : base;
+        });
+        setUsers(mapped);
       } else {
         setUsers(mockUsers.map(u => ({ ...u, telegramId: 0 })));
       }

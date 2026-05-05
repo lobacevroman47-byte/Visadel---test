@@ -8,6 +8,12 @@ const ROLE_LABELS: Record<AdminRole, string> = {
   moderator: 'Модератор',
 };
 
+const ROLE_LABELS_PLURAL: Record<AdminRole, string> = {
+  founder: 'Основатели',
+  admin: 'Администраторы',
+  moderator: 'Модераторы',
+};
+
 const ROLE_COLORS: Record<AdminRole, string> = {
   founder: 'bg-purple-100 text-purple-700',
   admin: 'bg-blue-100 text-blue-700',
@@ -167,7 +173,7 @@ export const Administrators: React.FC = () => {
               {ROLE_ICON[role]}
             </div>
             <div>
-              <p className="text-xs text-gray-500">{ROLE_LABELS[role]}ов</p>
+              <p className="text-xs text-gray-500">{ROLE_LABELS_PLURAL[role]}</p>
               <p className="text-2xl font-semibold text-gray-800">{counts[role]}</p>
             </div>
           </div>

@@ -1,9 +1,26 @@
 import React, { useState } from 'react';
-import { Search, Plus, Minus, Loader2, RefreshCw, X, ExternalLink } from 'lucide-react';
+import { Search, Plus, Minus, Loader2, RefreshCw, X, ExternalLink, ShieldCheck, Shield, User as UserIcon } from 'lucide-react';
 import { useAdminUsers, updateUserBonuses, updateUserStatus, type AdminUser } from '../hooks/useAdminData';
 
 interface UsersProps {
   filter?: { filter?: 'all' | 'partners' | 'regular' };
+}
+
+// Effective role label & visual style — admin role takes priority over partner/regular.
+function getRoleBadge(user: AdminUser) {
+  if (user.adminRole === 'founder') {
+    return { label: 'Основатель', className: 'bg-purple-100 text-purple-700', icon: <ShieldCheck className="w-3 h-3" /> };
+  }
+  if (user.adminRole === 'admin') {
+    return { label: 'Администратор', className: 'bg-blue-100 text-blue-700', icon: <Shield className="w-3 h-3" /> };
+  }
+  if (user.adminRole === 'moderator') {
+    return { label: 'Модератор', className: 'bg-emerald-100 text-emerald-700', icon: <UserIcon className="w-3 h-3" /> };
+  }
+  if (user.status === 'partner') {
+    return { label: 'Партнёр', className: 'bg-green-100 text-green-700', icon: null };
+  }
+  return { label: 'Обычный', className: 'bg-gray-100 text-gray-600', icon: null };
 }
 
 // ── User Modal ────────────────────────────────────────────────────────────────
@@ -225,11 +242,15 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
                     <span className="text-sm font-medium text-amber-600">{user.bonusBalance} ₽</span>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      user.status === 'partner' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {user.status === 'partner' ? 'Партнёр' : 'Обычный'}
-                    </span>
+                    {(() => {
+                      const badge = getRoleBadge(user);
+                      return (
+                        <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.className}`}>
+                          {badge.icon}
+                          {badge.label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{user.applicationsCount}</td>
                   <td className="px-6 py-4">
