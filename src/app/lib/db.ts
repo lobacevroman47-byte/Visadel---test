@@ -473,6 +473,18 @@ export async function submitReview(params: {
   } catch (e) {
     console.warn('Failed to post review to channel:', e);
   }
+
+  // Notify admins about new review on moderation
+  fetch('/api/notify-admin', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      event: 'new_review',
+      review_country: params.country,
+      review_rating: params.rating,
+      review_text: params.text,
+    }),
+  }).catch(() => { /* no-op */ });
 }
 
 export async function getReferralCount(referralCode: string): Promise<number> {

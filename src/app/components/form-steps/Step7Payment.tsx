@@ -151,6 +151,22 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
         }).catch(console.error);
       }
 
+      // 3b. Notify all admins about new application
+      fetch('/api/notify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'new_application',
+          application_id: savedApp?.id,
+          country: visa.country,
+          visa_type: visa.type,
+          price: totalPrice,
+          urgent,
+          customer_name: formData.basicData?.fullName ?? formData.basicData?.lastName ?? null,
+          customer_telegram: formData.contactInfo?.telegram ?? null,
+        }),
+      }).catch(console.error);
+
       // 4. Referral bonus to the referrer is paid by admin when status moves to 'in_progress'
       // (i.e. only after the payment is actually confirmed). See admin/Applications.tsx.
 
