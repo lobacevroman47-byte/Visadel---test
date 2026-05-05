@@ -75,6 +75,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   const [draftId, setDraftId] = useState<string>('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
+  const paymentReminderScheduled = useRef(false);
 
   // Keyboard detection — shrink header when keyboard opens + scroll focused input into view
   useEffect(() => {
@@ -129,6 +130,26 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     }
   }, [visa.id, urgent]);
 
+  const getTelegramId = (): number => {
+    try { return JSON.parse(localStorage.getItem('userData') ?? '{}').telegramId ?? 0; } catch { return 0; }
+  };
+
+  const scheduleReminders = (type: 'draft' | 'payment') => {
+    const telegramId = getTelegramId();
+    if (!telegramId || !draftId) return;
+    fetch('/api/schedule-reminders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: telegramId,
+        draft_key: draftId,
+        country: visa.country,
+        visa_type: visa.type,
+        type,
+      }),
+    }).catch(console.error);
+  };
+
   const saveDraft = () => {
     const draft = {
       id: draftId,
@@ -139,21 +160,34 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
       savedAt: new Date().toISOString(),
     };
     localStorage.setItem(draftId, JSON.stringify(draft));
-    
+
     // Also save to drafts list for ApplicationsTab
     const draftsKey = 'visa_drafts';
     const existingDrafts = JSON.parse(localStorage.getItem(draftsKey) || '[]');
     const draftIndex = existingDrafts.findIndex((d: any) => d.id === draftId);
-    
+
     if (draftIndex >= 0) {
       existingDrafts[draftIndex] = draft;
     } else {
       existingDrafts.push(draft);
     }
-    
+
     localStorage.setItem(draftsKey, JSON.stringify(existingDrafts));
+
+    // Schedule draft reminders
+    scheduleReminders('draft');
+
     alert('✅ Черновик сохранен!');
   };
+
+  // When user reaches payment step — schedule "payment abandoned" reminders (once)
+  useEffect(() => {
+    if (currentStep === 5 && !paymentReminderScheduled.current && draftId) {
+      paymentReminderScheduled.current = true;
+      scheduleReminders('payment');
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep, draftId]);
 
   const updateFormData = (step: keyof FormData, data: any) => {
     setFormData(prev => ({

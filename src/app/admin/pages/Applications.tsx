@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download } from 'lucide-react';
 import { statusLabels, statusColors } from '../data/mockData';
 import {
@@ -342,25 +342,33 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
+  const saveGuard = useRef(false); // prevent double-execution
 
   const tgUsername = (application.telegram ?? '').replace('@', '') ||
     ((application.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? '').replace('@', '');
 
-  const sendNotify = async () => {
-    const res = await fetch('/api/notify', {
+  // Returns: 'sent' | 'skipped' — throws on error
+  const sendNotify = async (overrideStatus?: string): Promise<'sent' | 'skipped'> => {
+    const s = overrideStatus ?? application.status;
+    const res = await fetch('/api/notify-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         telegram_id: application.telegramId,
+        status: s,
         country: application.country,
         visa_type: application.visaType,
+        application_id: application.id,
       }),
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error ?? `HTTP ${res.status}`);
+    return data.skipped ? 'skipped' : 'sent';
   };
 
   const handleSave = async () => {
+    if (saveGuard.current) return; // hard guard — no double execution
+    saveGuard.current = true;
     setSaving(true);
     try {
       let visaUrl: string | undefined;
@@ -387,26 +395,21 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         } catch (e) { console.error('payment bonus error', e); }
       }
 
-      // Send status notification for all statuses that have a message
-      const NOTIFIABLE = ['pending_confirmation', 'in_progress', 'ready', 'pending_payment', 'completed'];
-      if (NOTIFIABLE.includes(status) && application.telegramId) {
+      // Send Telegram notification for all statuses except draft
+      if (status !== 'draft' && application.telegramId) {
         try {
-          const notifyRes = await fetch('/api/notify-status', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: application.telegramId,
-              status,
-              country: application.country,
-              visa_type: application.visaType,
-            }),
-          });
-          const notifyData = await notifyRes.json();
-          if (!notifyRes.ok || notifyData.error) throw new Error(notifyData.error ?? `HTTP ${notifyRes.status}`);
-          alert(visaUrl ? 'Виза загружена! Уведомление отправлено в Telegram.' : 'Статус обновлён. Уведомление отправлено в Telegram.');
+          const notifyResult = await sendNotify(status);
+          if (notifyResult === 'sent') {
+            alert(visaUrl ? 'Виза загружена! Уведомление отправлено в Telegram.' : 'Статус обновлён. Уведомление отправлено в Telegram.');
+          } else {
+            // skipped by dedup (duplicate within 1 min) — changes saved, no double send
+            alert('Изменения сохранены. Уведомление уже было недавно отправлено.');
+          }
         } catch (notifyErr) {
-          alert(`Изменения сохранены, но уведомление не отправлено: ${String(notifyErr)}`);
+          alert(`Изменения сохранены, но уведомление не отправлено:\n${String(notifyErr)}`);
         }
+      } else if (status !== 'draft' && !application.telegramId) {
+        alert('Изменения сохранены. Telegram ID не найден — уведомление не отправлено.');
       } else {
         alert('Изменения сохранены');
       }
@@ -415,6 +418,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
       alert('Ошибка сохранения');
     } finally {
       setSaving(false);
+      saveGuard.current = false;
     }
   };
 

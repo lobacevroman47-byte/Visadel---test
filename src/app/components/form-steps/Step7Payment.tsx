@@ -82,7 +82,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
       await Promise.all(photoUploads);
 
       // 3. Save application to Supabase (or localStorage fallback)
-      await saveApplication({
+      const savedApp = await saveApplication({
         user_telegram_id: telegramId,
         country: visa.country,
         visa_type: visa.type,
@@ -101,6 +101,21 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
         bonuses_used: bonusAmount,
       });
 
+      // 3a. Notify user: application received (pending_confirmation)
+      if (telegramId) {
+        fetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: telegramId,
+            status: 'pending_confirmation',
+            country: visa.country,
+            visa_type: visa.type,
+            application_id: savedApp?.id,
+          }),
+        }).catch(console.error);
+      }
+
       // 4. Pay referral bonus to referrer (500₽ on first application)
       if (telegramId) {
         payReferralBonus(telegramId).catch(console.error);
@@ -118,7 +133,15 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
       }
 
       // 4. Remove draft
-      localStorage.removeItem(`draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`);
+      const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
+      localStorage.removeItem(draftKey);
+
+      // 5. Cancel any pending reminders for this draft
+      fetch('/api/cancel-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_key: draftKey }),
+      }).catch(console.error);
 
       haptic('success');
       alert('Заявка отправлена! Мы свяжемся с вами в ближайшее время.');

@@ -136,6 +136,35 @@ export function useAdminApplications() {
   }, []);
 
   useEffect(() => { fetch(); }, [fetch]);
+
+  // Supabase Realtime — live updates for admin dashboard
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel('admin-apps-realtime')
+      .on(
+        'postgres_changes' as any,
+        { event: '*', schema: 'public', table: 'applications' },
+        (payload: any) => {
+          if (payload.eventType === 'INSERT') {
+            setApplications(prev => [rowToApplication(payload.new), ...prev]);
+          } else if (payload.eventType === 'UPDATE') {
+            setApplications(prev =>
+              prev.map(app =>
+                app.id === payload.new.id ? rowToApplication(payload.new) : app
+              )
+            );
+          } else if (payload.eventType === 'DELETE') {
+            setApplications(prev => prev.filter(app => app.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   return { applications, loading, refetch: fetch };
 }
 
@@ -154,14 +183,7 @@ export async function updateApplicationStatus(
     await supabase.from('applications').update(patch).eq('id', id);
   }
 
-  // Send status notification (skip 'draft' and 'completed' — 'completed' handled by notify.js)
-  if (telegramId && status !== 'draft' && status !== 'completed') {
-    fetch('/api/notify-status', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ telegram_id: telegramId, status: dbStatus, country, visa_type: visaType }),
-    }).catch(console.error);
-  }
+  // Notification is sent by the caller (Applications.tsx handleSave) to avoid double-send
 }
 
 export async function uploadVisaFile(file: File): Promise<string | null> {

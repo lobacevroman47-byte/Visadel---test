@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Clock, Download, Lock, Star, X, Copy, Loader2, RefreshCw } from 'lucide-react';
+import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw } from 'lucide-react';
 import { getUserApplications, getReviewedAppIds, submitReview, type Application } from '../../lib/db';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useTelegram } from '../../App';
 
 interface Draft {
   id: string;
@@ -24,6 +26,62 @@ const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string
   in_progress:          { label: 'В работе',                icon: '✅', color: 'bg-green-100 text-green-700' },
   ready:                { label: 'Готово',                  icon: '🎉', color: 'bg-purple-100 text-purple-700' },
 };
+
+// ── Status Progress Bar ───────────────────────────────────────────────────────
+const PROGRESS_STEPS = [
+  { id: 'pending_confirmation', label: 'Заявка\nподана',    icon: '📋' },
+  { id: 'in_progress',         label: 'Проверка\nоплаты',  icon: '✅' },
+  { id: 'working',             label: 'Виза\nоформляется', icon: '⚙️' },
+  { id: 'ready',               label: 'Готово',             icon: '🎉' },
+];
+
+function getProgressIndex(status: string): number {
+  if (status === 'pending_confirmation') return 0;
+  if (status === 'in_progress') return 2;
+  if (status === 'ready') return 3;
+  return -1;
+}
+
+function StatusProgress({ status }: { status: string }) {
+  const activeIdx = getProgressIndex(status);
+  if (activeIdx < 0) return null;
+
+  return (
+    <div className="mt-3 mb-1 px-1">
+      <div className="flex items-start">
+        {PROGRESS_STEPS.map((step, idx) => {
+          const done = idx < activeIdx;
+          const active = idx === activeIdx;
+          return (
+            <div key={step.id} className="flex items-start flex-1 last:flex-none">
+              {/* Step circle + label */}
+              <div className="flex flex-col items-center gap-1 min-w-[44px]">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shadow-sm transition-all ${
+                  done   ? 'bg-blue-500 text-white shadow-blue-200' :
+                  active ? 'bg-blue-600 text-white ring-2 ring-blue-300 ring-offset-1 shadow-blue-300' :
+                           'bg-gray-100 text-gray-400'
+                }`}>
+                  {done ? '✓' : step.icon}
+                </div>
+                <span className={`text-[9px] text-center leading-tight whitespace-pre-line ${
+                  active ? 'text-blue-600 font-semibold' : done ? 'text-blue-400' : 'text-gray-400'
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+              {/* Connector line */}
+              {idx < PROGRESS_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mt-4 mx-0.5 rounded-full transition-colors ${
+                  done ? 'bg-blue-500' : 'bg-gray-200'
+                }`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ── Review Modal ──────────────────────────────────────────────────────────────
 function ReviewModal({ app, onClose, onSubmitted }: {
@@ -128,17 +186,21 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
   const [loading, setLoading] = useState(true);
   const [reviewApp, setReviewApp] = useState<Application | null>(null);
   const [submittingReviewId, setSubmittingReviewId] = useState<string | null>(null);
+  const [deletingDraftKey, setDeletingDraftKey] = useState<string | null>(null);
 
-  const telegramId: number = (() => {
+  // ── Use context so telegramId is always up-to-date (not stale localStorage) ──
+  const { appUser } = useTelegram();
+  const telegramId: number = appUser?.telegram_id ?? (() => {
     try { return JSON.parse(localStorage.getItem('userData') ?? '{}').telegramId ?? 0; } catch { return 0; }
   })();
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (tid?: number) => {
+    const id = tid ?? telegramId;
     setLoading(true);
     try {
       const [apps, reviewed] = await Promise.all([
-        telegramId ? getUserApplications(telegramId) : Promise.resolve([]),
-        telegramId ? getReviewedAppIds(telegramId) : Promise.resolve(new Set<string>()),
+        id ? getUserApplications(id) : Promise.resolve([]),
+        id ? getReviewedAppIds(id) : Promise.resolve(new Set<string>()),
       ]);
       setApplications(apps);
       setReviewedIds(reviewed);
@@ -158,12 +220,52 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
     } finally {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reload whenever telegramId becomes available (async user load race-condition fix)
+  useEffect(() => {
+    if (telegramId) load(telegramId);
+  }, [telegramId, load]);
+
+  // Supabase Realtime — auto-update statuses without column-level filter
+  // (column filters require Supabase Pro; we filter client-side instead)
+  useEffect(() => {
+    if (!telegramId || !isSupabaseConfigured()) return;
+
+    const channel = supabase
+      .channel(`user-apps-${telegramId}`)
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'applications' },
+        (payload: any) => {
+          // Client-side filter — only update this user's applications
+          if (payload.new.user_telegram_id !== telegramId) return;
+          setApplications(prev =>
+            prev.map(app =>
+              app.id === payload.new.id ? { ...app, ...payload.new } : app
+            )
+          );
+        }
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'applications' },
+        (payload: any) => {
+          if (payload.new.user_telegram_id !== telegramId) return;
+          setApplications(prev => {
+            if (prev.find(a => a.id === payload.new.id)) return prev;
+            return [payload.new as Application, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, [telegramId]);
 
-  useEffect(() => { load(); }, [load]);
-
   const handleDeleteDraft = (draftKey: string) => {
-    if (!confirm('Удалить черновик?')) return;
+    // Remove from localStorage
     localStorage.removeItem(draftKey);
     try {
       const raw = localStorage.getItem('visa_drafts');
@@ -173,6 +275,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
       }
     } catch {}
     setDrafts(prev => prev.filter(d => d.draftKey !== draftKey));
+    setDeletingDraftKey(null);
   };
 
   const handleReviewSubmitted = () => {
@@ -256,7 +359,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
       <div className="space-y-6">
         {/* Refresh */}
         <div className="flex justify-end">
-          <button onClick={load} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
+          <button onClick={() => load()} className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600">
             <RefreshCw className="w-3 h-3" /> Обновить
           </button>
         </div>
@@ -278,19 +381,41 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                     <span className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full">📝 Черновик</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-500 mb-3">
-                    <span>Шаг {draft.step + 1} из 7</span>
+                    <span>Шаг {draft.step + 1} из 6</span>
                     <span>{new Date(draft.savedAt).toLocaleDateString('ru-RU')}</span>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => onContinueDraft?.(draft)}
-                      className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition text-sm">
-                      Продолжить
-                    </button>
-                    <button onClick={() => handleDeleteDraft(draft.draftKey)}
-                      className="px-4 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm">
-                      Удалить
-                    </button>
-                  </div>
+
+                  {deletingDraftKey === draft.draftKey ? (
+                    /* Confirmation row */
+                    <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                      <p className="text-sm text-red-700 mb-2 text-center">Удалить черновик?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleDeleteDraft(draft.draftKey)}
+                          className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-medium"
+                        >
+                          Да, удалить
+                        </button>
+                        <button
+                          onClick={() => setDeletingDraftKey(null)}
+                          className="flex-1 bg-gray-100 text-gray-600 py-2 rounded-lg text-sm"
+                        >
+                          Отмена
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={() => onContinueDraft?.(draft)}
+                        className="flex-1 bg-blue-500 text-white py-2 rounded-lg hover:bg-blue-600 transition text-sm">
+                        Продолжить
+                      </button>
+                      <button onClick={() => setDeletingDraftKey(draft.draftKey)}
+                        className="px-4 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm">
+                        Удалить
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -329,7 +454,12 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                       </span>
                     </div>
 
-                    <div className="space-y-1 text-sm text-gray-500 mb-3">
+                    {/* Progress bar for active applications */}
+                    {['pending_confirmation', 'in_progress', 'ready'].includes(app.status) && (
+                      <StatusProgress status={app.status} />
+                    )}
+
+                    <div className="space-y-1 text-sm text-gray-500 mb-3 mt-2">
                       <div className="flex justify-between items-center">
                         <span>К оплате:</span>
                         <span className="text-base font-semibold text-gray-800">
