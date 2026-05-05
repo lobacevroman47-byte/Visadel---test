@@ -515,7 +515,7 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
       .eq('referred_by', referralCode)
       .order('created_at', { ascending: false }),
     // 2. Clicks count — via server-side API (bypasses RLS)
-    fetch(`/api/referral-clicks-count?code=${encodeURIComponent(referralCode)}`)
+    fetch(`/api/track-click?code=${encodeURIComponent(referralCode)}`)
       .then(r => r.ok ? r.json() : { count: 0 })
       .then((d: { count?: number }) => d.count ?? 0)
       .catch(() => 0),
