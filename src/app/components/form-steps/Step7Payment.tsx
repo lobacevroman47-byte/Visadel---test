@@ -41,7 +41,24 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
 
   const handleSaveDraft = () => {
     const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
-    localStorage.setItem(draftKey, JSON.stringify({ formData, step: 6, visa, urgent, savedAt: new Date().toISOString() }));
+    const draft = {
+      id: draftKey,
+      formData,
+      step: 5, // payment step (index in STEPS array)
+      visa,
+      urgent,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(draftKey, JSON.stringify(draft));
+
+    // Also save to drafts list for ApplicationsTab
+    const draftsKey = 'visa_drafts';
+    const existingDrafts = JSON.parse(localStorage.getItem(draftsKey) || '[]');
+    const draftIndex = existingDrafts.findIndex((d: { id?: string }) => d.id === draftKey);
+    if (draftIndex >= 0) existingDrafts[draftIndex] = draft;
+    else existingDrafts.push(draft);
+    localStorage.setItem(draftsKey, JSON.stringify(existingDrafts));
+
     alert('Черновик сохранён! Вернитесь позже.');
   };
 

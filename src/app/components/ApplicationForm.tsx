@@ -120,7 +120,9 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
       try {
         const parsed = JSON.parse(savedDraft);
         setFormData(parsed.formData);
-        setCurrentStep(parsed.step);
+        // Clamp step to valid range (0..STEPS.length-1) — handles legacy drafts with bad step values
+        const safeStep = Math.max(0, Math.min(parsed.step ?? 0, STEPS.length - 1));
+        setCurrentStep(safeStep);
         if (onContinueDraft) {
           onContinueDraft(parsed);
         }
