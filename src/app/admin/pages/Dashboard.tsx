@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   FileText, Users, Globe, TrendingUp, Wallet, PiggyBank, Coins, Loader2,
+  Info, ChevronDown,
 } from 'lucide-react';
 import { statusLabels } from '../data/mockData';
 import { useAdminApplications, useAdminUsers } from '../hooks/useAdminData';
@@ -50,6 +51,8 @@ const FinanceSection: React.FC = () => {
   const [period, setPeriod] = useState<Period>('30d');
   const [stats, setStats] = useState<FinanceStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showRevenueFormula, setShowRevenueFormula] = useState(false);
+  const [showProfitFormula, setShowProfitFormula] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -97,34 +100,62 @@ const FinanceSection: React.FC = () => {
 
       {/* Hero metrics — Revenue / Profit / Bonuses owed */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        {/* Revenue */}
         <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-5 rounded-xl text-white">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Выручка</p>
-            <TrendingUp size={16} className="opacity-70" />
+            <button
+              type="button"
+              onClick={() => setShowRevenueFormula(v => !v)}
+              className="p-1 -m-1 rounded hover:bg-white/10 transition flex items-center gap-1 text-xs opacity-80 hover:opacity-100"
+              aria-label="Показать формулу выручки"
+            >
+              <Info size={14} />
+              <ChevronDown size={12} className={`transition-transform ${showRevenueFormula ? 'rotate-180' : ''}`} />
+            </button>
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.revenue ?? 0)}</p>
           <p className="text-xs opacity-75 mt-1">{stats?.paidApplicationsCount ?? 0} оплачено · после скидок бонусами</p>
+          {showRevenueFormula && (
+            <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 leading-relaxed">
+              <p className="font-semibold opacity-90">Как считается выручка:</p>
+              <p className="font-mono opacity-80">price − bonuses_used</p>
+              <p className="opacity-80">Сумма по всем оплаченным заявкам (статусы in_progress + ready) с учётом списанных клиентом бонусов.</p>
+              <p className="opacity-80 pt-1">Бонусы списанные клиентом уменьшают выручку — это уже потерянная нами скидка.</p>
+            </div>
+          )}
         </div>
 
-        <div
-          className={`p-5 rounded-xl text-white bg-gradient-to-br cursor-help ${(stats?.profit ?? 0) >= 0 ? 'from-emerald-500 to-emerald-700' : 'from-red-500 to-red-700'}`}
-          title={`Формула прибыли:
-Выручка (${fmtRub(stats?.revenue ?? 0)})
-− Себестоимость (${fmtRub(stats?.costOfGoods ?? 0)})
-− Налог (${fmtRub(stats?.taxes ?? 0)})
-− Партнёрам (${fmtRub(stats?.commissionsPaid ?? 0)})
-= Прибыль (${fmtRub(stats?.profit ?? 0)})
-
-Бонусы клиентов уже учтены в выручке (price − bonuses_used).`}
-        >
+        {/* Profit */}
+        <div className={`p-5 rounded-xl text-white bg-gradient-to-br ${(stats?.profit ?? 0) >= 0 ? 'from-emerald-500 to-emerald-700' : 'from-red-500 to-red-700'}`}>
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Прибыль</p>
-            <PiggyBank size={16} className="opacity-70" />
+            <button
+              type="button"
+              onClick={() => setShowProfitFormula(v => !v)}
+              className="p-1 -m-1 rounded hover:bg-white/10 transition flex items-center gap-1 text-xs opacity-80 hover:opacity-100"
+              aria-label="Показать формулу прибыли"
+            >
+              <Info size={14} />
+              <ChevronDown size={12} className={`transition-transform ${showProfitFormula ? 'rotate-180' : ''}`} />
+            </button>
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.profit ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">маржа {margin}% · выручка − себест. − налог − партнёрам</p>
+          <p className="text-xs opacity-75 mt-1">маржа {margin}%</p>
+          {showProfitFormula && (
+            <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 leading-relaxed font-mono">
+              <p className="font-sans font-semibold opacity-90 mb-2">Формула прибыли:</p>
+              <p className="opacity-90">Выручка <span className="float-right">{fmtRub(stats?.revenue ?? 0)}</span></p>
+              <p className="opacity-80">− Себестоимость виз/билетов <span className="float-right">−{fmtRub(stats?.costOfGoods ?? 0)}</span></p>
+              <p className="opacity-80">− Налог (УСН) <span className="float-right">−{fmtRub(stats?.taxes ?? 0)}</span></p>
+              <p className="opacity-80">− Партнёрам (профит-шеринг) <span className="float-right">−{fmtRub(stats?.commissionsPaid ?? 0)}</span></p>
+              <p className="font-semibold opacity-100 pt-1 border-t border-white/20">= Прибыль <span className="float-right">{fmtRub(stats?.profit ?? 0)}</span></p>
+              <p className="font-sans opacity-75 pt-2 leading-snug">Себестоимость = ($сбор + $комиссия) × курс USD заявки + себест. аддонов (билет 780₽ и т.д.). Бонусы клиентов уже учтены в выручке.</p>
+            </div>
+          )}
         </div>
 
+        {/* Bonuses owed */}
         <div className="bg-gradient-to-br from-amber-500 to-amber-700 p-5 rounded-xl text-white">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs uppercase tracking-wider opacity-80">Бонусы у юзеров</p>

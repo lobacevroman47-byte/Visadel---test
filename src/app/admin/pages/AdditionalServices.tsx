@@ -84,8 +84,11 @@ export const AdditionalServices: React.FC = () => {
                   {s.description && <p className="text-xs text-gray-500 mt-0.5">{s.description}</p>}
                   <p className="text-xs text-gray-400 font-mono mt-0.5">{s.id}</p>
                 </div>
-                <div className="text-blue-600 font-semibold whitespace-nowrap">
-                  +{s.price.toLocaleString('ru-RU')} ₽
+                <div className="text-right whitespace-nowrap">
+                  <div className="text-blue-600 font-semibold">+{s.price.toLocaleString('ru-RU')} ₽</div>
+                  {s.cost_rub > 0 && (
+                    <div className="text-xs text-gray-400">себест. {s.cost_rub.toLocaleString('ru-RU')} ₽</div>
+                  )}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -141,7 +144,7 @@ const ServiceFormModal: React.FC<{
   const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
     service ?? {
       id: '', name: '', icon: '⭐', description: '',
-      price: 0, enabled: true, sort_order: 0,
+      price: 0, cost_rub: 0, enabled: true, sort_order: 0,
     }
   );
   const [saving, setSaving] = useState(false);
@@ -218,7 +221,7 @@ const ServiceFormModal: React.FC<{
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Цена ₽ *</label>
+              <label className="block text-sm text-gray-700 mb-1">Цена для клиента ₽ *</label>
               <input
                 type="number" value={form.price} min={0}
                 onChange={e => set('price', parseInt(e.target.value, 10) || 0)}
@@ -226,13 +229,22 @@ const ServiceFormModal: React.FC<{
               />
             </div>
             <div>
-              <label className="block text-sm text-gray-700 mb-1">Порядок</label>
+              <label className="block text-sm text-gray-700 mb-1">Себестоимость ₽</label>
               <input
-                type="number" value={form.sort_order} min={0}
-                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                type="number" value={form.cost_rub} min={0}
+                onChange={e => set('cost_rub', parseFloat(e.target.value) || 0)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
+              <p className="text-xs text-gray-400 mt-1">Сколько мы тратим на эту услугу (для финансов)</p>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Порядок отображения</label>
+            <input
+              type="number" value={form.sort_order} min={0}
+              onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+            />
           </div>
 
           <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">

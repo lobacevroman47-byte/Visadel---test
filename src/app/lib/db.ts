@@ -1073,12 +1073,26 @@ export interface AdditionalService {
   name: string;
   icon: string | null;
   description: string | null;
-  price: number;
+  price: number;          // что платит клиент
+  cost_rub: number;       // что платим мы (себестоимость, ₽). Учитывается в финансах
   enabled: boolean;
   sort_order: number;
   created_at?: string;
   updated_at?: string;
 }
+
+// Бизнес-модель аддонов (источник истины — таблица additional_services):
+//
+//   urgent-processing  ⚡  Срочное оформление
+//     price 1000₽  · cost ?₽   (cost не задан — впишет владелец)
+//
+//   hotel-booking      🏨  Подтверждение проживания
+//     price 1000₽  · cost ?₽
+//
+//   flight-booking     ✈️  Обратный билет
+//     price 2000₽  · cost 780₽  (себестоимость самого билета)
+//     ─ налог 4% берётся с полной цены 2000₽ = 80₽
+//     ─ прибыль с одного билета: 2000 − 780 − 80 = 1140₽
 
 export async function getAdditionalServices(): Promise<AdditionalService[]> {
   if (!isSupabaseConfigured()) return [];
@@ -1137,7 +1151,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   // Apps query — only paid statuses count toward revenue
   let appsQ = supabase
     .from('applications')
-    .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub, tax_pct')
+    .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub, tax_pct, form_data')
     .in('status', ['in_progress', 'ready']);
   if (sinceISO) appsQ = appsQ.gte('updated_at', sinceISO);
 
@@ -1151,24 +1165,39 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   // Product cost lookup
   const productsQ = supabase.from('visa_products').select('id, cost_usd_fee, cost_usd_commission');
 
-  const [appsRes, bonusRes, balanceRes, productsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ]);
+  // Addon cost lookup (urgent / hotel / ticket — keyed by service ID, value is RUB cost we pay)
+  const addonsQ = supabase.from('additional_services').select('id, cost_rub');
 
-  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null; tax_pct: number | null }>;
+  const [appsRes, bonusRes, balanceRes, productsRes, addonsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ, addonsQ]);
+
+  const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null; tax_pct: number | null; form_data: Record<string, unknown> | null }>;
   const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
   const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
   const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
+  const addons = (addonsRes.data ?? []) as Array<{ id: string; cost_rub: number }>;
 
   // USD cost (in dollars) per visa; converted to RUB per-app using each app's own usd_rate_rub
   const usdCostByVisa = new Map<string, number>();
   for (const p of products) {
     usdCostByVisa.set(p.id, (p.cost_usd_fee ?? 0) + (p.cost_usd_commission ?? 0));
   }
+  // RUB cost per addon ID (urgent-processing / hotel-booking / flight-booking)
+  const addonCostById = new Map<string, number>();
+  for (const a of addons) addonCostById.set(a.id, a.cost_rub ?? 0);
 
-  // Compute per-app cost in RUB using that app's snapshotted USD rate
-  const costForApp = (a: { visa_id: string; usd_rate_rub: number | null }) => {
+  // Compute per-app cost in RUB:
+  // — visa cost (USD × per-app rate)
+  // — plus actual addon costs from form_data (e.g., flight ticket = 780₽)
+  const costForApp = (a: { visa_id: string; usd_rate_rub: number | null; form_data: Record<string, unknown> | null }) => {
     const usd = usdCostByVisa.get(a.visa_id) ?? 0;
     const rate = a.usd_rate_rub ?? BONUS_CONFIG.USD_RATE_RUB;
-    return usd * rate;
+    let total = usd * rate;
+
+    const addOns = (a.form_data?.additionalDocs ?? {}) as { urgentProcessing?: boolean; hotelBooking?: boolean; returnTicket?: boolean };
+    if (addOns.urgentProcessing) total += addonCostById.get('urgent-processing') ?? 0;
+    if (addOns.hotelBooking)     total += addonCostById.get('hotel-booking') ?? 0;
+    if (addOns.returnTicket)     total += addonCostById.get('flight-booking') ?? 0;
+    return total;
   };
 
   // Per-app tax (% of full sticker price, not net of bonuses — matches УСН/самозанятый base)
