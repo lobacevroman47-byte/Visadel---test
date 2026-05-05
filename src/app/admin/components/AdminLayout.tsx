@@ -97,17 +97,23 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
 
   return (
     <div className="flex h-screen bg-[#F5F7FA] overflow-hidden relative">
-      {/* Mobile Hamburger Button - Only show when menu is closed */}
-      {!isSidebarOpen && (
+      {/* Mobile top bar with hamburger — sits in document flow, doesn't overlap */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-30 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between">
         <button
           onClick={toggleSidebar}
-          className="lg:hidden fixed top-4 left-4 z-50 p-3.5 bg-[#3B5BFF] text-white rounded-xl shadow-lg hover:bg-[#4F2FE6] transition-all active:scale-95 hover:shadow-xl"
+          className="w-9 h-9 rounded-lg vd-grad text-white flex items-center justify-center active:scale-95 transition vd-shadow-cta"
           aria-label="Открыть меню"
-          title="Открыть меню"
         >
-          <Menu size={24} strokeWidth={2.5} />
+          <Menu size={18} strokeWidth={2.5} />
         </button>
-      )}
+        <div className="flex items-center gap-1.5">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-[#0F2A36] font-extrabold text-[15px] tracking-tight">VISADEL</span>
+        </div>
+        <span className="w-9" />
+      </div>
 
       {/* Backdrop for mobile */}
       {isSidebarOpen && (
@@ -119,8 +125,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       )}
 
       {/* Sidebar */}
-      <AdminSidebar 
-        activeSection={activeSection} 
+      <AdminSidebar
+        activeSection={activeSection}
         onSectionChange={(section) => {
           setActiveSection(section);
           closeSidebar();
@@ -129,8 +135,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         onClose={closeSidebar}
       />
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Main Content — pad-top on mobile so the fixed header doesn't cover content */}
+      <div className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         {renderContent()}
       </div>
     </div>

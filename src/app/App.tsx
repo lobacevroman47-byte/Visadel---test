@@ -5,6 +5,8 @@ import ApplicationForm from './components/ApplicationForm';
 import UserProfile from './components/UserProfile';
 import SriLankaExtensionForm from './components/SriLankaExtensionForm';
 import PartnerApplicationForm from './components/PartnerApplicationForm';
+import BottomNav, { type MainTab } from './components/BottomNav';
+import ComingSoon from './components/ComingSoon';
 import { AdminApp } from './admin/AdminApp';
 import { initializeUserData } from './utils/userData';
 import {
@@ -61,6 +63,7 @@ export interface VisaOption {
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('splash');
+  const [mainTab, setMainTab] = useState<MainTab>('visas');
   const [selectedVisa, setSelectedVisa] = useState<VisaOption | null>(null);
   const [urgentVisa, setUrgentVisa] = useState(false);
   const [prefilledAddons, setPrefilledAddons] = useState<{ urgent: boolean; hotel: boolean; ticket: boolean } | undefined>(undefined);
@@ -200,14 +203,53 @@ function App() {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
         {currentScreen === 'splash' && <SplashScreen />}
         {currentScreen === 'home' && (
-          <Home
-            onVisaSelect={handleVisaSelect}
-            onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-            onOpenReferrals={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
-            onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
-            onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
-            onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
-          />
+          <>
+            {mainTab === 'visas' && (
+              <div className="pb-20">
+                <Home
+                  onVisaSelect={handleVisaSelect}
+                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                  onOpenReferrals={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
+                  onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
+                  onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
+                  onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
+                />
+              </div>
+            )}
+            {mainTab === 'bookings' && (
+              <ComingSoon
+                title="Брони документов"
+                description="Бронь отеля и обратного билета как самостоятельный раздел. Пока эти услуги доступны при оформлении визы — на шаге калькулятора."
+                emoji="📋"
+                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+              />
+            )}
+            {mainTab === 'flights' && (
+              <ComingSoon
+                title="Авиабилеты"
+                description="Поиск и покупка авиабилетов в одном окне. Планируем подключить Aviasales API — будет полноценный поиск туда-обратно."
+                emoji="✈️"
+                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+              />
+            )}
+            {mainTab === 'hotels' && (
+              <ComingSoon
+                title="Отели"
+                description="Бронирование отелей по всему миру. Подключим Островок и Booking — будет фильтр по звёздам, цене и удобствам."
+                emoji="🏨"
+                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+              />
+            )}
+            {mainTab === 'insurance' && (
+              <ComingSoon
+                title="Страховки"
+                description="Туристические страховки на любой бюджет. Базовая, Стандарт и Премиум — подбираем под страну поездки."
+                emoji="🛡️"
+                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+              />
+            )}
+            <BottomNav active={mainTab} onChange={setMainTab} />
+          </>
         )}
         {currentScreen === 'application' && selectedVisa && (
           <ApplicationForm
