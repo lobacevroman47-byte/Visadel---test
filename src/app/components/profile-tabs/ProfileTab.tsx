@@ -393,6 +393,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             ['💳', 'При заказе можно оплатить до 500₽ бонусами'],
             ['👫', '+500₽ за друга с оплаченной визой'],
             ['⭐', '+200₽ за оставленный отзыв'],
+            ['🌟', 'Партнёрам — до 20% с каждого заказа'],
           ].map(([icon, text]) => (
             <div key={text} className="flex items-start gap-2">
               <span>{icon}</span>

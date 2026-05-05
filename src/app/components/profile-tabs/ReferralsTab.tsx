@@ -1,108 +1,91 @@
-import { useState, useEffect } from 'react';
-import { Users, Copy, TrendingUp, Award, Share2 } from 'lucide-react';
-
-interface Referral {
-  id: string;
-  name: string;
-  joinedAt: string;
-  hasPaidVisa: boolean;
-  earnedBonus: number;
-}
-
-interface InfluencerStats {
-  totalReferrals: number;
-  paidReferrals: number;
-  totalEarnings: number;
-  clicks: number;
-}
-
-const TOP_INFLUENCERS = [
-  { name: 'Алексей М.', referrals: 127, earnings: 88900, avatar: '👨‍💼' },
-  { name: 'Мария К.', referrals: 95, earnings: 66500, avatar: '👩‍💼' },
-  { name: 'Дмитрий П.', referrals: 73, earnings: 51100, avatar: '👨‍💻' },
-];
+import { useEffect, useState } from 'react';
+import { Users, Copy, TrendingUp, Award, Share2, Loader2 } from 'lucide-react';
+import { useTelegram } from '../../App';
+import { getReferralStats, type ReferralStats } from '../../lib/db';
+import { BONUS_CONFIG } from '../../lib/bonus-config';
 
 interface ReferralTabProps {
   onOpenPartnerApplication?: () => void;
 }
 
+const BOT_USERNAME = 'Visadel_test_bot';
+
 export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabProps) {
-  const [referralCode] = useState('VISA' + Math.random().toString(36).substr(2, 6).toUpperCase());
-  const [referrals, setReferrals] = useState<Referral[]>([]);
-  const [stats, setStats] = useState<InfluencerStats>({
-    totalReferrals: 0,
-    paidReferrals: 0,
-    totalEarnings: 0,
-    clicks: 0,
+  const { appUser } = useTelegram();
+  const referralCode = appUser?.referral_code ?? '';
+  const isPartner = appUser?.is_influencer ?? false;
+  const myTelegramId = appUser?.telegram_id ?? 0;
+
+  const [stats, setStats] = useState<ReferralStats>({
+    totalReferrals: 0, paidReferrals: 0, totalEarnings: 0, referrals: [],
   });
-  const [isInfluencer, setIsInfluencer] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    const savedReferrals = localStorage.getItem('referrals');
-    if (savedReferrals) {
-      const refs = JSON.parse(savedReferrals);
-      setReferrals(refs);
-      calculateStats(refs);
+    if (!referralCode || !myTelegramId) { setLoading(false); return; }
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const s = await getReferralStats(referralCode, myTelegramId);
+        if (!cancelled) setStats(s);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [referralCode, myTelegramId]);
+
+  const link = `https://t.me/${BOT_USERNAME}?start=${referralCode}`;
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      alert('Не удалось скопировать. Скопируйте вручную: ' + link);
     }
-
-    const influencerStatus = localStorage.getItem('isInfluencer');
-    setIsInfluencer(influencerStatus === 'true');
-  }, []);
-
-  const calculateStats = (refs: Referral[]) => {
-    const paidRefs = refs.filter(r => r.hasPaidVisa);
-    const earnings = paidRefs.reduce((sum, r) => sum + r.earnedBonus, 0);
-    setStats({
-      totalReferrals: refs.length,
-      paidReferrals: paidRefs.length,
-      totalEarnings: earnings,
-      clicks: Math.floor(Math.random() * 100) + refs.length * 3, // Mock clicks
-    });
   };
 
-  const handleCopyLink = () => {
-    const link = `https://t.me/visadelagency_bot?start=${referralCode}`;
-    navigator.clipboard.writeText(link);
-    alert('Реферальная ссылка скопирована!');
-  };
-
-  const handleShare = () => {
-    const link = `https://t.me/visadelagency_bot?start=${referralCode}`;
-    const text = `Оформляй визу легко с Visadel Agency! 
-🎁 Получи скидку по моей ссылке: ${link}`;
-    
+  const handleShare = async () => {
+    const text = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке: ${link}`;
+    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void } } }).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(text)}`);
+      return;
+    }
     if (navigator.share) {
-      navigator.share({
-        title: 'Visadel Agency',
-        text: text,
-      });
-    } else {
-      navigator.clipboard.writeText(text);
-      alert('Текст для приглашения скопирован!');
+      try { await navigator.share({ title: 'Visadel Agency', text }); return; } catch {/* user cancelled */}
     }
+    await navigator.clipboard.writeText(text).catch(() => {});
+    alert('Текст для приглашения скопирован!');
   };
 
-  const bonusPerReferral = isInfluencer ? 700 : 300;
+  // Display amount per referral — partners see "%", regular users see fixed sum
+  const headlineRefBonus = isPartner
+    ? `до ${BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа`
+    : `+${BONUS_CONFIG.REFERRER_REGULAR}₽ за друга с оплаченной визой`;
 
-  const onApplyForPartner = () => {
-    // Add logic to handle partner application
-    if (onOpenPartnerApplication) {
-      onOpenPartnerApplication();
-    } else {
-      alert('Заявка на статус партнёра отправлена!');
-    }
-  };
+  if (!referralCode) {
+    return (
+      <div className="flex items-center justify-center py-20 text-sm text-gray-400">
+        <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем профиль…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Referral Link Card */}
+      {/* Hero Card */}
       <div className="bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg">
         <div className="flex items-center gap-3 mb-4">
           <Users className="w-8 h-8" />
           <div>
             <h3 className="text-xl">Реферальная программа</h3>
             <p className="text-blue-100 text-sm">
-              {isInfluencer ? 'Статус: Партнёр 🌟' : 'Приглашай друзей'}
+              {isPartner ? 'Статус: Партнёр 🌟' : 'Приглашай друзей'}
             </p>
           </div>
         </div>
@@ -110,109 +93,76 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         <div className="bg-white/20 rounded-lg p-4 mb-4 backdrop-blur-sm">
           <p className="text-sm text-blue-100 mb-2">Ваш реферальный код:</p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 bg-white/30 px-3 py-2 rounded text-lg">{referralCode}</code>
+            <code className="flex-1 bg-white/30 px-3 py-2 rounded text-base break-all">{referralCode}</code>
             <button
               onClick={handleCopyLink}
-              className="p-2 bg-white/30 hover:bg-white/40 rounded transition"
+              className="p-2 bg-white/30 hover:bg-white/40 rounded transition flex items-center gap-1"
+              title="Скопировать ссылку"
             >
               <Copy className="w-5 h-5" />
             </button>
           </div>
+          {copied && <p className="text-xs text-blue-50 mt-2">✓ Ссылка скопирована</p>}
         </div>
 
         <button
           onClick={handleShare}
-          className="w-full bg-white text-blue-600 py-3 rounded-lg hover:bg-blue-50 transition flex items-center justify-center gap-2"
+          className="w-full bg-white text-blue-600 py-3 rounded-lg hover:bg-blue-50 transition flex items-center justify-center gap-2 font-medium"
         >
-          <Share2 className="w-5 h-5" />
-          Поделиться ссылкой
+          <Share2 className="w-5 h-5" /> Поделиться ссылкой
         </button>
 
         <div className="mt-4 space-y-1 text-sm text-blue-100">
-          <p>• +{bonusPerReferral}₽ за каждого друга с оплаченной визой</p>
-          {!isInfluencer && <p>• +200₽ за оставленный отзыв</p>}
-          {!isInfluencer && <p>• Можно оплатить до 1000₽ бонусами</p>}
-          {isInfluencer && <p>• Полная оплата бонусами для инфлюенсеров</p>}
+          <p>• {headlineRefBonus}</p>
+          {!isPartner && <p>• +{BONUS_CONFIG.NEW_USER_WELCOME}₽ новичку при первой оплате</p>}
+          {!isPartner && <p>• Можно оплатить до {BONUS_CONFIG.MAX_BONUS_USAGE_REFERRAL_USER}₽ бонусами</p>}
+          {isPartner && <p>• 100% оплата визы бонусами</p>}
+          {isPartner && <p>• Подробные проценты по каждой услуге — в партнёрском кабинете</p>}
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-xl shadow-md p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Users className="w-5 h-5 text-blue-600" />
-            <span className="text-sm text-gray-600">Всего рефералов</span>
-          </div>
-          <p className="text-2xl text-gray-800">{stats.totalReferrals}</p>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-md p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <TrendingUp className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-gray-600">Оплатили визу</span>
-          </div>
-          <p className="text-2xl text-gray-800">{stats.paidReferrals}</p>
-        </div>
-
-        {isInfluencer && (
-          <>
-            <div className="bg-white rounded-xl shadow-md p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">👁️</span>
-                <span className="text-sm text-gray-600">Переходов</span>
-              </div>
-              <p className="text-2xl text-gray-800">{stats.clicks}</p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Award className="w-5 h-5 text-purple-600" />
-                <span className="text-sm text-gray-600">Заработано</span>
-              </div>
-              <p className="text-2xl text-gray-800">{stats.totalEarnings}₽</p>
-            </div>
-          </>
+        <StatCard icon={<Users className="w-5 h-5 text-blue-600" />} label="Всего рефералов" value={stats.totalReferrals} loading={loading} />
+        <StatCard icon={<TrendingUp className="w-5 h-5 text-green-600" />} label="Оплатили визу" value={stats.paidReferrals} loading={loading} />
+        <StatCard icon={<Award className="w-5 h-5 text-purple-600" />} label="Заработано" value={`${stats.totalEarnings}₽`} loading={loading} fullWidth={!isPartner} />
+        {isPartner && (
+          <StatCard
+            icon={<span className="text-base">📈</span>}
+            label="Конверсия"
+            value={stats.totalReferrals > 0 ? `${Math.round((stats.paidReferrals / stats.totalReferrals) * 100)}%` : '—'}
+            loading={loading}
+          />
         )}
       </div>
 
-      {!isInfluencer && stats.totalEarnings > 0 && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Заработано на рефералах</p>
-              <p className="text-2xl text-green-600">{stats.totalEarnings}₽</p>
-            </div>
-            <Award className="w-12 h-12 text-green-600" />
-          </div>
+      {/* Referrals list */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12 text-sm text-gray-400">
+          <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем рефералов…
         </div>
-      )}
-
-      {/* Referrals List */}
-      {referrals.length > 0 && (
+      ) : stats.referrals.length > 0 ? (
         <div>
           <h3 className="text-lg text-gray-800 mb-3">Ваши рефералы</h3>
           <div className="space-y-3">
-            {referrals.map((ref) => (
-              <div key={ref.id} className="bg-white rounded-xl shadow-md p-4">
+            {stats.referrals.map((ref) => (
+              <div key={ref.telegram_id} className="bg-white rounded-xl shadow-md p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-gray-800">{ref.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {new Date(ref.joinedAt).toLocaleDateString('ru-RU')}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-gray-800 truncate">{ref.name}</p>
+                    {ref.username && <p className="text-xs text-blue-500">@{ref.username}</p>}
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {new Date(ref.joined_at).toLocaleDateString('ru-RU')}
                     </p>
                   </div>
-                  <div className="text-right">
-                    {ref.hasPaidVisa ? (
+                  <div className="text-right ml-3">
+                    {ref.has_paid ? (
                       <>
-                        <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full">
-                          ✓ Оплачено
-                        </span>
-                        <p className="text-sm text-green-600 mt-1">+{ref.earnedBonus}₽</p>
+                        <span className="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full whitespace-nowrap">✓ Оплачено</span>
+                        {ref.earned_bonus > 0 && <p className="text-sm text-green-600 mt-1">+{ref.earned_bonus}₽</p>}
                       </>
                     ) : (
-                      <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full">
-                        В ожидании
-                      </span>
+                      <span className="bg-gray-100 text-gray-600 text-xs px-3 py-1 rounded-full whitespace-nowrap">В ожидании</span>
                     )}
                   </div>
                 </div>
@@ -220,72 +170,50 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             ))}
           </div>
         </div>
-      )}
-
-      {/* Top Influencers */}
-      {isInfluencer && (
-        <div>
-          <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
-            <Award className="w-5 h-5 text-yellow-500" />
-            Топ партнёров
-          </h3>
-          <div className="space-y-2">
-            {TOP_INFLUENCERS.map((influencer, idx) => (
-              <div
-                key={idx}
-                className={`bg-white rounded-xl shadow-md p-4 ${
-                  idx === 0 ? 'border-2 border-yellow-400' : ''
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{influencer.avatar}</span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-gray-800">{influencer.name}</p>
-                        {idx === 0 && <span className="text-yellow-500">👑</span>}
-                        {idx === 1 && <span className="text-gray-400">🥈</span>}
-                        {idx === 2 && <span className="text-orange-600">🥉</span>}
-                      </div>
-                      <p className="text-sm text-gray-500">{influencer.referrals} рефералов</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-lg text-green-600">{influencer.earnings}₽</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-4">
-            <p className="text-sm text-blue-800">
-              🏆 Топ-3 партнёра каждый месяц получают специальные призы!
-            </p>
-          </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-dashed border-gray-200 p-8 text-center">
+          <p className="text-gray-400 text-sm">Пока никто не пришёл по вашей ссылке</p>
+          <p className="text-gray-300 text-xs mt-1">Поделитесь ссылкой — за каждого друга будет бонус</p>
         </div>
       )}
 
-      {!isInfluencer && (
+      {/* Become a partner CTA — only for regular users */}
+      {!isPartner && (
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-xl p-4">
           <h4 className="text-gray-800 mb-2">Станьте партнёром! 🌟</h4>
           <p className="text-sm text-gray-600 mb-3">
-            Привлекайте аудиторию и зарабатывайте больше:
+            Если вы блогер или агент — зарабатывайте больше:
           </p>
           <ul className="text-sm text-gray-700 space-y-1 mb-3">
-            <li>• +700₽ за каждого оплатившего визу</li>
-            <li>• Полная оплата визы бонусами</li>
-            <li>• Статистика переходов и заявок</li>
-            <li>• Участие в топе с призами</li>
+            <li>• До {BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа (визы, отели, билеты, страховки)</li>
+            <li>• 100% оплата бонусами</li>
+            <li>• Статистика по каждому реферальному заказу</li>
+            <li>• Подробные проценты в партнёрском кабинете</li>
           </ul>
-          <button 
-            onClick={onApplyForPartner}
+          <button
+            onClick={onOpenPartnerApplication}
             className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 rounded-lg hover:shadow-lg transition"
           >
             Подать заявку на статус партнёра
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+function StatCard({
+  icon, label, value, loading, fullWidth,
+}: { icon: React.ReactNode; label: string; value: string | number; loading: boolean; fullWidth?: boolean }) {
+  return (
+    <div className={`bg-white rounded-xl shadow-md p-4 ${fullWidth ? 'col-span-2' : ''}`}>
+      <div className="flex items-center gap-2 mb-2">
+        {icon}
+        <span className="text-sm text-gray-600">{label}</span>
+      </div>
+      <p className="text-2xl text-gray-800">
+        {loading ? <Loader2 className="w-5 h-5 animate-spin text-gray-300" /> : value}
+      </p>
     </div>
   );
 }
