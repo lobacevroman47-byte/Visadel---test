@@ -74,7 +74,9 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     return () => { cancelled = true; };
   }, [referralCode, myTelegramId]);
 
-  const link = `https://t.me/${BOT_USERNAME}?start=${referralCode}`;
+  // Use ?startapp= so the MiniApp opens directly with start_param.
+  // ?start= would only open bot chat — start_param wouldn't reach the MiniApp.
+  const link = `https://t.me/${BOT_USERNAME}?startapp=${referralCode}`;
   const shareText = `Оформляй визу легко с Visadel Agency!\n🎁 По моей ссылке ты получишь 200₽ на первую визу: ${link}`;
 
   const copyLink = async () => {
