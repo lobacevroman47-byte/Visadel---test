@@ -11,11 +11,12 @@ interface Step7Props {
   visa: VisaOption;
   urgent: boolean;
   totalPrice: number;
+  addonPrices: { urgent: number; hotel: number; ticket: number };
   onPrev: () => void;
   onComplete: () => void;
 }
 
-export default function Step7Payment({ formData, visa, urgent, totalPrice, onPrev, onComplete }: Step7Props) {
+export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete }: Step7Props) {
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [useBonuses, setUseBonuses] = useState(false);
   const [bonusAmount, setBonusAmount] = useState(0);
@@ -209,9 +210,9 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, onPre
   };
 
   const breakdown = [{ label: visa.type, amount: visa.price }];
-  if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') breakdown.push({ label: 'Срочное оформление', amount: 1000 });
-  if (formData.additionalDocs.hotelBooking) breakdown.push({ label: 'Подтверждение бронирования', amount: 1000 });
-  if (formData.additionalDocs.returnTicket) breakdown.push({ label: 'Бронирование авиабилета', amount: 2000 });
+  if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') breakdown.push({ label: 'Срочное оформление', amount: addonPrices.urgent });
+  if (formData.additionalDocs.hotelBooking) breakdown.push({ label: 'Подтверждение бронирования', amount: addonPrices.hotel });
+  if (formData.additionalDocs.returnTicket) breakdown.push({ label: 'Бронирование авиабилета', amount: addonPrices.ticket });
 
   return (
     <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">

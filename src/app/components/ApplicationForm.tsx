@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
 import Step1BasicData from './form-steps/Step1BasicData';
+import { getAdditionalServices } from '../lib/db';
 import Step2AdditionalDocs from './form-steps/Step2AdditionalDocs';
 import Step4ContactInfo from './form-steps/Step4ContactInfo';
 import Step5PhotoUpload from './form-steps/Step5PhotoUpload';
@@ -74,6 +75,25 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   });
   const [draftId, setDraftId] = useState<string>('');
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  // Addon prices loaded from DB so admin changes propagate to total + breakdown
+  const [addonPrices, setAddonPrices] = useState({ urgent: 1000, hotel: 1000, ticket: 2000 });
+
+  useEffect(() => {
+    let alive = true;
+    getAdditionalServices()
+      .then(services => {
+        if (!alive) return;
+        const enabled = services.filter(s => s.enabled);
+        const byId = new Map(enabled.map(s => [s.id, s.price] as const));
+        setAddonPrices({
+          urgent: byId.get('urgent-processing') ?? 1000,
+          hotel:  byId.get('hotel-booking')     ?? 1000,
+          ticket: byId.get('flight-booking')    ?? 2000,
+        });
+      })
+      .catch(e => console.warn('addon prices load failed', e));
+    return () => { alive = false; };
+  }, []);
   const headerRef = useRef<HTMLDivElement>(null);
   const paymentReminderScheduled = useRef(false);
 
@@ -220,13 +240,13 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   const calculateTotal = () => {
     let total = visa.price;
     if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') {
-      total += 1000;
+      total += addonPrices.urgent;
     }
     if (formData.additionalDocs.hotelBooking) {
-      total += 1000;
+      total += addonPrices.hotel;
     }
     if (formData.additionalDocs.returnTicket) {
-      total += 2000;
+      total += addonPrices.ticket;
     }
     return total;
   };
@@ -335,6 +355,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
               visa={visa}
               urgent={urgent}
               totalPrice={calculateTotal()}
+              addonPrices={addonPrices}
               onPrev={goToPrevStep}
               onComplete={onBack}
             />
