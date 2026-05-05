@@ -30,12 +30,12 @@ const SidebarItem: React.FC<SidebarItemProps> = ({ icon, label, active, onClick,
       <button
         onClick={onClick}
         disabled={disabled}
-        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-          disabled 
-            ? 'opacity-40 cursor-not-allowed' 
-            : active 
-              ? 'bg-[#2196F3] text-white shadow-sm' 
-              : 'text-gray-700 hover:bg-[#F5F7FA]'
+        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all font-medium ${
+          disabled
+            ? 'opacity-40 cursor-not-allowed text-gray-500'
+            : active
+              ? 'vd-grad text-white shadow-md'
+              : 'text-[#0F2A36] hover:bg-[#F5F7FA]'
         }`}
         title={disabled ? 'Недостаточно прав' : ''}
       >
@@ -90,17 +90,22 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
       </button>
 
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
-        <h1 className="text-[#2196F3] pr-8">Visadel Agency</h1>
-        <p className="text-sm text-gray-500 mt-1">Админ-панель</p>
+      <div className="p-6 border-b border-gray-100">
+        <div className="flex items-center gap-2">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
+        </div>
+        <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mt-2">Админ-панель</p>
       </div>
 
       {/* User Info */}
       {currentUser && (
-        <div className="px-4 py-4 border-b border-gray-200">
-          <p className="text-sm pr-8">{currentUser.name}</p>
-          <p className="text-xs text-gray-500">{currentUser.telegram}</p>
-          <span className="inline-block mt-2 px-2 py-1 bg-[#F5F7FA] text-xs rounded">
+        <div className="px-4 py-4 border-b border-gray-100">
+          <p className="text-sm font-bold text-[#0F2A36] pr-8">{currentUser.name}</p>
+          <p className="text-xs text-gray-500 mt-0.5">{currentUser.telegram}</p>
+          <span className="inline-block mt-2 px-2.5 py-1 vd-grad-soft text-[#3B5BFF] text-[11px] font-bold uppercase tracking-wider rounded-full border border-blue-100/50">
             {currentUser.role === 'owner' ? 'Владелец' : currentUser.role === 'admin' ? 'Администратор' : 'Менеджер'}
           </span>
         </div>
