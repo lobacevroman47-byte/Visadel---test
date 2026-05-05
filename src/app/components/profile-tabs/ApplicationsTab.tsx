@@ -543,7 +543,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                     {app.status === 'pending_confirmation' && (
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                         <Clock className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
-                        <p className="text-sm text-blue-800">Ожидаем подтверждения оплаты — обычно до 3 часов</p>
+                        <p className="text-sm text-blue-800">Ожидаем подтверждения оплаты — обычно это занимает до 3-х часов</p>
                       </div>
                     )}
                   </div>
