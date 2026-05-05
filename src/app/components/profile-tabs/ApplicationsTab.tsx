@@ -283,7 +283,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
     load();
   };
 
-  // One-click: submit review + open Telegram + give 100₽ review bonus
+  // One-click: submit review + open Telegram + give 200₽ review bonus
   const handleQuickReview = async (app: Application) => {
     if (submittingReviewId) return;
     setSubmittingReviewId(app.id!);
@@ -509,7 +509,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                               {submittingReviewId === app.id
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
                                 : <Star className="w-4 h-4" />}
-                              Оставить отзыв (+100 ₽)
+                              Оставить отзыв (+200 ₽)
                             </button>
                           </div>
                         ) : (

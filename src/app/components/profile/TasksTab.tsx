@@ -21,8 +21,8 @@ export default function TasksTab() {
     {
       id: 3,
       title: 'Оставить отзыв',
-      description: 'Оставьте отзыв о нашем сервисе и получите 100₽',
-      reward: 100,
+      description: 'Оставьте отзыв о нашем сервисе и получите 200₽',
+      reward: 200,
       completed: false,
       icon: '⭐',
     },

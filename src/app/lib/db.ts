@@ -434,13 +434,13 @@ export async function submitReview(params: {
       text: params.text,
       status: 'pending',
     });
-    await addBonuses(params.telegramId, 100);
+    // Bonus is granted by the caller via /api/grant-bonus (with dedup) — don't add here
   } else {
     const reviews = lsGet<unknown[]>('vd_reviews', []);
     reviews.push({ ...params, id: crypto.randomUUID(), created_at: new Date().toISOString() });
     lsSet('vd_reviews', reviews);
     const user = lsGet<AppUser | null>(LS_KEY, null);
-    if (user) { user.bonus_balance = (user.bonus_balance ?? 0) + 100; lsSet(LS_KEY, user); }
+    if (user) { user.bonus_balance = (user.bonus_balance ?? 0) + 200; lsSet(LS_KEY, user); }
   }
 
   // Post to Telegram channel @visadel_recall
