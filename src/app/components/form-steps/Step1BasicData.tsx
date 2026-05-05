@@ -1,17 +1,31 @@
 import { useState, useEffect } from 'react';
-import { ChevronRight, Plus, X } from 'lucide-react';
+import { ChevronRight, Plus, X, Loader2 } from 'lucide-react';
 import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
+import { getFormFields, type VisaFormField } from '../../lib/db';
 
 interface Step1Props {
   country: string;
+  visaId?: string;
   data: Record<string, any>;
   onChange: (data: Record<string, any>) => void;
   onNext: () => void;
 }
 
-export default function Step1BasicData({ country, data, onChange, onNext }: Step1Props) {
+export default function Step1BasicData({ country, visaId, data, onChange, onNext }: Step1Props) {
   const [formData, setFormData] = useState(data);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // DB-driven fields. While loading or empty, fall back to hardcoded per-country forms.
+  const [dbFields, setDbFields] = useState<VisaFormField[]>([]);
+  const [dbLoaded, setDbLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getFormFields(country, visaId)
+      .then(f => { if (alive) setDbFields(f); })
+      .catch(e => console.warn('form fields load error', e))
+      .finally(() => { if (alive) setDbLoaded(true); });
+    return () => { alive = false; };
+  }, [country, visaId]);
 
   useEffect(() => {
     onChange(formData);
@@ -32,7 +46,10 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
   };
 
   const validateAndNext = () => {
-    const requiredFields = getRequiredFields(country);
+    // If DB is the source of truth, derive required fields from there
+    const requiredFields = dbFields.length > 0
+      ? ['firstName', 'lastName', ...dbFields.filter(f => f.required).map(f => f.field_key)]
+      : getRequiredFields(country);
     const newErrors: Record<string, string> = {};
 
     requiredFields.forEach(field => {
@@ -102,15 +119,27 @@ export default function Step1BasicData({ country, data, onChange, onNext }: Step
         </div>
       </div>
 
-      {country === 'Индия' && <IndiaForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Вьетнам' && <VietnamForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Шри-Ланка' && <SriLankaForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Южная Корея' && <KoreaForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Израиль' && <IsraelForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Пакистан' && <PakistanForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Камбоджа' && <CambodiaForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Кения' && <KenyaForm formData={formData} updateField={updateField} errors={errors} />}
-      {country === 'Филиппины' && <PhilippinesForm formData={formData} updateField={updateField} errors={errors} />}
+      {/* While DB load is in flight, show a spinner. After it settles, prefer DB-driven
+          DynamicForm; fall back to legacy hardcoded country form only if DB has nothing
+          for this country/visa. Once admin runs «Импортировать из кода» in FormBuilder,
+          the legacy path goes away naturally. */}
+      {!dbLoaded ? (
+        <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
+      ) : dbFields.length > 0 ? (
+        <DynamicForm fields={dbFields} formData={formData} updateField={updateField} errors={errors} />
+      ) : (
+        <>
+          {country === 'Индия' && <IndiaForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Вьетнам' && <VietnamForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Шри-Ланка' && <SriLankaForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Южная Корея' && <KoreaForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Израиль' && <IsraelForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Пакистан' && <PakistanForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Камбоджа' && <CambodiaForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Кения' && <KenyaForm formData={formData} updateField={updateField} errors={errors} />}
+          {country === 'Филиппины' && <PhilippinesForm formData={formData} updateField={updateField} errors={errors} />}
+        </>
+      )}
 
       <div className="mt-6">
         <label className="block mb-2 text-gray-700">
@@ -1836,5 +1865,111 @@ function FormField({
       {children}
       {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
     </div>
+  );
+}
+// ─── Generic DB-driven form renderer ──────────────────────────────────────────
+// Used when admin has populated visa_form_fields in DB (via FormBuilder).
+// Dispatches by field_type to existing widgets so we keep the same visual style.
+function DynamicForm({
+  fields, formData, updateField, errors,
+}: {
+  fields: VisaFormField[];
+  formData: Record<string, any>;
+  updateField: (k: string, v: any) => void;
+  errors: Record<string, string>;
+}) {
+  return (
+    <div className="space-y-4">
+      {fields.map(f => (
+        <DynamicField
+          key={f.id}
+          field={f}
+          value={formData[f.field_key]}
+          onChange={(v) => updateField(f.field_key, v)}
+          error={errors[f.field_key]}
+        />
+      ))}
+    </div>
+  );
+}
+
+function DynamicField({
+  field, value, onChange, error,
+}: {
+  field: VisaFormField;
+  value: any;
+  onChange: (v: any) => void;
+  error?: string;
+}) {
+  const { field_type, label, required, placeholder, comment, options, warning } = field;
+  const placeholderStr = placeholder ?? "";
+
+  let input: React.ReactNode;
+  switch (field_type) {
+    case "citizenship":
+      input = <CitizenshipSelect value={value || ""} onChange={onChange} error={error} />;
+      break;
+    case "countries-multi":
+      input = <CountriesMultiSelect value={value || []} onChange={onChange} />;
+      break;
+    case "south-asia-visits":
+      input = <SouthAsiaVisitsSelect value={value || []} onChange={onChange} />;
+      break;
+    case "date":
+      input = <DateInput value={value || ""} onChange={onChange} />;
+      break;
+    case "textarea":
+      input = (
+        <textarea
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholderStr}
+          className="form-input min-h-[80px]"
+          rows={3}
+        />
+      );
+      break;
+    case "select":
+      input = (
+        <select value={value || ""} onChange={(e) => onChange(e.target.value)} className="form-input">
+          <option value="">Выберите...</option>
+          {(options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+      );
+      break;
+    case "radio":
+      input = (
+        <div className="space-y-2">
+          {(options ?? []).map(o => (
+            <label key={o} className="flex items-center gap-2 cursor-pointer">
+              <input type="radio" name={field.id} value={o} checked={value === o} onChange={() => onChange(o)} />
+              <span>{o}</span>
+            </label>
+          ))}
+        </div>
+      );
+      break;
+    case "file":
+      input = (
+        <input type="file" onChange={(e) => onChange(e.target.files?.[0] || null)} className="form-input" />
+      );
+      break;
+    default:
+      input = (
+        <input
+          type={field_type}
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholderStr}
+          className="form-input"
+        />
+      );
+  }
+
+  return (
+    <FormField label={label} required={required} hint={comment ?? undefined} error={error}>
+      {input}
+      {warning && <p className="text-sm text-amber-600 mt-1">{warning}</p>}
+    </FormField>
   );
 }

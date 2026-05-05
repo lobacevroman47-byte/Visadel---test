@@ -288,6 +288,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
           {currentStep === 0 && (
             <Step1BasicData
               country={visa.country}
+              visaId={visa.id}
               data={formData.basicData}
               onChange={(data) => updateFormData('basicData', data)}
               onNext={goToNextStep}
