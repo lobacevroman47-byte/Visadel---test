@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, ChevronRight, ChevronDown, Calculator, Check } from 'lucide-react';
 import type { VisaOption } from '../App';
@@ -370,12 +370,23 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [showUrgentVietnam, setShowUrgentVietnam] = useState(false);
   const [showExtensions, setShowExtensions] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to top after any screen transition — runs after render
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop = 0;
+    }
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, [selectedCountry, showUrgentVietnam, showExtensions]);
 
   const handleCountryClick = (country: Country) => {
     setSelectedCountry(country);
     setShowUrgentVietnam(false);
     setShowExtensions(false);
-    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   const handleBackFromCountry = () => {
@@ -386,11 +397,10 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenExtension, onO
     } else {
       setSelectedCountry(null);
     }
-    window.scrollTo({ top: 0, behavior: 'instant' });
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] pb-20">
+    <div ref={scrollRef} className="min-h-screen bg-[#F5F7FA] pb-20" style={{ overflowAnchor: 'none' }}>
       {/* Header */}
       <div className="bg-white sticky top-0 z-10 shadow-md border-b border-gray-100">
         <div className="relative px-3 overflow-hidden" style={{ height: '110px' }}>
