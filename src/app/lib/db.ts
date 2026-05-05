@@ -536,15 +536,14 @@ export async function toggleVisaProductEnabled(id: string, enabled: boolean): Pr
 }
 
 // Seed catalog from hardcoded countriesData.ts on first install / reset
-export async function seedVisaProductsFromCode(force = false): Promise<{ inserted: number; skipped: number }> {
-  if (!isSupabaseConfigured()) return { inserted: 0, skipped: 0 };
+export async function seedVisaProductsFromCode(force = false, dataset?: { countriesVisaData: { id: string; name: string; flag: string; visaTypes: { id: string; name: string; price: number; processingTime: string; description?: string }[] }[] }): Promise<{ inserted: number; skipped: number; error?: string }> {
+  if (!isSupabaseConfigured()) return { inserted: 0, skipped: 0, error: 'Supabase не настроен' };
   const existing = await getVisaProducts();
   if (existing.length > 0 && !force) return { inserted: 0, skipped: existing.length };
 
-  // Lazy-import to avoid bundling admin data unless this seed is called
-  const { countriesVisaData } = await import('../admin/data/countriesData');
+  if (!dataset) return { inserted: 0, skipped: 0, error: 'Не передан dataset' };
   const rows: Omit<VisaProduct, 'created_at' | 'updated_at'>[] = [];
-  countriesVisaData.forEach((country, ci) => {
+  dataset.countriesVisaData.forEach((country, ci) => {
     country.visaTypes.forEach((v, vi) => {
       rows.push({
         id: v.id,
@@ -561,9 +560,12 @@ export async function seedVisaProductsFromCode(force = false): Promise<{ inserte
     });
   });
 
-  if (rows.length === 0) return { inserted: 0, skipped: 0 };
+  if (rows.length === 0) return { inserted: 0, skipped: 0, error: 'Нет данных для импорта' };
   const { error } = await supabase.from('visa_products').upsert(rows, { onConflict: 'id' });
-  if (error) { console.error('seed error', error); return { inserted: 0, skipped: 0 }; }
+  if (error) {
+    console.error('seed error', error);
+    return { inserted: 0, skipped: 0, error: error.message ?? String(error) };
+  }
   return { inserted: rows.length, skipped: 0 };
 }
 

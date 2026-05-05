@@ -11,6 +11,7 @@ import {
   seedVisaProductsFromCode,
   type VisaProduct,
 } from '../../lib/db';
+import { countriesVisaData } from '../data/countriesData';
 
 export const Countries: React.FC = () => {
   const [products, setProducts] = useState<VisaProduct[]>([]);
@@ -52,9 +53,18 @@ export const Countries: React.FC = () => {
     if (!confirm('Загрузить визы из хардкода в БД? Существующие записи не будут перезаписаны.')) return;
     setSeeding(true);
     try {
-      const r = await seedVisaProductsFromCode();
-      alert(`Импортировано: ${r.inserted}, уже было: ${r.skipped}`);
+      console.log('[seed] starting, countriesVisaData length:', countriesVisaData?.length);
+      const r = await seedVisaProductsFromCode(false, { countriesVisaData });
+      console.log('[seed] result:', r);
+      if (r.error) {
+        alert(`Ошибка импорта:\n${r.error}\n\nВозможные причины:\n— Таблица visa_products не создана в Supabase\n— RLS блокирует запись\n\nЗапусти SQL из инструкции и попробуй снова.`);
+      } else {
+        alert(`✅ Импортировано: ${r.inserted}\nУже было в БД: ${r.skipped}`);
+      }
       await load();
+    } catch (e) {
+      console.error('[seed] exception:', e);
+      alert(`Не удалось импортировать:\n${e instanceof Error ? e.message : String(e)}`);
     } finally { setSeeding(false); }
   };
 
