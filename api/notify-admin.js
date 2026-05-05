@@ -6,18 +6,35 @@
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 
-async function getAdminIds() {
-  if (!SUPABASE_URL || !SERVICE_KEY) return [];
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?select=telegram_id`, {
-      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
-    });
-    const data = await r.json();
-    return Array.isArray(data) ? data.map(u => u.telegram_id).filter(Boolean) : [];
-  } catch (err) {
-    console.warn('[notify-admin] failed to fetch admin ids', err);
-    return [];
+// Founders come from env (VITE_ADMIN_TELEGRAM_IDS or ADMIN_TELEGRAM_IDS).
+// They are NOT stored in admin_users table — must merge them in manually.
+function getFounderIds() {
+  const raw = process.env.VITE_ADMIN_TELEGRAM_IDS ?? process.env.ADMIN_TELEGRAM_IDS ?? '';
+  return raw.split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+    .map(Number)
+    .filter(n => Number.isFinite(n));
+}
+
+// All staff (founders + admins + moderators), deduplicated.
+async function getAllStaffIds() {
+  const founders = getFounderIds();
+  let dbAdmins = [];
+  if (SUPABASE_URL && SERVICE_KEY) {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/admin_users?select=telegram_id`, {
+        headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+      });
+      const data = await r.json();
+      if (Array.isArray(data)) {
+        dbAdmins = data.map(u => Number(u.telegram_id)).filter(n => Number.isFinite(n));
+      }
+    } catch (err) {
+      console.warn('[notify-admin] failed to fetch admin_users', err);
+    }
   }
+  return Array.from(new Set([...founders, ...dbAdmins]));
 }
 
 async function sendTg(token, chat_id, text, reply_markup) {
@@ -71,17 +88,17 @@ export default async function handler(req, res) {
     ]],
   } : undefined;
 
-  const admins = await getAdminIds();
-  if (admins.length === 0) {
-    console.warn('[notify-admin] no admins to notify');
-    res.status(200).json({ ok: true, sent: 0, warn: 'no_admins' });
+  const recipients = await getAllStaffIds();
+  if (recipients.length === 0) {
+    console.warn('[notify-admin] no staff to notify (no founders in env, no admin_users rows)');
+    res.status(200).json({ ok: true, sent: 0, warn: 'no_staff' });
     return;
   }
 
   const results = await Promise.all(
-    admins.map(id => sendTg(token, id, text, reply_markup))
+    recipients.map(id => sendTg(token, id, text, reply_markup))
   );
   const sent = results.filter(r => r.ok).length;
-  console.log(`[notify-admin] event=${event} sent=${sent}/${admins.length}`);
-  res.status(200).json({ ok: true, sent, total: admins.length });
+  console.log(`[notify-admin] event=${event} sent=${sent}/${recipients.length} (founders + admin_users)`);
+  res.status(200).json({ ok: true, sent, total: recipients.length });
 }
