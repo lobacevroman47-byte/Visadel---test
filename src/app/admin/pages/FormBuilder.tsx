@@ -162,11 +162,11 @@ export const FormBuilder: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 flex items-start gap-3">
-        <AlertCircle className="text-amber-600 mt-0.5 shrink-0" size={18} />
-        <p className="text-sm text-amber-900">
-          Юзеры на главной пока заполняют формы из кода. Сейчас здесь — административное хранилище.
-          На следующем шаге переключим юзерский рендер на этот источник, и изменения станут видны клиентам сразу.
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-5 flex items-start gap-3">
+        <AlertCircle className="text-emerald-600 mt-0.5 shrink-0" size={18} />
+        <p className="text-sm text-emerald-900">
+          ✓ Изменения здесь сразу видны клиентам в анкете на странице визы. Если страна
+          ещё не импортирована — клиент видит старую версию из кода (fallback).
         </p>
       </div>
 
