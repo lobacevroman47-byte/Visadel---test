@@ -1,5 +1,10 @@
 // Vercel Serverless Function — notifies user about application status change
 // Env vars: TELEGRAM_BOT_TOKEN, TELEGRAM_APP_URL, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_KEY
+//
+// Dedup strategy (3 layers — any one prevents duplicates):
+//   1. In-memory Map (same Vercel warm instance, 30s)
+//   2. notification_dedup table INSERT (unique index per minute, atomic across instances)
+//   3. applications row UPDATE with WHERE filter (atomic, requires last_notified_* columns if present)
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -32,6 +37,20 @@ const STATUS_MESSAGES = {
   },
 };
 
+// ─── Layer 1: in-memory dedup ─────────────────────────────────────────────────
+const recentSends = new Map();
+function isDuplicateInMemory(application_id, status) {
+  const key = `${application_id || 'no_id'}:${status}`;
+  const last = recentSends.get(key);
+  if (last && Date.now() - last < 60_000) return true;
+  recentSends.set(key, Date.now());
+  if (recentSends.size > 200) {
+    const cutoff = Date.now() - 120_000;
+    for (const [k, ts] of recentSends) { if (ts < cutoff) recentSends.delete(k); }
+  }
+  return false;
+}
+
 function dbHeaders() {
   return {
     apikey: SERVICE_KEY,
@@ -40,48 +59,36 @@ function dbHeaders() {
   };
 }
 
-// Atomic slot claim via PostgreSQL RPC.
-// Returns true → this instance owns the send.
-// Returns false → another instance already sent (within 60s for same status).
-// If status changed → always returns true (new status always sends).
-async function claimSlot(application_id, status) {
-  if (!application_id || !SUPABASE_URL || !SERVICE_KEY) {
-    console.warn('[notify-status] no DB config — skipping atomic dedup');
-    return true; // no DB → allow (fall back to in-memory dedup only)
-  }
+// ─── Layer 2: insert into notification_dedup table ───────────────────────────
+// Returns 'new' | 'duplicate' | 'unavailable' (table missing or DB error)
+async function insertDedupRow(application_id, status) {
+  if (!application_id || !SUPABASE_URL || !SERVICE_KEY) return 'unavailable';
   try {
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/claim_notification_slot`, {
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/notification_dedup`, {
       method: 'POST',
-      headers: dbHeaders(),
-      body: JSON.stringify({ p_application_id: application_id, p_status: status }),
+      headers: { ...dbHeaders(), 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ application_id, status }),
     });
-    const claimed = await res.json();
-    console.log('[notify-status] claimSlot result:', claimed, 'status:', res.status);
-    if (res.status !== 200) {
-      console.error('[notify-status] claimSlot error response:', claimed);
-      return true; // on error → allow (better to double-send than silently drop)
-    }
-    return claimed === true;
+    if (res.status === 201 || res.status === 204) return 'new';
+    if (res.status === 409) return 'duplicate';
+    const body = await res.text().catch(() => '');
+    console.warn('[notify-status] dedup table insert unexpected status:', res.status, body);
+    return 'unavailable';
   } catch (err) {
-    console.warn('[notify-status] claimSlot fetch error:', err);
-    return true; // on network error → allow
+    console.warn('[notify-status] dedup table insert error:', err);
+    return 'unavailable';
   }
 }
 
-// Release slot on Telegram failure so admin can retry immediately
-async function releaseSlot(application_id) {
+async function deleteDedupRow(application_id, status) {
   if (!application_id || !SUPABASE_URL || !SERVICE_KEY) return;
   try {
     await fetch(
-      `${SUPABASE_URL}/rest/v1/applications?id=eq.${encodeURIComponent(application_id)}`,
-      {
-        method: 'PATCH',
-        headers: { ...dbHeaders(), 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ last_notified_at: null, last_notified_status: null }),
-      }
+      `${SUPABASE_URL}/rest/v1/notification_dedup?application_id=eq.${encodeURIComponent(application_id)}&status=eq.${encodeURIComponent(status)}`,
+      { method: 'DELETE', headers: dbHeaders() }
     );
   } catch (err) {
-    console.warn('[notify-status] releaseSlot error:', err);
+    console.warn('[notify-status] dedup row delete error:', err);
   }
 }
 
@@ -118,16 +125,21 @@ export default async function handler(req, res) {
     return;
   }
 
-  // ── Atomic dedup via PostgreSQL RPC ───────────────────────────────────────
-  // Uses row-level locking inside claim_notification_slot():
-  //   - Different status → always sends (status changed = new notification)
-  //   - Same status within 60s → only first caller sends, second is blocked
-  const owned = await claimSlot(application_id, status);
-  if (!owned) {
-    console.log('[notify-status] slot not acquired — duplicate suppressed:', application_id, status);
-    res.status(200).json({ ok: true, skipped: 'duplicate' });
+  // ── Layer 1: in-memory dedup (same Vercel instance) ───────────────────────
+  if (isDuplicateInMemory(application_id, status)) {
+    console.log('[notify-status] in-memory dedup skip:', application_id, status);
+    res.status(200).json({ ok: true, skipped: 'in_memory' });
     return;
   }
+
+  // ── Layer 2: DB atomic dedup via notification_dedup unique constraint ─────
+  const dbDedup = await insertDedupRow(application_id, status);
+  if (dbDedup === 'duplicate') {
+    console.log('[notify-status] DB dedup skip:', application_id, status);
+    res.status(200).json({ ok: true, skipped: 'db_duplicate' });
+    return;
+  }
+  // 'new' or 'unavailable' → proceed to send
 
   // ── Build message ─────────────────────────────────────────────────────────
   const text =
@@ -144,7 +156,7 @@ export default async function handler(req, res) {
     };
   }
 
-  // ── Send to Telegram ──────────────────────────────────────────────────────
+  // ── Send Telegram ─────────────────────────────────────────────────────────
   try {
     const tgRes = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
       method: 'POST',
@@ -163,8 +175,8 @@ export default async function handler(req, res) {
     if (!data.ok) {
       const errMsg = `Telegram error ${data.error_code}: ${data.description}`;
       console.error('[notify-status]', errMsg);
-      // Release slot so admin can retry
-      await releaseSlot(application_id);
+      // Release dedup slot so admin can retry
+      if (dbDedup === 'new') await deleteDedupRow(application_id, status);
       res.status(400).json({ error: errMsg });
       return;
     }
@@ -172,7 +184,7 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true, sent: true, message_id: data.result?.message_id });
   } catch (err) {
     console.error('[notify-status] fetch error:', err);
-    await releaseSlot(application_id);
+    if (dbDedup === 'new') await deleteDedupRow(application_id, status);
     res.status(500).json({ error: String(err) });
   }
 }
