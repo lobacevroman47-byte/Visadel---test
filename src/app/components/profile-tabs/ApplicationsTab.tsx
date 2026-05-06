@@ -48,12 +48,13 @@ interface ApplicationsTabProps {
   onBonusChange?: (newBalance: number) => void;
 }
 
-const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
-  draft:                { label: 'Черновик',                icon: '📝', color: 'bg-gray-100 text-gray-700' },
-  pending_payment:      { label: 'Ожидает оплаты',          icon: '💰', color: 'bg-yellow-100 text-yellow-700' },
-  pending_confirmation: { label: 'Ожидает подтверждения',   icon: '⏳', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  in_progress:          { label: 'В работе',                icon: '✅', color: 'bg-green-100 text-green-700' },
-  ready:                { label: 'Готово',                  icon: '🎉', color: 'bg-purple-100 text-purple-700' },
+// Visa status chip — matches booking status palette (emoji-free, brand-aligned)
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  draft:                { label: 'Черновик',              color: 'bg-gray-100 text-gray-700' },
+  pending_payment:      { label: 'Ожидает оплаты',        color: 'bg-yellow-100 text-yellow-700' },
+  pending_confirmation: { label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  in_progress:          { label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
+  ready:                { label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
 };
 
 // ── Status Progress Bar ───────────────────────────────────────────────────────
@@ -491,8 +492,8 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                         <h4 className="text-gray-800 font-medium">{app.country}</h4>
                         <p className="text-sm text-gray-600">{app.visa_type}</p>
                       </div>
-                      <span className={`${cfg.color} text-xs px-3 py-1 rounded-full shrink-0`}>
-                        {cfg.icon} {cfg.label}
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
+                        {cfg.label}
                       </span>
                     </div>
 
@@ -547,7 +548,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                             <button
                               onClick={() => handleQuickReview(app)}
                               disabled={submittingReviewId === app.id}
-                              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium">
+                              className="w-full py-3 vd-grad text-white shadow-md vd-shadow-cta disabled:opacity-60 rounded-xl active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm font-bold">
                               {submittingReviewId === app.id
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
                                 : <Star className="w-4 h-4" />}
@@ -558,7 +559,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                           /* Unlocked */
                           <div className="space-y-2">
                             <a href={app.visa_file_url} target="_blank" rel="noreferrer" download
-                              className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:shadow-lg transition text-sm font-medium">
+                              className="w-full flex items-center justify-center gap-2 py-3 bg-[#EAF1FF] text-[#3B5BFF] rounded-xl hover:bg-[#DCE7FF] active:scale-[0.99] transition text-sm font-bold">
                               <Download className="w-4 h-4" /> Скачать визу
                             </a>
                             <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
