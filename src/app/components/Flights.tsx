@@ -22,14 +22,23 @@ type Step = 'search' | 'results';
 
 // Quick-pick destinations that match the visa countries the user already books.
 const POPULAR: Array<{ flag: string; label: string; code: string; }> = [
-  { flag: '🇹🇷', label: 'Стамбул',     code: 'IST' },
-  { flag: '🇹🇭', label: 'Бангкок',     code: 'BKK' },
-  { flag: '🇦🇪', label: 'Дубай',       code: 'DXB' },
-  { flag: '🇪🇬', label: 'Хургада',     code: 'HRG' },
-  { flag: '🇬🇪', label: 'Тбилиси',     code: 'TBS' },
-  { flag: '🇮🇩', label: 'Бали',        code: 'DPS' },
-  { flag: '🇱🇰', label: 'Коломбо',     code: 'CMB' },
-  { flag: '🇻🇳', label: 'Нячанг',      code: 'CXR' },
+  // user-curated picks first
+  { flag: '🇻🇳', label: 'Нячанг',         code: 'CXR' },
+  { flag: '🇹🇭', label: 'Бангкок',        code: 'BKK' },
+  { flag: '🇮🇳', label: 'Нью-Дели',       code: 'DEL' },
+  { flag: '🇮🇳', label: 'Гоа',            code: 'GOI' },
+  { flag: '🇦🇪', label: 'Дубай',          code: 'DXB' },
+  { flag: '🇱🇰', label: 'Коломбо',        code: 'CMB' },
+  // top destinations from Russia
+  { flag: '🇹🇷', label: 'Стамбул',        code: 'IST' },
+  { flag: '🇹🇷', label: 'Анталья',        code: 'AYT' },
+  { flag: '🇹🇭', label: 'Пхукет',         code: 'HKT' },
+  { flag: '🇪🇬', label: 'Хургада',        code: 'HRG' },
+  { flag: '🇪🇬', label: 'Шарм-эль-Шейх',  code: 'SSH' },
+  { flag: '🇬🇪', label: 'Тбилиси',        code: 'TBS' },
+  { flag: '🇮🇩', label: 'Бали',           code: 'DPS' },
+  { flag: '🇲🇻', label: 'Мале',           code: 'MLE' },
+  { flag: '🇦🇲', label: 'Ереван',         code: 'EVN' },
 ];
 
 function todayPlus(days: number): string {
