@@ -552,9 +552,8 @@ export default function Flights({ onOpenProfile }: FlightsProps) {
         limit: 30,
       });
       setFares(res.data || []);
-      if (!res.data?.length) {
-        setError('По этим датам в кэше Aviasales нет вариантов. Откройте полный поиск напрямую.');
-      }
+      // Empty cache is a normal outcome on rare routes — let the empty-state
+      // card render with an "Open Aviasales" CTA instead of a red error.
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
