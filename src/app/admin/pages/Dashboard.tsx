@@ -115,13 +115,27 @@ const FinanceSection: React.FC = () => {
             </button>
           </div>
           <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.revenue ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">{stats?.paidApplicationsCount ?? 0} оплачено · после скидок бонусами</p>
+          <p className="text-xs opacity-75 mt-1">
+            {stats?.paidApplicationsCount ?? 0} визы · {stats?.bookingsCount ?? 0} брони · после скидок бонусами
+          </p>
           {showRevenueFormula && (
-            <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 leading-relaxed">
-              <p className="font-semibold opacity-90">Как считается выручка:</p>
-              <p className="font-mono opacity-80">price − bonuses_used</p>
-              <p className="opacity-80">Сумма по всем оплаченным заявкам (статусы in_progress + ready) с учётом списанных клиентом бонусов.</p>
-              <p className="opacity-80 pt-1">Бонусы списанные клиентом уменьшают выручку — это уже потерянная нами скидка.</p>
+            <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-2 leading-relaxed">
+              <p className="font-semibold opacity-90">Как считается выручка</p>
+
+              <div className="space-y-1">
+                <p className="opacity-90">Визы <span className="float-right font-mono">{fmtRub(stats?.visaRevenue ?? 0)}</span></p>
+                <p className="opacity-70 text-[11px]">Цена визы минус списанные клиентом бонусы (учитываются только оплаченные заявки — статусы «В работе» и «Готово»).</p>
+              </div>
+
+              <div className="space-y-1 pt-1 border-t border-white/15">
+                <p className="opacity-90">Брони (отель + авиабилет) <span className="float-right font-mono">{fmtRub(stats?.bookingsRevenue ?? 0)}</span></p>
+                <p className="opacity-70 text-[11px]">Сумма цен по подтверждённым броням отелей и авиабилетов (статус «Готово»). Бонусами оплата броней пока не предусмотрена.</p>
+              </div>
+
+              <p className="font-semibold opacity-100 pt-2 border-t border-white/20">
+                Итого выручка <span className="float-right font-mono">{fmtRub(stats?.revenue ?? 0)}</span>
+              </p>
+              <p className="opacity-70 text-[11px]">Списанные бонусы — это уже потерянная нами скидка, поэтому они вычитаются из выручки сразу.</p>
             </div>
           )}
         </div>
@@ -144,13 +158,19 @@ const FinanceSection: React.FC = () => {
           <p className="text-xs opacity-75 mt-1">маржа {margin}%</p>
           {showProfitFormula && (
             <div className="mt-3 pt-3 border-t border-white/20 text-xs space-y-1 leading-relaxed font-mono">
-              <p className="font-sans font-semibold opacity-90 mb-2">Формула прибыли:</p>
-              <p className="opacity-90">Выручка <span className="float-right">{fmtRub(stats?.revenue ?? 0)}</span></p>
-              <p className="opacity-80">− Себестоимость виз/билетов <span className="float-right">−{fmtRub(stats?.costOfGoods ?? 0)}</span></p>
+              <p className="font-sans font-semibold opacity-90 mb-2">Как считается прибыль</p>
+              <p className="opacity-90">Выручка (визы + брони) <span className="float-right">{fmtRub(stats?.revenue ?? 0)}</span></p>
+              <p className="opacity-80">− Себестоимость <span className="float-right">−{fmtRub(stats?.costOfGoods ?? 0)}</span></p>
               <p className="opacity-80">− Налог (УСН) <span className="float-right">−{fmtRub(stats?.taxes ?? 0)}</span></p>
               <p className="opacity-80">− Партнёрам (профит-шеринг) <span className="float-right">−{fmtRub(stats?.commissionsPaid ?? 0)}</span></p>
               <p className="font-semibold opacity-100 pt-1 border-t border-white/20">= Прибыль <span className="float-right">{fmtRub(stats?.profit ?? 0)}</span></p>
-              <p className="font-sans opacity-75 pt-2 leading-snug">Себестоимость = ($сбор + $комиссия) × курс USD заявки + себест. аддонов (билет 780₽ и т.д.). Бонусы клиентов уже учтены в выручке.</p>
+              <div className="font-sans opacity-75 pt-2 leading-snug space-y-1.5">
+                <p><span className="opacity-100 font-semibold">Себестоимость</span> состоит из:</p>
+                <p>• По визам: ($сбор + $комиссия посольства) × курс USD заявки + себестоимость доп. услуг (например, билет 780₽).</p>
+                <p>• По броням: себестоимость одного отеля и одного билета берётся из «Доп. услуги».</p>
+                <p>• Налог (УСН) — % от полной цены каждой позиции (визы + брони).</p>
+                <p>Бонусы, которые списали клиенты, уже учтены в выручке (выручка = цена − бонусы), поэтому отдельно из прибыли не вычитаются.</p>
+              </div>
             </div>
           )}
         </div>

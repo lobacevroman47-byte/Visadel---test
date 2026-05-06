@@ -1222,9 +1222,11 @@ export async function deleteAdditionalService(id: string): Promise<void> {
 // ─── Finance / Analytics ──────────────────────────────────────────────────────
 
 export interface FinanceStats {
-  revenue: number;          // Выручка = Σ (price − bonuses_used) по оплаченным заявкам
-  costOfGoods: number;      // Себестоимость = Σ (cost_usd_fee + cost_usd_commission) × app.usd_rate_rub
-  taxes: number;            // Налог = Σ (price × app.tax_pct / 100)
+  revenue: number;          // Выручка = Σ виз (price − bonuses_used) + Σ броней (price)
+  visaRevenue: number;      // Выручка только с виз
+  bookingsRevenue: number;  // Выручка только с подтверждённых броней (отель + авиа)
+  costOfGoods: number;      // Себестоимость = себест. виз + себест. броней
+  taxes: number;            // Налог = (выручка × tax_pct / 100) для каждой позиции
   commissionsPaid: number;  // Партнёрам = Σ bonus_logs WHERE type='referral' (реальное профит-шеринг)
   // ── Информационно (НЕ вычитается из прибыли — это ещё не cash-out, а лишь обязательство):
   welcomeBonusesPaid: number; // Новичкам по реф. ссылке — Σ bonus_logs WHERE type='welcome'
@@ -1234,16 +1236,18 @@ export interface FinanceStats {
   bonusesOutstanding: number; // Текущий долг компании: Σ users.bonus_balance
   profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid
   paidApplicationsCount: number;
+  bookingsCount: number;    // Количество подтверждённых броней
   series: { date: string; revenue: number; profit: number }[];
 }
 
 // Period in days; 0 means "all time"
 export async function getFinanceStats(periodDays: number): Promise<FinanceStats> {
   const empty: FinanceStats = {
-    revenue: 0, costOfGoods: 0, taxes: 0,
+    revenue: 0, visaRevenue: 0, bookingsRevenue: 0,
+    costOfGoods: 0, taxes: 0,
     commissionsPaid: 0, welcomeBonusesPaid: 0, otherBonusesPaid: 0,
     bonusesIssued: 0, bonusesUsed: 0, bonusesOutstanding: 0,
-    profit: 0, paidApplicationsCount: 0, series: [],
+    profit: 0, paidApplicationsCount: 0, bookingsCount: 0, series: [],
   };
   if (!isSupabaseConfigured()) return empty;
 
@@ -1271,13 +1275,24 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   // Addon cost lookup (urgent / hotel / ticket — keyed by service ID, value is RUB cost we pay)
   const addonsQ = supabase.from('additional_services').select('id, cost_rub');
 
-  const [appsRes, bonusRes, balanceRes, productsRes, addonsRes] = await Promise.all([appsQ, bonusQ, balanceQ, productsQ, addonsQ]);
+  // Standalone bookings — confirmed = "paid" for revenue purposes
+  let hotelBookingsQ = supabase.from('hotel_bookings').select('price, status, created_at').eq('status', 'confirmed');
+  if (sinceISO) hotelBookingsQ = hotelBookingsQ.gte('created_at', sinceISO);
+
+  let flightBookingsQ = supabase.from('flight_bookings').select('price, status, created_at').eq('status', 'confirmed');
+  if (sinceISO) flightBookingsQ = flightBookingsQ.gte('created_at', sinceISO);
+
+  const [appsRes, bonusRes, balanceRes, productsRes, addonsRes, hotelBookingsRes, flightBookingsRes] = await Promise.all([
+    appsQ, bonusQ, balanceQ, productsQ, addonsQ, hotelBookingsQ, flightBookingsQ,
+  ]);
 
   const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null; tax_pct: number | null; form_data: Record<string, unknown> | null }>;
   const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
   const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
   const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
   const addons = (addonsRes.data ?? []) as Array<{ id: string; cost_rub: number }>;
+  const hotelBookings = (hotelBookingsRes.data ?? []) as Array<{ price: number | null; created_at: string }>;
+  const flightBookings = (flightBookingsRes.data ?? []) as Array<{ price: number | null; created_at: string }>;
 
   // USD cost (in dollars) per visa; converted to RUB per-app using each app's own usd_rate_rub
   const usdCostByVisa = new Map<string, number>();
@@ -1309,16 +1324,39 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
     return ((a.price ?? 0) * pct) / 100;
   };
 
-  let revenue = 0;
+  let visaRevenue = 0;
   let bonusesUsed = 0;
   let costOfGoods = 0;
   let taxes = 0;
   for (const a of apps) {
-    revenue += (a.price ?? 0) - (a.bonuses_used ?? 0);
+    visaRevenue += (a.price ?? 0) - (a.bonuses_used ?? 0);
     bonusesUsed += a.bonuses_used ?? 0;
     costOfGoods += costForApp(a);
     taxes += taxForApp(a);
   }
+
+  // Standalone bookings — confirmed entries count as revenue
+  // Cost: re-use the already-loaded addon costs (hotel-booking / flight-booking)
+  // because the standalone form is the same offer as the in-visa addon.
+  const hotelAddonCost = addonCostById.get('hotel-booking') ?? 0;
+  const flightAddonCost = addonCostById.get('flight-booking') ?? 0;
+  const defaultTaxPct = BONUS_CONFIG.TAX_PCT_DEFAULT;
+
+  let bookingsRevenue = 0;
+  for (const b of hotelBookings) {
+    const price = b.price ?? 0;
+    bookingsRevenue += price;
+    costOfGoods += hotelAddonCost;
+    taxes += (price * defaultTaxPct) / 100;
+  }
+  for (const b of flightBookings) {
+    const price = b.price ?? 0;
+    bookingsRevenue += price;
+    costOfGoods += flightAddonCost;
+    taxes += (price * defaultTaxPct) / 100;
+  }
+  const bookingsCount = hotelBookings.length + flightBookings.length;
+  const revenue = visaRevenue + bookingsRevenue;
 
   const commissionsPaid = bonusLogs
     .filter(b => b.type === 'referral')
@@ -1354,6 +1392,22 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
         dayTax += taxForApp(a);
       }
     }
+    for (const b of hotelBookings) {
+      if (b.created_at?.slice(0, 10) === key) {
+        const p = b.price ?? 0;
+        dayRev += p;
+        dayCost += hotelAddonCost;
+        dayTax += (p * defaultTaxPct) / 100;
+      }
+    }
+    for (const b of flightBookings) {
+      if (b.created_at?.slice(0, 10) === key) {
+        const p = b.price ?? 0;
+        dayRev += p;
+        dayCost += flightAddonCost;
+        dayTax += (p * defaultTaxPct) / 100;
+      }
+    }
     const dayCommissions = bonusLogs
       .filter(b => b.type === 'referral' && b.created_at?.slice(0, 10) === key)
       .reduce((s, b) => s + (b.amount ?? 0), 0);
@@ -1362,6 +1416,8 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
 
   return {
     revenue,
+    visaRevenue,
+    bookingsRevenue,
     costOfGoods,
     taxes,
     commissionsPaid,
@@ -1372,6 +1428,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
     bonusesOutstanding,
     profit,
     paidApplicationsCount: apps.length,
+    bookingsCount,
     series,
   };
 }
