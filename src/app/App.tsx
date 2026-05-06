@@ -256,6 +256,14 @@ function App() {
                 onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
               />
             )}
+            {mainTab === 'excursions' && (
+              <ComingSoon
+                title="Экскурсии"
+                description="Каталог экскурсий по странам с местными гидами. После запуска — бронирования напрямую через приложение, как у виз и отелей."
+                emoji="🗺️"
+                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+              />
+            )}
             <BottomNav active={mainTab} onChange={setMainTab} />
           </>
         )}

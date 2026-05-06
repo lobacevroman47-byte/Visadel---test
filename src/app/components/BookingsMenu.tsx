@@ -1,4 +1,4 @@
-import { User, ChevronRight, Hotel, Plane, Map, Clock } from 'lucide-react';
+import { User, ChevronRight, Hotel, Plane } from 'lucide-react';
 
 interface BookingsMenuProps {
   onOpenProfile?: () => void;
@@ -74,19 +74,6 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
             <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
           </button>
 
-          {/* Excursions — coming soon */}
-          <div className="w-full bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 opacity-60">
-            <div className="w-12 h-12 rounded-xl bg-[#EAF1FF] flex items-center justify-center text-[#3B5BFF] shrink-0">
-              <Map className="w-6 h-6" strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-bold text-[#0F2A36]">Экскурсии</p>
-              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">С местными гидами по всему миру</p>
-            </div>
-            <span className="text-[10px] uppercase tracking-wider font-bold text-[#3B5BFF]/60 shrink-0 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> скоро
-            </span>
-          </div>
         </div>
 
         {/* Info card */}

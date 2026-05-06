@@ -19,7 +19,7 @@ interface AdminLayoutProps {
   onBackToApp?: () => void;
 }
 
-type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels' | 'product-insurance';
+type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels' | 'product-insurance' | 'product-excursions';
 
 const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: string; description: string; emoji: string }> = {
   bookings: {
@@ -136,6 +136,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         return <Bookings initialTab="hotels" />;
       case 'product-insurance':
         return <ComingSoonAdmin tab="insurance" />;
+      case 'product-excursions':
+        return <ExcursionsPlaceholder />;
       case 'excursions':
         return <ExcursionsPlaceholder />;
       case 'users':
