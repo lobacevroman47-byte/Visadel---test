@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane } from 'lucide-react';
+import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane, Check } from 'lucide-react';
 import {
   getUserApplications, getReviewedAppIds, submitReview,
   getUserHotelBookings, getUserFlightBookings,
