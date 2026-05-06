@@ -10,6 +10,8 @@ const ApplicationForm        = lazy(() => import('./components/ApplicationForm')
 const UserProfile            = lazy(() => import('./components/UserProfile'));
 const SriLankaExtensionForm  = lazy(() => import('./components/SriLankaExtensionForm'));
 const PartnerApplicationForm = lazy(() => import('./components/PartnerApplicationForm'));
+const HotelBookingForm       = lazy(() => import('./components/HotelBookingForm'));
+const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
 const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
 import {
   getTelegramUser,
@@ -49,6 +51,7 @@ type Screen =
   | 'profile'
   | 'extension'
   | 'partner_application'
+  | 'hotel_booking'
   | 'admin';
 
 export interface VisaOption {
@@ -219,12 +222,12 @@ function App() {
               </div>
             )}
             {mainTab === 'bookings' && (
-              <ComingSoon
-                title="Брони документов"
-                description="Бронь отеля и обратного билета как самостоятельный раздел. Пока эти услуги доступны при оформлении визы — на шаге калькулятора."
-                emoji="📋"
-                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-              />
+              <Suspense fallback={<SplashScreen />}>
+                <BookingsMenu
+                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                  onOpenHotelBooking={() => setCurrentScreen('hotel_booking')}
+                />
+              </Suspense>
             )}
             {mainTab === 'flights' && (
               <ComingSoon
@@ -288,6 +291,14 @@ function App() {
         {currentScreen === 'partner_application' && (
           <Suspense fallback={<SplashScreen />}>
             <PartnerApplicationForm onBack={handleBackToHome} onSubmit={handleBackToHome} />
+          </Suspense>
+        )}
+        {currentScreen === 'hotel_booking' && (
+          <Suspense fallback={<SplashScreen />}>
+            <HotelBookingForm
+              onBack={() => { setMainTab('bookings'); setCurrentScreen('home'); }}
+              onComplete={() => { setMainTab('visas'); setCurrentScreen('home'); }}
+            />
           </Suspense>
         )}
         {currentScreen === 'admin' && (
