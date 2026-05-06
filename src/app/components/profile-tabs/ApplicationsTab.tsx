@@ -1,5 +1,28 @@
-import { useState, useEffect, useCallback } from 'react';
-import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane, Check } from 'lucide-react';
+import { useState, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane, Check, AlertTriangle } from 'lucide-react';
+
+// ── Error Boundary so a single bad row doesn't blank the whole tab ─────────
+class BookingsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null as Error | null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('[BookingsErrorBoundary]', error); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="bg-white rounded-xl border border-amber-200 bg-amber-50/50 p-4 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-amber-900">Не удалось показать брони</p>
+            <p className="text-xs text-amber-800/80 mt-0.5">
+              {this.state.error.message || 'Внутренняя ошибка'}. Перезагрузите мини-апп.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import {
   getUserApplications, getReviewedAppIds, submitReview,
   getUserHotelBookings, getUserFlightBookings,
@@ -574,35 +597,37 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
 
         {/* ── Bookings (hotel + flight) ─────────────────────── */}
         {(hotelBookings.length > 0 || flightBookings.length > 0) && (
-          <div>
-            <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
-              <Hotel className="w-5 h-5" /> Мои брони
-            </h3>
-            <div className="space-y-3">
-              {hotelBookings.map(b => (
-                <HotelBookingCard
-                  key={b.id}
-                  b={b}
-                  isPartner={appUser?.is_influencer ?? false}
-                  telegramId={telegramId}
-                  username={(appUser as any)?.username ?? ''}
-                  onBonusChange={onBonusChange}
-                  onUpdate={(patch) => setHotelBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
-                />
-              ))}
-              {flightBookings.map(b => (
-                <FlightBookingCard
-                  key={b.id}
-                  b={b}
-                  isPartner={appUser?.is_influencer ?? false}
-                  telegramId={telegramId}
-                  username={(appUser as any)?.username ?? ''}
-                  onBonusChange={onBonusChange}
-                  onUpdate={(patch) => setFlightBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
-                />
-              ))}
+          <BookingsErrorBoundary>
+            <div>
+              <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
+                <Hotel className="w-5 h-5" /> Мои брони
+              </h3>
+              <div className="space-y-3">
+                {hotelBookings.map(b => (
+                  <HotelBookingCard
+                    key={b.id}
+                    b={b}
+                    isPartner={appUser?.is_influencer ?? false}
+                    telegramId={telegramId}
+                    username={(appUser as any)?.username ?? ''}
+                    onBonusChange={onBonusChange}
+                    onUpdate={(patch) => setHotelBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
+                  />
+                ))}
+                {flightBookings.map(b => (
+                  <FlightBookingCard
+                    key={b.id}
+                    b={b}
+                    isPartner={appUser?.is_influencer ?? false}
+                    telegramId={telegramId}
+                    username={(appUser as any)?.username ?? ''}
+                    onBonusChange={onBonusChange}
+                    onUpdate={(patch) => setFlightBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          </BookingsErrorBoundary>
         )}
       </div>
 
@@ -750,6 +775,7 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
   onUpdate: (patch: Partial<HotelBookingRow>) => void;
 }) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
+  const childrenAges = Array.isArray(b.children_ages) ? b.children_ages : [];
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
       <div className="flex items-start gap-3">
@@ -764,11 +790,11 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
             </span>
           </div>
           <p className="text-xs text-[#0F2A36]/70">
-            {b.country}, {b.city}
+            {b.country ?? '—'}, {b.city ?? '—'}
           </p>
           <p className="text-xs text-[#0F2A36]/60 mt-0.5">
-            {fmtBookingDate(b.check_in)} → {fmtBookingDate(b.check_out)} · {b.guests} гост.
-            {b.children_ages.length > 0 && ` + ${b.children_ages.length} реб.`}
+            {b.check_in ? fmtBookingDate(b.check_in) : '—'} → {b.check_out ? fmtBookingDate(b.check_out) : '—'} · {b.guests ?? 1} гост.
+            {childrenAges.length > 0 && ` + ${childrenAges.length} реб.`}
           </p>
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
             <span className="text-[11px] text-gray-400 flex items-center gap-1">
@@ -803,10 +829,10 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
             </span>
           </div>
           <p className="text-xs text-[#0F2A36]/70">
-            {b.from_city} → {b.to_city}
+            {b.from_city ?? '—'} → {b.to_city ?? '—'}
           </p>
           <p className="text-xs text-[#0F2A36]/60 mt-0.5">
-            {fmtBookingDate(b.booking_date)}
+            {b.booking_date ? fmtBookingDate(b.booking_date) : '—'}
           </p>
           <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
             <span className="text-[11px] text-gray-400 flex items-center gap-1">
