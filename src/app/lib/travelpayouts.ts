@@ -108,9 +108,12 @@ export function buildAviasalesUrl(opts:
       adults?: number;
     }
 ): string {
+  // Russian locale + RUB currency forced via URL params so the Aviasales page
+  // matches what the user saw in our search results.
+  const trailing = `marker=${TP_MARKER}&currency=rub&locale=ru`;
   if ('fareLink' in opts) {
     const sep = opts.fareLink.includes('?') ? '&' : '?';
-    return `https://aviasales.com${opts.fareLink}${sep}marker=${TP_MARKER}`;
+    return `https://www.aviasales.ru${opts.fareLink}${sep}${trailing}`;
   }
   const dep = compactDate(opts.departureDate);
   const ret = opts.returnDate ? compactDate(opts.returnDate) : '';
@@ -118,7 +121,7 @@ export function buildAviasalesUrl(opts:
   // where PAX = adults count (1..9). Return leg is omitted for one-way trips.
   const pax = Math.max(1, Math.min(9, opts.adults ?? 1));
   const path = `/search/${opts.origin}${dep}${opts.destination}${ret}${pax}`;
-  return `https://aviasales.com${path}?marker=${TP_MARKER}`;
+  return `https://www.aviasales.ru${path}?${trailing}`;
 }
 
 // "2026-06-23" → "2306"
