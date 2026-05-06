@@ -621,10 +621,10 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
 // ── Booking card components ─────────────────────────────────────────────────
 
 const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
-  new:         { label: 'Новая',          color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  in_progress: { label: 'В работе',       color: 'bg-amber-100 text-amber-700' },
-  confirmed:   { label: 'Подтверждена',   color: 'bg-emerald-100 text-emerald-700' },
-  cancelled:   { label: 'Отменена',       color: 'bg-red-100 text-red-700' },
+  new:         { label: 'Новая',     color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  in_progress: { label: 'В работе',  color: 'bg-amber-100 text-amber-700' },
+  confirmed:   { label: 'Готово',    color: 'bg-emerald-100 text-emerald-700' },
+  cancelled:   { label: 'Отменена',  color: 'bg-red-100 text-red-700' },
 };
 
 const fmtBookingDate = (s: string) =>
@@ -651,8 +651,9 @@ function BookingActions({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const reviewed = !!booking.review_bonus_granted;
-  const canReview = booking.status === 'confirmed' && !reviewed;
   const ready = !!booking.confirmation_url;
+  // Отзыв доступен только когда подтверждение загружено (а статус confirmed по логике должен быть выставлен ДО загрузки)
+  const canReview = ready && booking.status === 'confirmed' && !reviewed;
 
   const handleReview = async () => {
     if (submitting || !canReview) return;

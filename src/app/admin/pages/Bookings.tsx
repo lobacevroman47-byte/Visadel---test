@@ -53,10 +53,10 @@ interface FlightBooking {
 type Tab = 'hotels' | 'flights';
 
 const STATUS_OPTIONS = [
-  { value: 'new',         label: 'Новая',          color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  { value: 'in_progress', label: 'В работе',       color: 'bg-amber-100 text-amber-700' },
-  { value: 'confirmed',   label: 'Подтверждена',   color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'cancelled',   label: 'Отменена',       color: 'bg-red-100 text-red-700' },
+  { value: 'new',         label: 'Новая',     color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  { value: 'in_progress', label: 'В работе',  color: 'bg-amber-100 text-amber-700' },
+  { value: 'confirmed',   label: 'Готово',    color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'cancelled',   label: 'Отменена',  color: 'bg-red-100 text-red-700' },
 ];
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -171,7 +171,7 @@ export const Bookings: React.FC = () => {
           onClose={() => setSelectedHotel(null)}
           onStatusChange={(status) => updateStatus('hotel_bookings', selectedHotel.id, status)}
           onConfirmationUploaded={(url) => {
-            setSelectedHotel(s => s ? { ...s, confirmation_url: url, status: 'confirmed' } : s);
+            setSelectedHotel(s => s ? { ...s, confirmation_url: url } : s);
             void refresh();
           }}
         />
@@ -182,7 +182,7 @@ export const Bookings: React.FC = () => {
           onClose={() => setSelectedFlight(null)}
           onStatusChange={(status) => updateStatus('flight_bookings', selectedFlight.id, status)}
           onConfirmationUploaded={(url) => {
-            setSelectedFlight(s => s ? { ...s, confirmation_url: url, status: 'confirmed' } : s);
+            setSelectedFlight(s => s ? { ...s, confirmation_url: url } : s);
             void refresh();
           }}
         />
@@ -278,25 +278,37 @@ function FlightRow({ b, onClick }: { b: FlightBooking; onClick: () => void }) {
 }
 
 function ConfirmationUploader({
-  url, table, id, onUploaded,
+  url, status, table, id, onUploaded,
 }: {
   url: string | null;
+  status: string;
   table: 'hotel_bookings' | 'flight_bookings';
   id: string;
   onUploaded: (newUrl: string) => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const ready = status === 'confirmed';
 
   const handleFile = async (file: File) => {
     if (!file) return;
     setUploading(true);
     try {
       const newUrl = await uploadFile(file, 'visas');
-      if (!newUrl) { alert('Не удалось загрузить файл'); return; }
+      if (!newUrl) { alert('Не удалось загрузить файл в хранилище. Проверь Supabase Storage.'); return; }
       if (isSupabaseConfigured()) {
-        await supabase.from(table).update({ confirmation_url: newUrl, status: 'confirmed' }).eq('id', id);
+        const { error } = await supabase.from(table).update({ confirmation_url: newUrl }).eq('id', id);
+        if (error) {
+          alert(
+            `Не удалось сохранить ссылку на файл:\n${error.message}\n\n` +
+            `Похоже что в БД нет колонки confirmation_url. Выполни в Supabase SQL Editor:\n\n` +
+            `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS confirmation_url text;`
+          );
+          return;
+        }
       }
       onUploaded(newUrl);
+    } catch (e) {
+      alert(`Ошибка: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setUploading(false);
     }
@@ -305,30 +317,41 @@ function ConfirmationUploader({
   return (
     <div>
       <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Подтверждение брони (для клиента)</p>
-      {url ? (
-        <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center">
-            <Check className="w-4 h-4 text-emerald-600" strokeWidth={3} />
+
+      {!ready && !url && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-900">
+          ℹ️ Чтобы прикрепить файл, сначала переведи статус в <span className="font-bold">«Готово»</span> (выше).
+        </div>
+      )}
+
+      {(ready || url) && (
+        url ? (
+          <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center">
+              <Check className="w-4 h-4 text-emerald-600" strokeWidth={3} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-[#0F2A36]">Загружено</p>
+              <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть</a>
+            </div>
+            {ready && (
+              <label className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] cursor-pointer transition active:scale-95 flex items-center gap-1 shrink-0">
+                <Upload className="w-3.5 h-3.5" />
+                Заменить
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+              </label>
+            )}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-[#0F2A36]">Загружено</p>
-            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть</a>
-          </div>
-          <label className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] cursor-pointer transition active:scale-95 flex items-center gap-1 shrink-0">
-            <Upload className="w-3.5 h-3.5" />
-            Заменить
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+        ) : (
+          <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+            {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
+            <p className="text-xs text-[#0F2A36]">{uploading ? 'Загружаем…' : 'Загрузить подтверждение'}</p>
+            <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете</p>
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
               onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
           </label>
-        </div>
-      ) : (
-        <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
-          {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
-          <p className="text-xs text-[#0F2A36]">{uploading ? 'Загружаем…' : 'Загрузить подтверждение'}</p>
-          <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">PDF/JPG/PNG · автоматически переключит статус в «Подтверждена»</p>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
-            onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
-        </label>
+        )
       )}
     </div>
   );
@@ -458,6 +481,7 @@ function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
         <PassportBlock url={b.passport_url} />
         <ConfirmationUploader
           url={b.confirmation_url}
+          status={b.status}
           table="hotel_bookings"
           id={b.id}
           onUploaded={onConfirmationUploaded}
@@ -498,6 +522,7 @@ function FlightDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
         <PassportBlock url={b.passport_url} />
         <ConfirmationUploader
           url={b.confirmation_url}
+          status={b.status}
           table="flight_bookings"
           id={b.id}
           onUploaded={onConfirmationUploaded}
