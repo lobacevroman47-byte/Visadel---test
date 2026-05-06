@@ -45,7 +45,36 @@ interface Draft {
 
 interface ApplicationsTabProps {
   onContinueDraft?: (draft: Draft) => void;
+  onContinueHotelDraft?: () => void;
+  onContinueFlightDraft?: () => void;
   onBonusChange?: (newBalance: number) => void;
+}
+
+interface BookingDraft {
+  type: 'hotel' | 'flight';
+  savedAt: string;
+  summary: string;
+}
+
+function loadBookingDrafts(): BookingDraft[] {
+  const drafts: BookingDraft[] = [];
+  try {
+    const h = localStorage.getItem('hotel_booking_draft');
+    if (h) {
+      const d = JSON.parse(h);
+      const summary = [d.country, d.city].filter(Boolean).join(', ') || 'Без страны';
+      drafts.push({ type: 'hotel', savedAt: d.savedAt ?? new Date().toISOString(), summary });
+    }
+  } catch { /* no-op */ }
+  try {
+    const f = localStorage.getItem('flight_booking_draft');
+    if (f) {
+      const d = JSON.parse(f);
+      const summary = [d.fromCity, d.toCity].filter(Boolean).join(' → ') || 'Без маршрута';
+      drafts.push({ type: 'flight', savedAt: d.savedAt ?? new Date().toISOString(), summary });
+    }
+  } catch { /* no-op */ }
+  return drafts;
 }
 
 // Visa status chip — matches booking status palette (emoji-free, brand-aligned)
@@ -214,12 +243,13 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
 }
 
 // ── Main Component ─────────────────────────────────────────────────────────────
-export default function ApplicationsTab({ onContinueDraft, onBonusChange }: ApplicationsTabProps) {
+export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft, onContinueFlightDraft, onBonusChange }: ApplicationsTabProps) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [hotelBookings, setHotelBookings] = useState<HotelBookingRow[]>([]);
   const [flightBookings, setFlightBookings] = useState<FlightBookingRow[]>([]);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Draft[]>([]);
+  const [bookingDrafts, setBookingDrafts] = useState<BookingDraft[]>([]);
   const [loading, setLoading] = useState(true);
   const [reviewApp, setReviewApp] = useState<Application | null>(null);
   const [submittingReviewId, setSubmittingReviewId] = useState<string | null>(null);
@@ -258,6 +288,9 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
           setDrafts(valid);
         }
       } catch {}
+
+      // Load booking drafts (single-slot per type) from localStorage
+      setBookingDrafts(loadBookingDrafts());
     } finally {
       setLoading(false);
     }
@@ -406,7 +439,7 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
         </div>
 
         {/* Drafts */}
-        {drafts.length > 0 && (
+        {(drafts.length > 0 || bookingDrafts.length > 0) && (
           <div>
             <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
               <FileText className="w-5 h-5" /> Незавершённые заявки
@@ -459,6 +492,42 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
                   )}
                 </div>
               ))}
+
+              {bookingDrafts.map(bd => {
+                const isHotel = bd.type === 'hotel';
+                const onContinue = isHotel ? onContinueHotelDraft : onContinueFlightDraft;
+                const onDelete = () => {
+                  try { localStorage.removeItem(isHotel ? 'hotel_booking_draft' : 'flight_booking_draft'); } catch { /* no-op */ }
+                  setBookingDrafts(loadBookingDrafts());
+                };
+                return (
+                  <div key={`booking-${bd.type}`} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-400">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        {isHotel ? <Hotel className="w-5 h-5 text-[#3B5BFF]" /> : <Plane className="w-5 h-5 text-[#3B5BFF]" />}
+                        <div>
+                          <h4 className="text-gray-800">{isHotel ? 'Бронь отеля' : 'Бронь авиабилета'}</h4>
+                          <p className="text-sm text-gray-600">{bd.summary}</p>
+                        </div>
+                      </div>
+                      <span className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full whitespace-nowrap">📝 Черновик</span>
+                    </div>
+                    <div className="flex justify-end text-xs text-gray-400 mb-3">
+                      <span>{new Date(bd.savedAt).toLocaleDateString('ru-RU')}</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={onContinue}
+                        className="flex-1 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white py-2 rounded-lg transition text-sm">
+                        Продолжить
+                      </button>
+                      <button onClick={onDelete}
+                        className="px-4 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition text-sm">
+                        Удалить
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

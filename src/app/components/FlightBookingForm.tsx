@@ -9,19 +9,27 @@ interface FlightBookingFormProps {
 }
 
 export default function FlightBookingForm({ onBack, onComplete }: FlightBookingFormProps) {
+  // Restore draft on first render
+  const draft = (() => {
+    try {
+      const raw = localStorage.getItem('flight_booking_draft');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   // Passenger (Latin, as in passport)
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState<string>(draft?.firstName ?? '');
+  const [lastName, setLastName] = useState<string>(draft?.lastName ?? '');
 
   // Trip
-  const [fromCity, setFromCity] = useState('');
-  const [toCity, setToCity] = useState('');
-  const [bookingDate, setBookingDate] = useState('');
+  const [fromCity, setFromCity] = useState<string>(draft?.fromCity ?? '');
+  const [toCity, setToCity] = useState<string>(draft?.toCity ?? '');
+  const [bookingDate, setBookingDate] = useState<string>(draft?.bookingDate ?? '');
 
   // Contacts (mirror visa form)
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [telegramLogin, setTelegramLogin] = useState('');
+  const [email, setEmail] = useState<string>(draft?.email ?? '');
+  const [phone, setPhone] = useState<string>(draft?.phone ?? '');
+  const [telegramLogin, setTelegramLogin] = useState<string>(draft?.telegramLogin ?? '');
 
   // Passport file
   const [passport, setPassport] = useState<File | null>(null);
@@ -46,6 +54,20 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
+
+  // Auto-save draft to localStorage
+  useEffect(() => {
+    const anyContent = !!(firstName || lastName || fromCity || toCity || bookingDate ||
+      email || phone || telegramLogin);
+    if (!anyContent) return;
+    try {
+      localStorage.setItem('flight_booking_draft', JSON.stringify({
+        firstName, lastName, fromCity, toCity, bookingDate,
+        email, phone, telegramLogin, extraValues,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch { /* no-op */ }
+  }, [firstName, lastName, fromCity, toCity, bookingDate, email, phone, telegramLogin, extraValues]);
 
   // UX state
   const [submitting, setSubmitting] = useState(false);
@@ -124,6 +146,8 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           }),
         });
       } catch { /* no-op */ }
+
+      try { localStorage.removeItem('flight_booking_draft'); } catch { /* no-op */ }
 
       setSubmitted(true);
     } catch (err) {

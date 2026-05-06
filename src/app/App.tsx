@@ -284,6 +284,8 @@ function App() {
               onBack={handleBackToHome}
               onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
               onContinueDraft={handleContinueDraft}
+              onContinueHotelDraft={() => setCurrentScreen('hotel_booking')}
+              onContinueFlightDraft={() => setCurrentScreen('flight_booking')}
               onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
               initialTab={initialProfileTab}
             />

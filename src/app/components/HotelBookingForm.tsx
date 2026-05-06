@@ -11,23 +11,31 @@ interface HotelBookingFormProps {
 interface ChildEntry { id: string; age: string; }
 
 export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFormProps) {
+  // Restore draft from localStorage (if any) on first render
+  const draft = (() => {
+    try {
+      const raw = localStorage.getItem('hotel_booking_draft');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   // Personal
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState<string>(draft?.firstName ?? '');
+  const [lastName, setLastName] = useState<string>(draft?.lastName ?? '');
 
   // Trip
-  const [country, setCountry] = useState('');
-  const [city, setCity] = useState('');
-  const [checkIn, setCheckIn] = useState('');
-  const [checkOut, setCheckOut] = useState('');
-  const [guests, setGuests] = useState(1);
-  const [hasChildren, setHasChildren] = useState<'no' | 'yes'>('no');
-  const [children, setChildren] = useState<ChildEntry[]>([]);
+  const [country, setCountry] = useState<string>(draft?.country ?? '');
+  const [city, setCity] = useState<string>(draft?.city ?? '');
+  const [checkIn, setCheckIn] = useState<string>(draft?.checkIn ?? '');
+  const [checkOut, setCheckOut] = useState<string>(draft?.checkOut ?? '');
+  const [guests, setGuests] = useState<number>(draft?.guests ?? 1);
+  const [hasChildren, setHasChildren] = useState<'no' | 'yes'>(draft?.hasChildren ?? 'no');
+  const [children, setChildren] = useState<ChildEntry[]>(draft?.children ?? []);
 
   // Contacts (same shape as visa forms)
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [telegramLogin, setTelegramLogin] = useState('');
+  const [email, setEmail] = useState<string>(draft?.email ?? '');
+  const [phone, setPhone] = useState<string>(draft?.phone ?? '');
+  const [telegramLogin, setTelegramLogin] = useState<string>(draft?.telegramLogin ?? '');
 
   // Passport file
   const [passport, setPassport] = useState<File | null>(null);
@@ -52,6 +60,22 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
+
+  // Auto-save draft to localStorage on every change.
+  // Only files (passport, paymentScreenshot) are excluded — they can't be serialised.
+  useEffect(() => {
+    const anyContent = !!(firstName || lastName || country || city || checkIn || checkOut ||
+      hasChildren === 'yes' || email || phone || telegramLogin);
+    if (!anyContent) return;
+    try {
+      localStorage.setItem('hotel_booking_draft', JSON.stringify({
+        firstName, lastName, country, city, checkIn, checkOut,
+        guests, hasChildren, children,
+        email, phone, telegramLogin, extraValues,
+        savedAt: new Date().toISOString(),
+      }));
+    } catch { /* quota or json error — ignore */ }
+  }, [firstName, lastName, country, city, checkIn, checkOut, guests, hasChildren, children, email, phone, telegramLogin, extraValues]);
 
   // UX state
   const [submitting, setSubmitting] = useState(false);
@@ -142,6 +166,9 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
           }),
         });
       } catch { /* no-op */ }
+
+      // Clear draft now that the booking is successfully submitted
+      try { localStorage.removeItem('hotel_booking_draft'); } catch { /* no-op */ }
 
       setSubmitted(true);
     } catch (err) {
