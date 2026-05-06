@@ -64,8 +64,12 @@ const fmtDateTime = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
-export const Bookings: React.FC = () => {
-  const [tab, setTab] = useState<Tab>('hotels');
+interface BookingsProps {
+  initialTab?: Tab;
+}
+
+export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
+  const [tab, setTab] = useState<Tab>(initialTab ?? 'hotels');
   const [hotels, setHotels] = useState<HotelBooking[]>([]);
   const [flights, setFlights] = useState<FlightBooking[]>([]);
   const [loading, setLoading] = useState(false);
