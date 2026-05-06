@@ -277,19 +277,19 @@ function SearchStep({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="space-y-3 mb-3">
             <label className="block">
-              <span className="text-[10px] uppercase tracking-widest text-[#0F2A36]/55 font-bold">Туда</span>
+              <span className="text-[10px] uppercase tracking-wider text-[#0F2A36]/55 font-bold">Туда</span>
               <input
                 type="date"
                 value={f.departureDate}
                 min={todayPlus(0)}
                 onChange={(e) => set('departureDate', e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
+                className="mt-1 w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-widest text-[#0F2A36]/55 font-bold">
+              <span className="text-[10px] uppercase tracking-wider text-[#0F2A36]/55 font-bold">
                 {f.oneWay ? 'Без обратного' : 'Обратно'}
               </span>
               <input
@@ -298,7 +298,7 @@ function SearchStep({
                 min={f.departureDate || todayPlus(0)}
                 disabled={f.oneWay}
                 onChange={(e) => set('returnDate', e.target.value)}
-                className="mt-1 w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] disabled:opacity-50"
+                className="mt-1 w-full px-3 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] disabled:opacity-50"
               />
             </label>
           </div>
