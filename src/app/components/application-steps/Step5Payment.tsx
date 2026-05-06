@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Copy, Upload, Check, CreditCard, AlertCircle } from 'lucide-react';
 import { ApplicationData } from '../ApplicationForm';
+import { getAppSettings } from '../../lib/db';
 
 interface Step7Props {
   data: ApplicationData;
@@ -41,8 +42,18 @@ export default function Step7Payment({
   const hotelFee = data.hotelBooking ? 2000 : 0;
   const totalPrice = basePrice + urgentFee + ticketFee + hotelFee;
 
-  const cardNumber = '2200 7007 1234 5678';
-  const recipientName = 'IVANOV IVAN';
+  const [cardNumber, setCardNumber] = useState('2200 7007 1234 5678');
+  const [recipientName, setRecipientName] = useState('IVANOV IVAN');
+
+  useEffect(() => {
+    let alive = true;
+    getAppSettings().then(s => {
+      if (!alive) return;
+      if (s.payment_card_number) setCardNumber(s.payment_card_number);
+      if (s.payment_card_holder) setRecipientName(s.payment_card_holder);
+    }).catch(() => { /* defaults stay */ });
+    return () => { alive = false; };
+  }, []);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(cardNumber.replace(/\s/g, ''));

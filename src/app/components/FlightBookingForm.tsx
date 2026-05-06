@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy } from 'lucide-react';
-import { uploadFile } from '../lib/db';
+import { useState, useEffect } from 'react';
+import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
+import { uploadFile, getAppSettings, type ExtraFormField } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface FlightBookingFormProps {
@@ -29,9 +29,25 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
   // Payment
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [cardCopied, setCardCopied] = useState(false);
-  const FLIGHT_PRICE = 2000;
-  const CARD_NUMBER = '2200 7007 1234 5678';
-  const CARD_HOLDER = 'IVANOV IVAN';
+
+  // Live settings (admin-editable)
+  const [price, setPrice] = useState(2000);
+  const [cardNumber, setCardNumber] = useState('2200 7007 1234 5678');
+  const [cardHolder, setCardHolder] = useState('IVANOV IVAN');
+  const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
+  const [extraValues, setExtraValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let alive = true;
+    getAppSettings().then(s => {
+      if (!alive) return;
+      setPrice(s.flight_booking_price ?? 2000);
+      setCardNumber(s.payment_card_number ?? '2200 7007 1234 5678');
+      setCardHolder(s.payment_card_holder ?? 'IVANOV IVAN');
+      setExtraFields(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
+    }).catch(() => { /* defaults stay */ });
+    return () => { alive = false; };
+  }, []);
 
   // UX state
   const [submitting, setSubmitting] = useState(false);
@@ -39,7 +55,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
   const [error, setError] = useState<string | null>(null);
 
   const copyCard = async () => {
-    try { await navigator.clipboard.writeText(CARD_NUMBER.replace(/\s/g, '')); } catch { /* no-op */ }
+    try { await navigator.clipboard.writeText(cardNumber.replace(/\s/g, '')); } catch { /* no-op */ }
     setCardCopied(true);
     setTimeout(() => setCardCopied(false), 2000);
   };
@@ -50,6 +66,9 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
     if (!toCity.trim()) return 'Укажите город прилёта';
     if (!bookingDate) return 'Укажите дату брони';
     if (!email.trim() || !phone.trim() || !telegramLogin.trim()) return 'Заполните все контактные данные';
+    for (const f of extraFields) {
+      if (f.required && !((extraValues[f.id] ?? '').trim())) return `Заполните поле «${f.label}»`;
+    }
     if (!passport) return 'Прикрепите скан загранпаспорта';
     if (!paymentScreenshot) return 'Прикрепите скриншот оплаты';
     return null;
@@ -84,8 +103,9 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
         phone: phone.trim(),
         telegram_login: telegramLogin.trim(),
         passport_url: passportUrl,
-        price: FLIGHT_PRICE,
+        price,
         payment_screenshot_url: paymentUrl,
+        extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
         status: 'new',
       };
 
@@ -297,6 +317,39 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           )}
         </section>
 
+        {/* ── ✨ Доп. поля от админа ────────────────────────── */}
+        {extraFields.length > 0 && (
+          <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-[#3B5BFF]" />
+              <h3 className="text-sm font-bold text-[#0F2A36]">Дополнительно</h3>
+            </div>
+            <div className="space-y-3">
+              {extraFields.map(f => (
+                <Field key={f.id} label={f.label} required={f.required}>
+                  {f.type === 'textarea' ? (
+                    <textarea
+                      value={extraValues[f.id] ?? ''}
+                      onChange={e => setExtraValues({ ...extraValues, [f.id]: e.target.value })}
+                      placeholder={f.placeholder}
+                      rows={3}
+                      className="vd-input"
+                    />
+                  ) : (
+                    <input
+                      type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
+                      value={extraValues[f.id] ?? ''}
+                      onChange={e => setExtraValues({ ...extraValues, [f.id]: e.target.value })}
+                      placeholder={f.placeholder}
+                      className="vd-input"
+                    />
+                  )}
+                </Field>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* ── 💳 Оплата ─────────────────────────────────────── */}
         <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
@@ -306,20 +359,20 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
 
           <div className="vd-grad rounded-xl p-4 text-white shadow-md vd-shadow-cta mb-3">
             <p className="text-[11px] uppercase tracking-widest text-white/80 font-bold">К оплате</p>
-            <p className="text-[28px] font-extrabold tracking-tight mt-0.5">{FLIGHT_PRICE.toLocaleString('ru-RU')} ₽</p>
+            <p className="text-[28px] font-extrabold tracking-tight mt-0.5">{price.toLocaleString('ru-RU')} ₽</p>
           </div>
 
           <div className="bg-gray-50 rounded-xl p-3 mb-3">
-            <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/55 mb-1">Карта Сбербанк</p>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/55 mb-1">Перевод по карте</p>
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-mono font-bold text-[#0F2A36] tracking-wider">{CARD_NUMBER}</p>
+              <p className="text-sm font-mono font-bold text-[#0F2A36] tracking-wider">{cardNumber}</p>
               <button type="button" onClick={copyCard}
                 className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] transition active:scale-95 flex items-center gap-1 shrink-0">
                 {cardCopied ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2.5} />}
                 {cardCopied ? 'Скопировано' : 'Копировать'}
               </button>
             </div>
-            <p className="text-xs text-[#0F2A36]/60 mt-2">Получатель: <span className="font-semibold">{CARD_HOLDER}</span></p>
+            <p className="text-xs text-[#0F2A36]/60 mt-2">Получатель: <span className="font-semibold">{cardHolder}</span></p>
           </div>
 
           <p className="text-xs font-semibold text-[#0F2A36]/70 mb-2">Скриншот оплаты <span className="text-red-500">*</span></p>

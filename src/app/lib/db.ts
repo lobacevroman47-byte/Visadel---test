@@ -1031,6 +1031,14 @@ export async function seedFormFieldsFromCode(
 
 // ─── App Settings (single-row config) ────────────────────────────────────────
 
+export interface ExtraFormField {
+  id: string;          // unique within the form
+  label: string;       // human label
+  type: 'text' | 'textarea' | 'date' | 'number';
+  required: boolean;
+  placeholder?: string;
+}
+
 export interface AppSettings {
   id: number;
   new_user_welcome_bonus: number;
@@ -1039,6 +1047,15 @@ export interface AppSettings {
   max_bonus_usage_regular: number;
   max_bonus_usage_partner: number | null;
   bonus_expiration_days: number;
+  // Payment (shared across visas + bookings)
+  payment_card_number: string;
+  payment_card_holder: string;
+  // Booking prices
+  hotel_booking_price: number;
+  flight_booking_price: number;
+  // Extra custom fields appended at the bottom of the form
+  hotel_extra_fields: ExtraFormField[];
+  flight_extra_fields: ExtraFormField[];
   updated_at?: string;
 }
 
@@ -1050,6 +1067,12 @@ const SETTINGS_DEFAULTS: AppSettings = {
   max_bonus_usage_regular: BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR,
   max_bonus_usage_partner: BONUS_CONFIG.MAX_BONUS_USAGE_PARTNER,
   bonus_expiration_days: 365,
+  payment_card_number: '2200 7007 1234 5678',
+  payment_card_holder: 'IVANOV IVAN',
+  hotel_booking_price: 2000,
+  flight_booking_price: 2000,
+  hotel_extra_fields: [],
+  flight_extra_fields: [],
 };
 
 export async function getAppSettings(): Promise<AppSettings> {

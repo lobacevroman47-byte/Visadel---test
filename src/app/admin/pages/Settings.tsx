@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Save, Gift, Percent, Loader2, Settings as SettingsIcon, Package } from 'lucide-react';
-import { getAppSettings, saveAppSettings, type AppSettings } from '../../lib/db';
+import { Save, Gift, Percent, Loader2, Settings as SettingsIcon, Package, CreditCard, Hotel, Plane, Plus, Trash2, GripVertical } from 'lucide-react';
+import { getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField } from '../../lib/db';
 
 export const Settings: React.FC = () => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -161,6 +161,77 @@ export const Settings: React.FC = () => {
             в боковом меню — там же можно добавлять новые услуги, скрывать ненужные и менять иконки.
           </p>
         </div>
+
+        {/* Реквизиты оплаты */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2.5 bg-purple-100 rounded-lg"><CreditCard className="text-purple-600" size={20} /></div>
+            <h3>Реквизиты оплаты</h3>
+          </div>
+          <p className="text-sm text-gray-600 mb-4">
+            Используются на всех формах: визы, бронь отеля, бронь авиабилета. Изменения подтянутся клиентам сразу.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Номер карты</label>
+              <input
+                type="text" value={settings.payment_card_number}
+                onChange={e => set('payment_card_number', e.target.value)}
+                placeholder="2200 0000 0000 0000"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+              />
+              <p className="text-xs text-gray-500 mt-1">Можно с пробелами. Клиенты копируют без пробелов автоматически.</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Получатель (ФИО на карте)</label>
+              <input
+                type="text" value={settings.payment_card_holder}
+                onChange={e => set('payment_card_holder', e.target.value)}
+                placeholder="IVANOV IVAN"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+              />
+              <p className="text-xs text-gray-500 mt-1">Отображается под номером карты.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Бронь отеля */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2.5 bg-[#EAF1FF] rounded-lg"><Hotel className="text-[#3B5BFF]" size={20} /></div>
+            <h3>Бронь отеля</h3>
+          </div>
+          <NumberRow
+            label="Цена услуги"
+            hint="Стоимость, которую клиент платит за подтверждение брони отеля"
+            value={settings.hotel_booking_price}
+            onChange={v => set('hotel_booking_price', v)}
+          />
+          <ExtraFieldsEditor
+            title="Дополнительные поля анкеты"
+            value={settings.hotel_extra_fields ?? []}
+            onChange={v => set('hotel_extra_fields', v)}
+          />
+        </div>
+
+        {/* Бронь билета */}
+        <div className="bg-white p-6 rounded-xl border border-gray-200">
+          <div className="flex items-center gap-3 mb-5">
+            <div className="p-2.5 bg-[#EAF1FF] rounded-lg"><Plane className="text-[#3B5BFF]" size={20} /></div>
+            <h3>Бронь авиабилета</h3>
+          </div>
+          <NumberRow
+            label="Цена услуги"
+            hint="Стоимость, которую клиент платит за подтверждение брони рейса"
+            value={settings.flight_booking_price}
+            onChange={v => set('flight_booking_price', v)}
+          />
+          <ExtraFieldsEditor
+            title="Дополнительные поля анкеты"
+            value={settings.flight_extra_fields ?? []}
+            onChange={v => set('flight_extra_fields', v)}
+          />
+        </div>
       </div>
 
       {/* System Info */}
@@ -201,3 +272,109 @@ const NumberRow: React.FC<{
     {hint && <p className="text-xs text-gray-500 mt-1">{hint}</p>}
   </div>
 );
+
+const ExtraFieldsEditor: React.FC<{
+  title: string;
+  value: ExtraFormField[];
+  onChange: (v: ExtraFormField[]) => void;
+}> = ({ title, value, onChange }) => {
+  const addField = () => {
+    onChange([
+      ...value,
+      { id: Math.random().toString(36).slice(2, 10), label: '', type: 'text', required: false },
+    ]);
+  };
+
+  const updateField = (idx: number, patch: Partial<ExtraFormField>) => {
+    onChange(value.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+  };
+
+  const removeField = (idx: number) => {
+    onChange(value.filter((_, i) => i !== idx));
+  };
+
+  const moveField = (idx: number, dir: -1 | 1) => {
+    const next = idx + dir;
+    if (next < 0 || next >= value.length) return;
+    const arr = [...value];
+    [arr[idx], arr[next]] = [arr[next], arr[idx]];
+    onChange(arr);
+  };
+
+  return (
+    <div className="mt-5 pt-5 border-t border-gray-100">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-sm font-semibold text-gray-700">{title}</p>
+        <span className="text-xs text-gray-400">{value.length} {value.length === 1 ? 'поле' : 'полей'}</span>
+      </div>
+      <p className="text-xs text-gray-500 mb-3">
+        Эти поля появятся внизу анкеты у клиента, перед оплатой.
+      </p>
+
+      {value.length === 0 ? (
+        <div className="text-center py-5 border-2 border-dashed border-gray-200 rounded-lg">
+          <p className="text-xs text-gray-400 mb-2">Пока нет дополнительных полей</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {value.map((f, idx) => (
+            <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+              <div className="flex items-start gap-2 mb-2">
+                <div className="flex flex-col gap-0.5 pt-1.5">
+                  <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
+                    className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 disabled:cursor-not-allowed">
+                    <GripVertical size={14} />
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={f.label}
+                  onChange={e => updateField(idx, { label: e.target.value })}
+                  placeholder="Название поля (например: Авиакомпания)"
+                  className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#5C7BFF]"
+                />
+                <button type="button" onClick={() => removeField(idx)}
+                  className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap pl-6">
+                <select
+                  value={f.type}
+                  onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
+                  className="px-2 py-1 text-xs border border-gray-200 rounded-md bg-white"
+                >
+                  <option value="text">Текст</option>
+                  <option value="textarea">Длинный текст</option>
+                  <option value="number">Число</option>
+                  <option value="date">Дата</option>
+                </select>
+                <input
+                  type="text"
+                  value={f.placeholder ?? ''}
+                  onChange={e => updateField(idx, { placeholder: e.target.value })}
+                  placeholder="Подсказка"
+                  className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                />
+                <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
+                  <input
+                    type="checkbox" checked={f.required}
+                    onChange={e => updateField(idx, { required: e.target.checked })}
+                    className="accent-[#3B5BFF]"
+                  />
+                  Обязательное
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={addField}
+        className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 hover:border-[#5C7BFF] hover:bg-[#EAF1FF] text-sm text-[#3B5BFF] font-semibold rounded-lg transition flex items-center justify-center gap-1">
+        <Plus size={14} strokeWidth={2.5} />
+        Добавить поле
+      </button>
+    </div>
+  );
+};
