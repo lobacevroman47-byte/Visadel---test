@@ -53,10 +53,10 @@ interface FlightBooking {
 type Tab = 'hotels' | 'flights';
 
 const STATUS_OPTIONS = [
-  { value: 'new',         label: 'Новая',     color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  { value: 'in_progress', label: 'В работе',  color: 'bg-amber-100 text-amber-700' },
-  { value: 'confirmed',   label: 'Готово',    color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'cancelled',   label: 'Отменена',  color: 'bg-red-100 text-red-700' },
+  { value: 'new',         label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  { value: 'in_progress', label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
+  { value: 'confirmed',   label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'cancelled',   label: 'Отменена',              color: 'bg-red-100 text-red-700' },
 ];
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -332,16 +332,8 @@ function ConfirmationUploader({
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-[#0F2A36]">Загружено</p>
-              <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть</a>
+              <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть файл</a>
             </div>
-            {ready && (
-              <label className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] cursor-pointer transition active:scale-95 flex items-center gap-1 shrink-0">
-                <Upload className="w-3.5 h-3.5" />
-                Заменить
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
-                  onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
-              </label>
-            )}
           </div>
         ) : (
           <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">

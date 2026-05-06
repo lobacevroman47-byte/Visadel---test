@@ -646,10 +646,10 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
 // ── Booking card components ─────────────────────────────────────────────────
 
 const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
-  new:         { label: 'Новая',     color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  in_progress: { label: 'В работе',  color: 'bg-amber-100 text-amber-700' },
-  confirmed:   { label: 'Готово',    color: 'bg-emerald-100 text-emerald-700' },
-  cancelled:   { label: 'Отменена',  color: 'bg-red-100 text-red-700' },
+  new:         { label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  in_progress: { label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
+  confirmed:   { label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
+  cancelled:   { label: 'Отменена',              color: 'bg-red-100 text-red-700' },
 };
 
 const fmtBookingDate = (s: string) =>
