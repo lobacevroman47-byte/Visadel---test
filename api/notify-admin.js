@@ -1,7 +1,12 @@
-// Vercel Serverless Function — notifies all admins about a new application.
-// POST { event, application_id, country, visa_type, price, urgent, customer_name, customer_telegram }
+// Vercel Serverless Function — notifies all admins about new submissions.
+// POST { event, ... } or POST { type: 'hotel_booking' | 'flight_booking', customer_name, details }
 //
-// event: 'new_application' (default) | 'new_review'
+// event values:
+//   'new_application' (default) — visa applications
+//   'new_review' — review awaiting moderation
+// type values (legacy alt format, used by booking forms):
+//   'hotel_booking' — hotel reservation request
+//   'flight_booking' — flight reservation request
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -57,21 +62,56 @@ export default async function handler(req, res) {
   const appUrl = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL;
   if (!token) { res.status(500).json({ error: 'TELEGRAM_BOT_TOKEN not configured' }); return; }
 
+  const body = req.body ?? {};
   const {
-    event = 'new_application',
+    event,
+    type, // alt routing key used by booking forms
     application_id,
     country, visa_type, price, urgent,
     customer_name, customer_telegram,
     review_country, review_rating, review_text,
-  } = req.body ?? {};
+    details,
+  } = body;
+
+  // Normalise: forms send `type: 'hotel_booking' | 'flight_booking'` instead of `event: 'new_application'`
+  const resolvedEvent = type ?? event ?? 'new_application';
+  const fmtRub = (n) => (typeof n === 'number' ? n.toLocaleString('ru-RU') + ' ₽' : '—');
 
   let text;
-  if (event === 'new_review') {
+  if (resolvedEvent === 'new_review') {
     text =
       `⭐ <b>Новый отзыв на модерации</b>\n\n` +
       `🌍 Страна: ${review_country ?? '—'}\n` +
       `Оценка: ${'⭐'.repeat(review_rating ?? 5)}\n\n` +
       `<i>${(review_text ?? '').slice(0, 200)}</i>`;
+  } else if (resolvedEvent === 'hotel_booking') {
+    const d = details ?? {};
+    const nameLine = customer_name ? `<b>${customer_name}</b>` : '<i>Имя не указано</i>';
+    const childrenLine = Array.isArray(d.children_ages) && d.children_ages.length > 0
+      ? ` + ${d.children_ages.length} реб. (${d.children_ages.join(', ')} лет)`
+      : '';
+    text =
+      `🏨 <b>Новая бронь отеля</b>\n` +
+      `${nameLine}\n\n` +
+      `📍 ${d.country ?? '—'}, ${d.city ?? '—'}\n` +
+      `📅 ${d.check_in ?? '—'} → ${d.check_out ?? '—'}\n` +
+      `👥 ${d.guests ?? '—'} гост.${childrenLine}\n` +
+      `💰 ${fmtRub(d.price)}\n` +
+      (d.telegram_login ? `📱 ${String(d.telegram_login).startsWith('@') ? d.telegram_login : '@' + d.telegram_login}\n` : '') +
+      (d.phone ? `☎️ ${d.phone}\n` : '') +
+      `\nЗайди в админку → раздел Брони → подтверди оплату.`;
+  } else if (resolvedEvent === 'flight_booking') {
+    const d = details ?? {};
+    const nameLine = customer_name ? `<b>${customer_name}</b>` : '<i>Имя не указано</i>';
+    text =
+      `✈️ <b>Новая бронь авиабилета</b>\n` +
+      `${nameLine}\n\n` +
+      `📍 ${d.from_city ?? '—'} → ${d.to_city ?? '—'}\n` +
+      `📅 ${d.booking_date ?? '—'}\n` +
+      `💰 ${fmtRub(d.price)}\n` +
+      (d.telegram_login ? `📱 ${String(d.telegram_login).startsWith('@') ? d.telegram_login : '@' + d.telegram_login}\n` : '') +
+      (d.phone ? `☎️ ${d.phone}\n` : '') +
+      `\nЗайди в админку → раздел Брони → подтверди оплату.`;
   } else {
     // Customer name (Имя + Фамилия) is the most useful piece — make it the title.
     const nameLine = customer_name ? `<b>${customer_name}</b>` : '<i>Имя не указано</i>';
@@ -101,6 +141,6 @@ export default async function handler(req, res) {
     recipients.map(id => sendTg(token, id, text, reply_markup))
   );
   const sent = results.filter(r => r.ok).length;
-  console.log(`[notify-admin] event=${event} sent=${sent}/${recipients.length} (founders + admin_users)`);
+  console.log(`[notify-admin] event=${resolvedEvent} sent=${sent}/${recipients.length} (founders + admin_users)`);
   res.status(200).json({ ok: true, sent, total: recipients.length });
 }

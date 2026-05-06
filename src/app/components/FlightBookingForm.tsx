@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar } from 'lucide-react';
+import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
@@ -26,10 +26,23 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
   // Passport file
   const [passport, setPassport] = useState<File | null>(null);
 
+  // Payment
+  const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
+  const [cardCopied, setCardCopied] = useState(false);
+  const FLIGHT_PRICE = 2000;
+  const CARD_NUMBER = '2200 7007 1234 5678';
+  const CARD_HOLDER = 'IVANOV IVAN';
+
   // UX state
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const copyCard = async () => {
+    try { await navigator.clipboard.writeText(CARD_NUMBER.replace(/\s/g, '')); } catch { /* no-op */ }
+    setCardCopied(true);
+    setTimeout(() => setCardCopied(false), 2000);
+  };
 
   const validate = (): string | null => {
     if (!firstName.trim() || !lastName.trim()) return 'Заполните имя и фамилию (как в загранпаспорте)';
@@ -38,6 +51,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
     if (!bookingDate) return 'Укажите дату брони';
     if (!email.trim() || !phone.trim() || !telegramLogin.trim()) return 'Заполните все контактные данные';
     if (!passport) return 'Прикрепите скан загранпаспорта';
+    if (!paymentScreenshot) return 'Прикрепите скриншот оплаты';
     return null;
   };
 
@@ -49,7 +63,10 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
     setSubmitting(true);
 
     try {
-      const passportUrl = passport ? await uploadFile(passport, 'photos') : null;
+      const [passportUrl, paymentUrl] = await Promise.all([
+        passport ? uploadFile(passport, 'photos') : Promise.resolve(null),
+        paymentScreenshot ? uploadFile(paymentScreenshot, 'payments') : Promise.resolve(null),
+      ]);
 
       const userData = (() => {
         try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
@@ -67,6 +84,8 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
         phone: phone.trim(),
         telegram_login: telegramLogin.trim(),
         passport_url: passportUrl,
+        price: FLIGHT_PRICE,
+        payment_screenshot_url: paymentUrl,
         status: 'new',
       };
 
@@ -149,7 +168,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           <span className="vd-grad-text">для визы</span>
         </h1>
         <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3">
-          Заполни 3 минуты — пришлём подтверждение для посольства
+          Заполни 3 минуты — пришлём подтверждение <br/>для посольства и пограничного контроля
         </p>
       </div>
 
@@ -278,6 +297,65 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           )}
         </section>
 
+        {/* ── 💳 Оплата ─────────────────────────────────────── */}
+        <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
+          <div className="flex items-center gap-2 mb-4">
+            <CreditCard className="w-5 h-5 text-[#3B5BFF]" />
+            <h3 className="text-sm font-bold text-[#0F2A36]">Оплата</h3>
+          </div>
+
+          <div className="vd-grad rounded-xl p-4 text-white shadow-md vd-shadow-cta mb-3">
+            <p className="text-[11px] uppercase tracking-widest text-white/80 font-bold">К оплате</p>
+            <p className="text-[28px] font-extrabold tracking-tight mt-0.5">{FLIGHT_PRICE.toLocaleString('ru-RU')} ₽</p>
+          </div>
+
+          <div className="bg-gray-50 rounded-xl p-3 mb-3">
+            <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/55 mb-1">Карта Сбербанк</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-mono font-bold text-[#0F2A36] tracking-wider">{CARD_NUMBER}</p>
+              <button type="button" onClick={copyCard}
+                className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] transition active:scale-95 flex items-center gap-1 shrink-0">
+                {cardCopied ? <Check size={13} strokeWidth={2.5} /> : <Copy size={13} strokeWidth={2.5} />}
+                {cardCopied ? 'Скопировано' : 'Копировать'}
+              </button>
+            </div>
+            <p className="text-xs text-[#0F2A36]/60 mt-2">Получатель: <span className="font-semibold">{CARD_HOLDER}</span></p>
+          </div>
+
+          <p className="text-xs font-semibold text-[#0F2A36]/70 mb-2">Скриншот оплаты <span className="text-red-500">*</span></p>
+          {!paymentScreenshot ? (
+            <label className="block border-2 border-dashed border-gray-300 rounded-xl p-5 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+              <Upload className="w-6 h-6 text-gray-400 mx-auto mb-2" />
+              <p className="text-sm text-[#0F2A36]">Загрузить скриншот платежа</p>
+              <p className="text-xs text-[#0F2A36]/55 mt-1">JPG или PNG · до 5 МБ</p>
+              <input
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0];
+                  if (f && f.size > 5 * 1024 * 1024) { setError('Файл больше 5 МБ'); return; }
+                  if (f) setPaymentScreenshot(f);
+                }}
+              />
+            </label>
+          ) : (
+            <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center">
+                <Check className="w-5 h-5 text-[#3B5BFF]" strokeWidth={3} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-[#0F2A36] truncate">{paymentScreenshot.name}</p>
+                <p className="text-[11px] text-[#0F2A36]/55">{(paymentScreenshot.size / 1024).toFixed(1)} КБ</p>
+              </div>
+              <button type="button" onClick={() => setPaymentScreenshot(null)}
+                className="w-8 h-8 rounded-lg bg-white text-red-500 flex items-center justify-center active:scale-95 transition">
+                <X size={14} strokeWidth={2.5} />
+              </button>
+            </div>
+          )}
+        </section>
+
         {/* Error */}
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
@@ -291,7 +369,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           disabled={submitting}
           className="w-full py-4 rounded-2xl vd-grad text-white font-bold shadow-md vd-shadow-cta active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-60"
         >
-          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем…</> : 'Отправить заявку'}
+          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем…</> : 'Оплатил — отправить заявку'}
         </button>
 
         <style>{`

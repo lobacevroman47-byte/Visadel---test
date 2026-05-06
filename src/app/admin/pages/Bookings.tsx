@@ -23,6 +23,8 @@ interface HotelBooking {
   phone: string;
   telegram_login: string;
   passport_url: string | null;
+  payment_screenshot_url: string | null;
+  price: number | null;
   status: string;
 }
 
@@ -40,6 +42,8 @@ interface FlightBooking {
   phone: string;
   telegram_login: string;
   passport_url: string | null;
+  payment_screenshot_url: string | null;
+  price: number | null;
   status: string;
 }
 
@@ -223,6 +227,7 @@ function HotelRow({ b, onClick }: { b: HotelBooking; onClick: () => void }) {
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
           <StatusBadge status={b.status} />
+          {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
         </div>
         <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
           {b.country}, {b.city} · {fmtDate(b.check_in)} → {fmtDate(b.check_out)} · {b.guests} гост.{b.children_ages.length > 0 ? ` + ${b.children_ages.length} реб.` : ''}
@@ -247,6 +252,7 @@ function FlightRow({ b, onClick }: { b: FlightBooking; onClick: () => void }) {
         <div className="flex items-center gap-2 flex-wrap">
           <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
           <StatusBadge status={b.status} />
+          {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
         </div>
         <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
           {b.from_city} → {b.to_city} · {fmtDate(b.booking_date)}
@@ -257,6 +263,29 @@ function FlightRow({ b, onClick }: { b: FlightBooking; onClick: () => void }) {
       </div>
       <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
     </button>
+  );
+}
+
+function PaymentBlock({ price, screenshotUrl }: { price: number | null; screenshotUrl: string | null }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Оплата</p>
+      <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] uppercase tracking-wider font-bold text-[#3B5BFF]">К оплате</p>
+          <p className="text-base font-extrabold text-[#0F2A36]">{price != null ? `${price.toLocaleString('ru-RU')} ₽` : '—'}</p>
+        </div>
+        {screenshotUrl ? (
+          <a href={screenshotUrl} target="_blank" rel="noreferrer"
+            className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] transition active:scale-95 flex items-center gap-1 shrink-0">
+            <FileText className="w-3.5 h-3.5" />
+            Скриншот
+          </a>
+        ) : (
+          <span className="text-[11px] text-gray-400 italic">Скриншот не приложен</span>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -354,6 +383,7 @@ function HotelDetail({ b, onClose, onStatusChange }: { b: HotelBooking; onClose:
         </div>
 
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
+        <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
       </div>
     </ModalShell>
@@ -384,6 +414,7 @@ function FlightDetail({ b, onClose, onStatusChange }: { b: FlightBooking; onClos
         </div>
 
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
+        <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
       </div>
     </ModalShell>

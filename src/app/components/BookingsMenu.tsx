@@ -35,10 +35,11 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
         <div className="vd-grad-soft px-5 pt-7 pb-6">
           <p className="text-center text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">📋 Раздел</p>
           <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36] mt-1">
-            Брони <span className="vd-grad-text">для визы</span>
+            Брони для виз <br/>
+            <span className="vd-grad-text">и пересечения границы</span>
           </h1>
           <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
-            Подтверждения бронирований для подачи документов в посольство
+            Подтверждения бронирований — для посольств и пограничного контроля
           </p>
         </div>
 
@@ -54,7 +55,7 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-bold text-[#0F2A36]">Бронь отеля</p>
-              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Подтверждение для визы — приходит на email</p>
+              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Для визы и пересечения границы — на email</p>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
           </button>
@@ -69,7 +70,7 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-[15px] font-bold text-[#0F2A36]">Бронь авиабилета</p>
-              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Подтверждение брони рейса для визы</p>
+              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Для визы и пересечения границы — рейс туда/обратно</p>
             </div>
             <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
           </button>

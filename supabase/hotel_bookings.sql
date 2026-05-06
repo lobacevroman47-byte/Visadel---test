@@ -26,11 +26,15 @@ CREATE TABLE IF NOT EXISTS hotel_bookings (
   phone           text          NOT NULL,
   telegram_login  text          NOT NULL,
 
-  -- Files (only passport for now)
-  passport_url    text,
+  -- Files
+  passport_url            text,
+  payment_screenshot_url  text,
+
+  -- Pricing
+  price                   integer,
 
   -- Lifecycle
-  status          text          NOT NULL DEFAULT 'new'
+  status                  text          NOT NULL DEFAULT 'new'
 );
 
 CREATE INDEX IF NOT EXISTS idx_hotel_bookings_telegram_id ON hotel_bookings (telegram_id);
