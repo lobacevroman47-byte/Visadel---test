@@ -676,9 +676,8 @@ function BookingActions({
 }) {
   const [submitting, setSubmitting] = useState(false);
   const reviewed = !!booking.review_bonus_granted;
-  const ready = !!booking.confirmation_url;
-  // Отзыв доступен только когда подтверждение загружено (а статус confirmed по логике должен быть выставлен ДО загрузки)
-  const canReview = ready && booking.status === 'confirmed' && !reviewed;
+  // Mirror the visa pattern: deliverable is "ready" only when status='confirmed' AND file is uploaded
+  const ready = booking.status === 'confirmed' && !!booking.confirmation_url;
 
   const handleReview = async () => {
     if (submitting || !canReview) return;
@@ -736,36 +735,48 @@ function BookingActions({
     }
   };
 
-  if (!ready && !canReview) return null;
+  if (!ready) return null;
 
+  // Mirror the visa "ready" download/review section 1-for-1
   return (
-    <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row gap-2">
-      {ready && booking.confirmation_url && (
-        <a
-          href={booking.confirmation_url}
-          target="_blank" rel="noreferrer"
-          className="flex-1 py-2.5 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition hover:bg-[#DCE7FF]"
-        >
-          <Download className="w-4 h-4" />
-          Скачать подтверждение
-        </a>
-      )}
-      {canReview && (
-        <button
-          type="button"
-          onClick={handleReview}
-          disabled={submitting}
-          className="flex-1 py-2.5 rounded-lg vd-grad text-white text-sm font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition shadow-md vd-shadow-cta disabled:opacity-60"
-        >
-          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-          {isPartner ? 'Оставить отзыв' : 'Оставить отзыв · +200 ₽'}
-        </button>
-      )}
-      {reviewed && (
-        <div className="flex-1 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-1.5">
-          <Check className="w-4 h-4" />
-          Отзыв оставлен
-        </div>
+    <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
+      {!reviewed ? (
+        // Locked download — must review first
+        <>
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-600 shrink-0" />
+            <p className="text-sm text-amber-700">Оставьте отзыв чтобы скачать подтверждение</p>
+          </div>
+          <button
+            disabled
+            className="w-full flex items-center justify-center gap-2 py-3 bg-gray-200 text-gray-400 rounded-xl text-sm font-medium cursor-not-allowed"
+          >
+            <Lock className="w-4 h-4" /> Скачать подтверждение (недоступно)
+          </button>
+          <button
+            type="button"
+            onClick={handleReview}
+            disabled={submitting}
+            className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium"
+          >
+            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+            {isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
+          </button>
+        </>
+      ) : (
+        // Unlocked — review submitted
+        <>
+          <a
+            href={booking.confirmation_url ?? '#'}
+            target="_blank" rel="noreferrer" download
+            className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
+          >
+            <Download className="w-4 h-4" /> Скачать подтверждение
+          </a>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-2 text-center">
+            <p className="text-xs text-green-700">✓ Отзыв оставлен · спасибо!</p>
+          </div>
+        </>
       )}
     </div>
   );
