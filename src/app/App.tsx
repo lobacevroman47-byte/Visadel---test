@@ -11,6 +11,7 @@ const UserProfile            = lazy(() => import('./components/UserProfile'));
 const SriLankaExtensionForm  = lazy(() => import('./components/SriLankaExtensionForm'));
 const PartnerApplicationForm = lazy(() => import('./components/PartnerApplicationForm'));
 const HotelBookingForm       = lazy(() => import('./components/HotelBookingForm'));
+const FlightBookingForm      = lazy(() => import('./components/FlightBookingForm'));
 const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
 const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
 import {
@@ -52,6 +53,7 @@ type Screen =
   | 'extension'
   | 'partner_application'
   | 'hotel_booking'
+  | 'flight_booking'
   | 'admin';
 
 export interface VisaOption {
@@ -226,6 +228,7 @@ function App() {
                 <BookingsMenu
                   onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
                   onOpenHotelBooking={() => setCurrentScreen('hotel_booking')}
+                  onOpenFlightBooking={() => setCurrentScreen('flight_booking')}
                 />
               </Suspense>
             )}
@@ -296,6 +299,14 @@ function App() {
         {currentScreen === 'hotel_booking' && (
           <Suspense fallback={<SplashScreen />}>
             <HotelBookingForm
+              onBack={() => { setMainTab('bookings'); setCurrentScreen('home'); }}
+              onComplete={() => { setMainTab('visas'); setCurrentScreen('home'); }}
+            />
+          </Suspense>
+        )}
+        {currentScreen === 'flight_booking' && (
+          <Suspense fallback={<SplashScreen />}>
+            <FlightBookingForm
               onBack={() => { setMainTab('bookings'); setCurrentScreen('home'); }}
               onComplete={() => { setMainTab('visas'); setCurrentScreen('home'); }}
             />
