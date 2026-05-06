@@ -737,7 +737,7 @@ function BookingActions({
 
   if (!ready) return null;
 
-  // Mirror the visa "ready" download/review section 1-for-1
+  // Same locked → unlock structure as visas, but with VISADEL brand colours on CTAs
   return (
     <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
       {!reviewed ? (
@@ -757,7 +757,7 @@ function BookingActions({
             type="button"
             onClick={handleReview}
             disabled={submitting}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 text-sm font-medium"
+            className="w-full py-3 vd-grad text-white shadow-md vd-shadow-cta disabled:opacity-60 rounded-xl active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm font-bold"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
             {isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
@@ -769,7 +769,7 @@ function BookingActions({
           <a
             href={booking.confirmation_url ?? '#'}
             target="_blank" rel="noreferrer" download
-            className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl hover:shadow-lg transition text-sm font-medium"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-[#EAF1FF] text-[#3B5BFF] rounded-xl hover:bg-[#DCE7FF] active:scale-[0.99] transition text-sm font-bold"
           >
             <Download className="w-4 h-4" /> Скачать подтверждение
           </a>
