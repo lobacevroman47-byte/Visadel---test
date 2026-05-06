@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw } from 'lucide-react';
-import { getUserApplications, getReviewedAppIds, submitReview, type Application } from '../../lib/db';
+import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane } from 'lucide-react';
+import {
+  getUserApplications, getReviewedAppIds, submitReview,
+  getUserHotelBookings, getUserFlightBookings,
+  type Application,
+  type HotelBookingRow, type FlightBookingRow,
+} from '../../lib/db';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useTelegram } from '../../App';
 
@@ -186,6 +191,8 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function ApplicationsTab({ onContinueDraft, onBonusChange }: ApplicationsTabProps) {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [hotelBookings, setHotelBookings] = useState<HotelBookingRow[]>([]);
+  const [flightBookings, setFlightBookings] = useState<FlightBookingRow[]>([]);
   const [reviewedIds, setReviewedIds] = useState<Set<string>>(new Set());
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -203,12 +210,16 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
     const id = tid ?? telegramId;
     setLoading(true);
     try {
-      const [apps, reviewed] = await Promise.all([
+      const [apps, reviewed, hotels, flights] = await Promise.all([
         id ? getUserApplications(id) : Promise.resolve([]),
         id ? getReviewedAppIds(id) : Promise.resolve(new Set<string>()),
+        id ? getUserHotelBookings(id) : Promise.resolve([] as HotelBookingRow[]),
+        id ? getUserFlightBookings(id) : Promise.resolve([] as FlightBookingRow[]),
       ]);
       setApplications(apps);
       setReviewedIds(reviewed);
+      setHotelBookings(hotels);
+      setFlightBookings(flights);
 
       // Load drafts from localStorage
       try {
@@ -434,11 +445,13 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
           </h3>
 
           {applications.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-md p-8 text-center">
-              <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600">У вас пока нет заявок</p>
-              <p className="text-sm text-gray-500 mt-1">Оформите первую визу, чтобы увидеть её здесь</p>
-            </div>
+            hotelBookings.length === 0 && flightBookings.length === 0 ? (
+              <div className="bg-white rounded-xl shadow-md p-8 text-center">
+                <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-600">У вас пока нет заявок</p>
+                <p className="text-sm text-gray-500 mt-1">Оформите визу или бронь, чтобы увидеть её здесь</p>
+              </div>
+            ) : null
           ) : (
             <div className="space-y-3">
               {applications.map(app => {
@@ -557,6 +570,19 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
             </div>
           )}
         </div>
+
+        {/* ── Bookings (hotel + flight) ─────────────────────── */}
+        {(hotelBookings.length > 0 || flightBookings.length > 0) && (
+          <div>
+            <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
+              <Hotel className="w-5 h-5" /> Мои брони
+            </h3>
+            <div className="space-y-3">
+              {hotelBookings.map(b => <HotelBookingCard key={b.id} b={b} />)}
+              {flightBookings.map(b => <FlightBookingCard key={b.id} b={b} />)}
+            </div>
+          </div>
+        )}
       </div>
 
       {reviewApp && (
@@ -568,5 +594,91 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
         />
       )}
     </>
+  );
+}
+
+// ── Booking card components ─────────────────────────────────────────────────
+
+const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
+  new:         { label: 'Новая',          color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  in_progress: { label: 'В работе',       color: 'bg-amber-100 text-amber-700' },
+  confirmed:   { label: 'Подтверждена',   color: 'bg-emerald-100 text-emerald-700' },
+  cancelled:   { label: 'Отменена',       color: 'bg-red-100 text-red-700' },
+};
+
+const fmtBookingDate = (s: string) =>
+  new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+
+const fmtBookingDateTime = (s: string) =>
+  new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+function HotelBookingCard({ b }: { b: HotelBookingRow }) {
+  const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+          <Hotel className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="text-sm font-bold text-[#0F2A36]">Бронь отеля</p>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${cfg.color}`}>
+              {cfg.label}
+            </span>
+          </div>
+          <p className="text-xs text-[#0F2A36]/70">
+            {b.country}, {b.city}
+          </p>
+          <p className="text-xs text-[#0F2A36]/60 mt-0.5">
+            {fmtBookingDate(b.check_in)} → {fmtBookingDate(b.check_out)} · {b.guests} гост.
+            {b.children_ages.length > 0 && ` + ${b.children_ages.length} реб.`}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+            <span className="text-[11px] text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> {fmtBookingDateTime(b.created_at)}
+            </span>
+            {b.price != null && (
+              <span className="text-[12px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FlightBookingCard({ b }: { b: FlightBookingRow }) {
+  const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+      <div className="flex items-start gap-3">
+        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+          <Plane className="w-5 h-5" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <p className="text-sm font-bold text-[#0F2A36]">Бронь авиабилета</p>
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${cfg.color}`}>
+              {cfg.label}
+            </span>
+          </div>
+          <p className="text-xs text-[#0F2A36]/70">
+            {b.from_city} → {b.to_city}
+          </p>
+          <p className="text-xs text-[#0F2A36]/60 mt-0.5">
+            {fmtBookingDate(b.booking_date)}
+          </p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+            <span className="text-[11px] text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" /> {fmtBookingDateTime(b.created_at)}
+            </span>
+            {b.price != null && (
+              <span className="text-[12px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

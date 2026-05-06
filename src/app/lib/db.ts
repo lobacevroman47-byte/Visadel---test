@@ -324,6 +324,73 @@ export async function getUserApplications(telegramId: number): Promise<Applicati
   return apps.filter(a => a.user_telegram_id === telegramId);
 }
 
+// ─── Bookings (Hotel + Flight) ───────────────────────────────────────────────
+
+export interface HotelBookingRow {
+  id: string;
+  created_at: string;
+  telegram_id: number | null;
+  username: string | null;
+  first_name: string;
+  last_name: string;
+  country: string;
+  city: string;
+  check_in: string;
+  check_out: string;
+  guests: number;
+  children_ages: string[];
+  email: string;
+  phone: string;
+  telegram_login: string;
+  passport_url: string | null;
+  payment_screenshot_url: string | null;
+  price: number | null;
+  status: string;
+  extra_fields?: Record<string, string> | null;
+}
+
+export interface FlightBookingRow {
+  id: string;
+  created_at: string;
+  telegram_id: number | null;
+  username: string | null;
+  first_name: string;
+  last_name: string;
+  from_city: string;
+  to_city: string;
+  booking_date: string;
+  email: string;
+  phone: string;
+  telegram_login: string;
+  passport_url: string | null;
+  payment_screenshot_url: string | null;
+  price: number | null;
+  status: string;
+  extra_fields?: Record<string, string> | null;
+}
+
+export async function getUserHotelBookings(telegramId: number): Promise<HotelBookingRow[]> {
+  if (!isSupabaseConfigured() || !telegramId) return [];
+  const { data, error } = await supabase
+    .from('hotel_bookings')
+    .select('*')
+    .eq('telegram_id', telegramId)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('getUserHotelBookings error', error.message); return []; }
+  return (data as HotelBookingRow[]) ?? [];
+}
+
+export async function getUserFlightBookings(telegramId: number): Promise<FlightBookingRow[]> {
+  if (!isSupabaseConfigured() || !telegramId) return [];
+  const { data, error } = await supabase
+    .from('flight_bookings')
+    .select('*')
+    .eq('telegram_id', telegramId)
+    .order('created_at', { ascending: false });
+  if (error) { console.warn('getUserFlightBookings error', error.message); return []; }
+  return (data as FlightBookingRow[]) ?? [];
+}
+
 export async function getApplication(id: string): Promise<Application | null> {
   if (isSupabaseConfigured()) {
     const { data } = await supabase
