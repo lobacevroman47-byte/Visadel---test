@@ -350,6 +350,16 @@ export const statusColors: Record<Application['status'], string> = {
   completed: '#00C853'
 };
 
+// Tailwind chip classes for status badges — matches the Bookings admin page,
+// so visa applications and hotel/flight bookings look visually consistent.
+export const statusChipClass: Record<Application['status'], string> = {
+  draft:                'bg-gray-100 text-gray-700',
+  pending_payment:      'bg-yellow-100 text-yellow-700',
+  pending_confirmation: 'bg-[#EAF1FF] text-[#3B5BFF]',
+  in_progress:          'bg-amber-100 text-amber-700',
+  completed:            'bg-emerald-100 text-emerald-700',
+};
+
 export const roleLabels: Record<'owner' | 'admin' | 'manager', string> = {
   owner: 'Владелец',
   admin: 'Администратор',

@@ -3,7 +3,7 @@ import {
   FileText, Users, Globe, TrendingUp, Wallet, PiggyBank, Coins, Loader2,
   Info, ChevronDown,
 } from 'lucide-react';
-import { statusLabels } from '../data/mockData';
+import { statusLabels, statusChipClass } from '../data/mockData';
 import { useAdminApplications, useAdminUsers } from '../hooks/useAdminData';
 import { getFinanceStats, type FinanceStats } from '../../lib/db';
 
@@ -333,7 +333,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                   <td className="px-6 py-4 text-sm"><span className="mr-2">{app.countryFlag}</span>{app.country}</td>
                   <td className="px-6 py-4 text-sm">{app.clientName}</td>
                   <td className="px-6 py-4 text-sm">{app.cost.toLocaleString('ru-RU')} ₽</td>
-                  <td className="px-6 py-4 text-sm"><span className="px-2 py-1 bg-[#F5F7FA] rounded text-xs">{statusLabels[app.status]}</span></td>
+                  <td className="px-6 py-4 text-sm"><span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>{statusLabels[app.status]}</span></td>
                   <td className="px-6 py-4 text-sm text-gray-600">{new Date(app.date).toLocaleDateString('ru-RU')}</td>
                 </tr>
               ))}

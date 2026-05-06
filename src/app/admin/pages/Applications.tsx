@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Search, Eye, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, History, Clock } from 'lucide-react';
-import { statusLabels, statusColors } from '../data/mockData';
+import { Search, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, History, Clock } from 'lucide-react';
+import { statusLabels, statusChipClass } from '../data/mockData';
 import {
   useAdminApplications,
   updateApplicationStatus,
@@ -538,20 +538,21 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
           <div>
             <div className="flex items-center gap-2">
               <span className="text-lg">{application.countryFlag}</span>
-              <h2 className="text-lg font-semibold text-gray-800">Заявка {application.id}</h2>
+              <h2 className="text-lg font-semibold text-[#0F2A36]">{application.clientName || 'Без имени'}</h2>
             </div>
-            {tgUsername ? (
-              <a
-                href={`https://t.me/${tgUsername}`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm text-blue-500 hover:underline flex items-center gap-1 mt-0.5"
-              >
-                @{tgUsername} <ExternalLink className="w-3 h-3" />
-              </a>
-            ) : (
-              <p className="text-sm text-gray-500 mt-0.5">{application.clientName}</p>
-            )}
+            <div className="flex items-center gap-2 text-sm text-gray-500 mt-0.5">
+              <span>{application.country} · {application.visaType}</span>
+              {tgUsername && (
+                <a
+                  href={`https://t.me/${tgUsername}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#3B5BFF] hover:underline flex items-center gap-1"
+                >
+                  @{tgUsername} <ExternalLink className="w-3 h-3" />
+                </a>
+              )}
+            </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
             <X size={20} />
@@ -1037,7 +1038,6 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
           <table className="w-full">
             <thead className="bg-[#F5F7FA]">
               <tr>
-                <th className="px-4 py-3 text-left text-xs text-gray-600">ID</th>
                 <th
                   className="px-4 py-3 text-left text-xs text-gray-600 cursor-pointer select-none hover:bg-gray-100"
                   onClick={() => toggleSort('country')}
@@ -1065,60 +1065,58 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                 >
                   Дата {sortIcon('date')}
                 </th>
-                <th className="px-4 py-3 text-left text-xs text-gray-600 w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {sorted.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-gray-400 text-sm">
+                  <td colSpan={7} className="px-6 py-12 text-center text-gray-400 text-sm">
                     {applications.length === 0 ? 'Заявок пока нет' : 'По выбранным фильтрам ничего не найдено'}
                   </td>
                 </tr>
               ) : sorted.map((app) => {
                 const tgUser = ((app.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? app.telegram ?? '').replace('@', '');
                 return (
-                  <tr key={app.id} className={`hover:bg-[#F5F7FA] ${app.urgent ? 'bg-red-50/40' : ''}`}>
-                    <td className="px-4 py-3 text-sm font-mono text-gray-600">{app.id.slice(0, 8)}</td>
+                  <tr
+                    key={app.id}
+                    onClick={() => setSelectedApp(app)}
+                    className={`cursor-pointer transition hover:bg-[#EAF1FF]/60 active:bg-[#EAF1FF] ${app.urgent ? 'bg-red-50/40' : ''}`}
+                    title="Открыть заявку"
+                  >
                     <td className="px-4 py-3 text-sm">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 font-medium text-[#0F2A36]">
                         <span>{app.countryFlag}</span>{app.country}
                         {app.urgent && <Flame className="w-3.5 h-3.5 text-red-500" />}
                       </div>
+                      <div className="text-[11px] text-gray-400 mt-0.5">{app.visaType}</div>
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <div>{app.clientName}</div>
+                      <div className="font-semibold text-[#0F2A36]">{app.clientName || 'Без имени'}</div>
                       {tgUser && (
                         <a href={`https://t.me/${tgUser}`} target="_blank" rel="noreferrer"
-                          className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-xs text-[#3B5BFF] hover:underline flex items-center gap-1">
                           @{tgUser} <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm">{app.phone}</td>
+                    <td className="px-4 py-3 text-sm text-[#0F2A36]/80">{app.phone}</td>
                     <td className="px-4 py-3 text-sm">
-                      <span className="font-semibold text-blue-600">{(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽</span>
+                      <span className="font-semibold text-[#3B5BFF]">{(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽</span>
                       {app.bonusesUsed > 0 && (
                         <span className="text-xs text-gray-400 block">из {app.cost.toLocaleString('ru-RU')} ₽</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm text-green-600">
+                    <td className="px-4 py-3 text-sm text-emerald-600">
                       {app.bonusesUsed > 0 ? `−${app.bonusesUsed} ₽` : '—'}
                     </td>
                     <td className="px-4 py-3 text-sm">
-                      <span className="px-2 py-1 rounded text-xs text-white whitespace-nowrap"
-                        style={{ backgroundColor: statusColors[app.status] }}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>
                         {statusLabels[app.status]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                    <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
                       {new Date(app.date).toLocaleDateString('ru-RU')}
-                    </td>
-                    <td className="px-4 py-3 text-sm">
-                      <button onClick={() => setSelectedApp(app)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition" title="Открыть заявку">
-                        <Eye size={18} className="text-[#3B5BFF]" />
-                      </button>
                     </td>
                   </tr>
                 );
