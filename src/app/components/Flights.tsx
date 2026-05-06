@@ -395,9 +395,14 @@ function ResultsStep({
       )}
 
       {!retrying && !error && sorted.length === 0 && (
-        <div className="bg-white rounded-2xl p-8 text-center shadow-sm border border-gray-100">
-          <p className="text-gray-600">Кэш Aviasales по этим датам пуст</p>
-          <p className="text-sm text-gray-400 mt-1">Можем открыть полный поиск напрямую</p>
+        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+          <h3 className="text-[#0F2A36] font-extrabold text-[17px] tracking-tight">
+            Поищем у Aviasales напрямую
+          </h3>
+          <p className="text-[13px] text-[#0F2A36]/65 mt-2 leading-snug">
+            Они найдут актуальные тарифы по этим датам в реальном времени — наша база
+            обновляется каждые несколько часов, у Aviasales — каждую секунду.
+          </p>
           <button
             onClick={() => {
               const url = buildAviasalesUrl({
@@ -411,9 +416,9 @@ function ResultsStep({
               if (tg && typeof tg.openLink === 'function') tg.openLink(url);
               else window.open(url, '_blank', 'noopener,noreferrer');
             }}
-            className="mt-4 px-5 py-2.5 rounded-xl vd-grad text-white font-bold text-sm vd-shadow-cta inline-flex items-center gap-2"
+            className="mt-4 w-full py-3 rounded-xl vd-grad text-white font-bold text-sm vd-shadow-cta active:scale-[0.98] transition flex items-center justify-center gap-2"
           >
-            <ExternalLink className="w-4 h-4" /> Открыть Aviasales
+            <Plane className="w-4 h-4" /> Открыть Aviasales
           </button>
         </div>
       )}
