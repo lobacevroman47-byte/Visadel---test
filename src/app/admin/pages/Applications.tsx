@@ -18,7 +18,167 @@ interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
 }
 
-// ── Human-readable field labels ───────────────────────────────────────────────
+// ── Per-country field order + Russian labels (auto-extracted from country forms,
+//    must match the user-facing form 1-to-1 — same order, same wording). ─────
+const ANKETA_BY_COUNTRY: Record<string, Array<{ key: string; label: string }>> = {
+  'Индия': [
+    { key: 'citizenship', label: 'Гражданство' },
+    { key: 'arrivalAirport', label: 'Аэропорт прилёта' },
+    { key: 'arrivalDate', label: 'Дата прилёта' },
+    { key: 'previousName', label: 'Предыдущие Фамилия и Имя' },
+    { key: 'birthCity', label: 'Город рождения' },
+    { key: 'previousCitizenship', label: 'Предыдущее гражданство' },
+    { key: 'passportSeries', label: 'Серия и номер внутреннего паспорта РФ' },
+    { key: 'regPostalCode', label: 'Индекс' },
+    { key: 'regRegion', label: 'Область' },
+    { key: 'regCity', label: 'Город' },
+    { key: 'regStreet', label: 'Улица' },
+    { key: 'regHouse', label: 'Дом' },
+    { key: 'liveAddress', label: 'Адрес проживания' },
+    { key: 'fatherName', label: 'Имя отца' },
+    { key: 'fatherCitizenship', label: 'Гражданство отца' },
+    { key: 'fatherBirthCity', label: 'Город рождения отца' },
+    { key: 'motherName', label: 'Имя матери' },
+    { key: 'motherCitizenship', label: 'Гражданство матери' },
+    { key: 'motherBirthCity', label: 'Город рождения матери' },
+    { key: 'maritalStatus', label: 'Семейное положение' },
+    { key: 'spouseName', label: 'ФИО супруга/супруги' },
+    { key: 'spouseBirthDate', label: 'Дата рождения супруга/супруги' },
+    { key: 'spouseCitizenship', label: 'Гражданство супруга/супруги' },
+    { key: 'companyName', label: 'Наименование компании' },
+    { key: 'companyAddress', label: 'Адрес компании' },
+    { key: 'position', label: 'Должность' },
+    { key: 'companyPhone', label: 'Телефон компании' },
+    { key: 'companyEmail', label: 'Email компании' },
+    { key: 'militaryService', label: 'Служили в армии/полиции' },
+    { key: 'planedCities', label: 'Города/места планируемого посещения в Индии' },
+    { key: 'visitedCountries', label: 'Страны, которые посещали за последние 10 лет' },
+    { key: 'visitedIndia', label: 'Посещали ранее Индию' },
+    { key: 'indiaVisitDates', label: 'Когда посещали Индию' },
+    { key: 'hotelName', label: 'Название отеля' },
+    { key: 'hotelAddress', label: 'Адрес отеля' },
+    { key: 'hotelPhone', label: 'Телефон отеля' },
+    { key: 'contactIndiaName', label: 'ФИО контакта в Индии' },
+    { key: 'contactIndiaAddress', label: 'Адрес контакта в Индии' },
+    { key: 'contactIndiaPhone', label: 'Телефон контакта в Индии' },
+    { key: 'emergencyContactName', label: 'Контакт на экстренный случай — ФИО' },
+    { key: 'emergencyContactAddress', label: 'Контакт на экстренный случай — адрес' },
+    { key: 'emergencyContactPhone', label: 'Контакт на экстренный случай — телефон' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Вьетнам': [
+    { key: 'citizenship', label: 'Гражданство' },
+    { key: 'birthCountry', label: 'Страна рождения' },
+    { key: 'secondCitizenship', label: 'Второе гражданство' },
+    { key: 'lawViolations', label: 'Нарушения законов Вьетнама' },
+    { key: 'otherPassports', label: 'Использовали другие паспорта для въезда во Вьетнам' },
+    { key: 'stayDateFrom', label: 'Предполагаемые даты пребывания' },
+    { key: 'registrationAddress', label: 'Адрес регистрации/прописки' },
+    { key: 'liveAddress', label: 'Адрес проживания' },
+    { key: 'emergencyContactName', label: 'Контакт на экстренный случай — ФИО' },
+    { key: 'emergencyContactPhone', label: 'Контакт на экстренный случай — телефон' },
+    { key: 'occupation', label: 'Работа/учёба' },
+    { key: 'visitPurpose', label: 'Цель визита' },
+    { key: 'vietnamContacts', label: 'Контакт с агентствами/организациями во Вьетнаме' },
+    { key: 'arrivalAirport', label: 'Аэропорт прилёта' },
+    { key: 'departureAirport', label: 'Аэропорт вылета' },
+    { key: 'vietnamAddress', label: 'Адрес проживания во Вьетнаме' },
+    { key: 'vietnamPreviousVisits', label: 'Если были во Вьетнаме за последний год' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Южная Корея': [
+    { key: 'visitPurpose', label: 'Цель поездки' },
+    { key: 'visitedKoreaBefore', label: 'Были ранее в Корее' },
+    { key: 'dualCitizenship', label: 'Двойное гражданство' },
+    { key: 'criminalRecord', label: 'Судимости' },
+    { key: 'diseases', label: 'Опасные заболевания' },
+    { key: 'koreaContacts', label: 'Знакомые в Корее' },
+    { key: 'companions', label: 'Сопровождающие лица' },
+    { key: 'companyName', label: 'Название компании' },
+    { key: 'position', label: 'Должность' },
+    { key: 'companyPhone', label: 'Телефон компании' },
+    { key: 'salary', label: 'Зарплата (примерно)' },
+    { key: 'countriesVisited', label: 'Количество стран, посещённых за всё время' },
+    { key: 'tripDateFrom', label: 'Даты поездки в Корею' },
+    { key: 'koreaPostalCode', label: 'Индекс в Корее' },
+    { key: 'koreaPhone', label: 'Телефон в Корее' },
+    { key: 'hotelName', label: 'Название отеля' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Израиль': [
+    { key: 'citizenship', label: 'Гражданство' },
+    { key: 'arrivalDate', label: 'Дата прилёта' },
+    { key: 'arrivalAirport', label: 'Аэропорт прилёта' },
+    { key: 'biometricPassport', label: 'Загранпаспорт биометрический' },
+    { key: 'secondCitizenship', label: 'Второе гражданство' },
+    { key: 'maritalStatus', label: 'Семейное положение' },
+    { key: 'fatherName', label: 'Имя отца' },
+    { key: 'motherName', label: 'Имя матери' },
+    { key: 'homeAddress', label: 'Домашний адрес' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Камбоджа': [
+    { key: 'entryDate', label: 'Ожидаемая дата въезда' },
+    { key: 'liveAddress', label: 'Адрес проживания' },
+    { key: 'cambodiaAddress', label: 'Предполагаемый адрес проживания в Камбодже' },
+    { key: 'entryPort', label: 'Порт въезда' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Кения': [
+    { key: 'profession', label: 'Профессия' },
+    { key: 'emergencyContactName', label: 'Контакт на экстренный случай — ФИО' },
+    { key: 'emergencyContactPhone', label: 'Контакт на экстренный случай — телефон' },
+    { key: 'arrivalDate', label: 'Дата прилёта' },
+    { key: 'departureDate', label: 'Дата вылета' },
+    { key: 'entryPort', label: 'Порт въезда' },
+    { key: 'arrivalFlight', label: 'Авиакомпания и номер рейса' },
+    { key: 'arrivalCountry', label: 'Страна прилёта' },
+    { key: 'exitPort', label: 'Порт выезда' },
+    { key: 'departureFlight', label: 'Авиакомпания и номер рейса при выезде' },
+    { key: 'departureCountry', label: 'Страна вылета' },
+    { key: 'kenyaAddress', label: 'Планируемый адрес проживания' },
+    { key: 'birthCountry', label: 'Страна рождения' },
+    { key: 'criminalRecord', label: 'Судимости за последние 5 лет' },
+    { key: 'entryRefusal', label: 'Отказы во въезде в Кению' },
+    { key: 'visitedBefore', label: 'Были ранее в Кении' },
+    { key: 'largeCurrency', label: 'Валюта более $5000' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Пакистан': [
+    { key: 'stayDays', label: 'Сколько дней планируете находиться' },
+    { key: 'entryPort', label: 'Планируемый порт въезда' },
+    { key: 'exitPort', label: 'Планируемый порт выезда' },
+    { key: 'stayDateFrom', label: 'Дата пребывания' },
+    { key: 'maritalStatus', label: 'Семейное положение' },
+    { key: 'fatherName', label: 'Имя отца' },
+    { key: 'motherName', label: 'Имя матери' },
+    { key: 'companyName', label: 'Название компании' },
+    { key: 'position', label: 'Должность' },
+    { key: 'companyAddress', label: 'Адрес компании' },
+    { key: 'pakistanAddress', label: 'Планируемый адрес проживания' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+  'Шри-Ланка': [
+    { key: 'citizenship', label: 'Гражданство' },
+    { key: 'birthCountry', label: 'Страна рождения' },
+    { key: 'lastCountry', label: 'Страна пребывания последние 14 дней' },
+    { key: 'arrivalDate', label: 'Предполагаемая дата прибытия' },
+    { key: 'departureAirport', label: 'Аэропорт вылета' },
+    { key: 'airline', label: 'Авиакомпания/судно' },
+    { key: 'liveAddress', label: 'Адрес проживания' },
+    { key: 'sriLankaAddress', label: 'Адрес проживания на Шри-Ланке' },
+    { key: 'residentVisa', label: 'Действующая резидентская виза' },
+    { key: 'alreadyInSriLanka', label: 'Уже на Шри-Ланке по действующему разрешению' },
+    { key: 'multipleVisa', label: 'Многократная виза' },
+    { key: 'homeAddress', label: 'Домашний адрес (прописка/последнее место проживания)' },
+    { key: 'arrivalDateSL', label: 'Дата прилёта на Шри-Ланку' },
+    { key: 'phoneRussia', label: 'Мобильный телефон РФ' },
+    { key: 'phoneSriLanka', label: 'Мобильный телефон Шри-Ланка' },
+    { key: 'howHeard', label: 'Как вы о нас узнали' },
+  ],
+};
+
+// ── Generic fallback labels (only used if country isn't in ANKETA_BY_COUNTRY) ─
 const FIELD_LABELS: Record<string, string> = {
   // Common
   citizenship: 'Гражданство',
@@ -324,24 +484,42 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
         </div>
       </section>
 
-      {/* Basic data */}
+      {/* Basic data — render in the same order as the user-facing form for app.country */}
       {Object.keys(basicData).length > 0 && (
         <section>
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Анкетные данные</h4>
           <div className="space-y-2">
-            {Object.entries(basicData).map(([key, value]) => {
-              // Fallback: split camelCase into words and capitalise — better than raw 'hotelAddress'
-              const fallback = key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
-              const label = FIELD_LABELS[key] ?? fallback;
-              const formatted = formatValue(key, value);
-              if (formatted === '—') return null;
-              return (
-                <div key={key} className="p-2 bg-gray-50 rounded-lg">
-                  <p className="text-xs text-gray-500">{label}</p>
-                  <p className="text-sm text-gray-800 whitespace-pre-wrap">{formatted}</p>
-                </div>
-              );
-            })}
+            {(() => {
+              const ordered = ANKETA_BY_COUNTRY[app.country] ?? [];
+              const orderedKeys = new Set(ordered.map(o => o.key));
+              // First — fields in form order with form labels
+              const rows: React.ReactNode[] = [];
+              for (const { key, label } of ordered) {
+                const formatted = formatValue(key, basicData[key]);
+                if (formatted === '—') continue;
+                rows.push(
+                  <div key={key} className="p-2 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{formatted}</p>
+                  </div>,
+                );
+              }
+              // Then — any extra keys we didn't expect (legacy data, new fields), with fallback labels
+              for (const [key, value] of Object.entries(basicData)) {
+                if (orderedKeys.has(key)) continue;
+                const formatted = formatValue(key, value);
+                if (formatted === '—') continue;
+                const fallback = key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+                const label = FIELD_LABELS[key] ?? fallback;
+                rows.push(
+                  <div key={key} className="p-2 bg-gray-50 rounded-lg">
+                    <p className="text-xs text-gray-500">{label}</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{formatted}</p>
+                  </div>,
+                );
+              }
+              return rows.length > 0 ? rows : <p className="text-xs text-gray-400">Анкета не заполнена</p>;
+            })()}
           </div>
         </section>
       )}
@@ -808,7 +986,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                       </div>
                       <button type="button" onClick={() => setReplaceVisa(true)}
                         className="text-xs text-[#3B5BFF] hover:underline">
-                        Загрузить другой файл (если ошиблись)
+                        Загрузить другой файл
                       </button>
                     </div>
                   )}
