@@ -490,10 +490,16 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Анкетные данные</h4>
           <div className="space-y-2">
             {(() => {
-              const ordered = ANKETA_BY_COUNTRY[app.country] ?? [];
+              // Match country name leniently (trim, ignore case, strip flag emojis if any)
+              const normalizedCountry = (app.country ?? '').trim().toLowerCase();
+              const matchedKey = Object.keys(ANKETA_BY_COUNTRY).find(
+                k => k.toLowerCase() === normalizedCountry,
+              );
+              const ordered = matchedKey ? ANKETA_BY_COUNTRY[matchedKey] : [];
               const orderedKeys = new Set(ordered.map(o => o.key));
-              // First — fields in form order with form labels
               const rows: React.ReactNode[] = [];
+
+              // First — fields in form order with form labels
               for (const { key, label } of ordered) {
                 const formatted = formatValue(key, basicData[key]);
                 if (formatted === '—') continue;
@@ -504,16 +510,20 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
                   </div>,
                 );
               }
-              // Then — any extra keys we didn't expect (legacy data, new fields), with fallback labels
+
+              // Then — any extras: prefer FIELD_LABELS (Russian), no English camelCase fallback
               for (const [key, value] of Object.entries(basicData)) {
                 if (orderedKeys.has(key)) continue;
                 const formatted = formatValue(key, value);
                 if (formatted === '—') continue;
-                const fallback = key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
-                const label = FIELD_LABELS[key] ?? fallback;
+                const russianLabel = FIELD_LABELS[key];
                 rows.push(
                   <div key={key} className="p-2 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500">{label}</p>
+                    {russianLabel ? (
+                      <p className="text-xs text-gray-500">{russianLabel}</p>
+                    ) : (
+                      <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{key}</p>
+                    )}
                     <p className="text-sm text-gray-800 whitespace-pre-wrap">{formatted}</p>
                   </div>,
                 );
