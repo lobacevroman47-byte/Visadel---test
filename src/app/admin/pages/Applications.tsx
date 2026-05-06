@@ -113,6 +113,109 @@ const FIELD_LABELS: Record<string, string> = {
   deniedEntry: 'Отказ въезда в Кению',
   beenToKenya: 'Был в Кении ранее',
   bringCurrency: 'Ввоз валюты >5000$',
+
+  // ── Universal / cross-country additions ──────────────────────────────────
+  firstName: 'Имя',
+  lastName: 'Фамилия',
+  middleName: 'Отчество',
+  firstNameLat: 'Имя (латиницей)',
+  lastNameLat: 'Фамилия (латиницей)',
+  firstNameEn: 'Имя на английском',
+  lastNameEn: 'Фамилия на английском',
+  patronymic: 'Отчество',
+  birthDate: 'Дата рождения',
+  gender: 'Пол',
+  passportNumber: 'Номер паспорта',
+  passportSeries: 'Серия и номер паспорта',
+  passportIssueDate: 'Дата выдачи паспорта',
+  passportExpiry: 'Срок действия паспорта',
+  passportExpiryDate: 'Срок действия паспорта',
+  passportIssuedBy: 'Кем выдан паспорт',
+  liveAddress: 'Адрес проживания',
+  homeAddress: 'Домашний адрес',
+  registrationAddress: 'Адрес регистрации',
+  registrationAddress2: 'Адрес регистрации',
+  regCity: 'Город регистрации',
+  regRegion: 'Регион регистрации',
+  regStreet: 'Улица регистрации',
+  regHouse: 'Дом регистрации',
+  regPostalCode: 'Индекс регистрации',
+  phoneRussia: 'Телефон в России',
+  phoneSriLanka: 'Телефон на Шри-Ланке',
+  arrivalCountry: 'Страна прилёта',
+  arrivalFlight: 'Номер рейса (прилёт)',
+  arrivalDateSL: 'Дата прибытия на Шри-Ланку',
+  departureCountry: 'Страна вылета',
+  departureFlight: 'Номер рейса (вылет)',
+  entryDate: 'Дата въезда',
+  stayDays: 'Количество дней пребывания',
+
+  // Family
+  fatherName: 'Имя отца',
+  fatherBirthCity: 'Город рождения отца',
+  fatherCitizenship: 'Гражданство отца',
+  motherName: 'Имя матери',
+  motherBirthCity: 'Город рождения матери',
+  motherCitizenship: 'Гражданство матери',
+  spouseName: 'Имя супруга/супруги',
+  spouseBirthDate: 'Дата рождения супруга/супруги',
+  spouseCitizenship: 'Гражданство супруга/супруги',
+
+  // Work / company
+  companyName: 'Название компании',
+  companyAddress: 'Адрес компании',
+  companyPhone: 'Телефон компании',
+  companyEmail: 'Email компании',
+  position: 'Должность',
+  occupation: 'Род занятий',
+  salary: 'Зарплата',
+
+  // Hotel / contacts in destination
+  hotelName: 'Название отеля',
+  hotelAddress: 'Адрес отеля',
+  hotelPhone: 'Телефон отеля',
+  cambodiaAddress: 'Адрес в Камбодже',
+  vietnamAddress: 'Адрес во Вьетнаме',
+  pakistanAddress: 'Адрес в Пакистане',
+  kenyaAddress: 'Адрес в Кении',
+  sriLankaAddress: 'Адрес на Шри-Ланке',
+  vietnamContacts: 'Контакты во Вьетнаме',
+  vietnamPreviousVisits: 'Предыдущие визиты во Вьетнам',
+  koreaContacts: 'Контакты в Корее',
+  koreaPhone: 'Телефон в Корее',
+  koreaPostalCode: 'Индекс в Корее',
+  contactIndiaName: 'Имя контактного лица в Индии',
+  contactIndiaAddress: 'Адрес контактного лица в Индии',
+  contactIndiaPhone: 'Телефон контактного лица в Индии',
+  emergencyContactName: 'Контакт на экстренный случай — имя',
+  emergencyContactAddress: 'Контакт на экстренный случай — адрес',
+  emergencyContactPhone: 'Контакт на экстренный случай — телефон',
+
+  // Visits / history
+  visitedBefore: 'Был в стране ранее',
+  visitedIndia: 'Был в Индии',
+  visitedKoreaBefore: 'Был в Корее',
+  visitedCountries: 'Посещённые страны',
+  indiaVisitDates: 'Даты предыдущих посещений Индии',
+  planedCities: 'Планируемые города',
+
+  // Misc
+  alreadyInSriLanka: 'Уже на Шри-Ланке',
+  multipleVisa: 'Многократная виза',
+  residentVisa: 'Резидентская виза',
+  biometricPassport: 'Биометрический паспорт',
+  criminalRecord: 'Судимости',
+  diseases: 'Опасные заболевания',
+  dualCitizenship: 'Двойное гражданство',
+  entryRefusal: 'Отказ во въезде',
+  largeCurrency: 'Ввоз валюты >5000$',
+  currencyAmount: 'Сумма валюты',
+  lawViolations: 'Нарушения законов',
+  militaryService: 'Военная служба',
+  otherPassports: 'Другие паспорта',
+  lived2Years: 'Проживал 2+ лет в стране оформления',
+  companions: 'Сопровождающие',
+  howHeard: 'Откуда узнали о нас',
 };
 
 const HOW_HEARD_LABELS: Record<string, string> = {
@@ -227,7 +330,9 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Анкетные данные</h4>
           <div className="space-y-2">
             {Object.entries(basicData).map(([key, value]) => {
-              const label = FIELD_LABELS[key] ?? key;
+              // Fallback: split camelCase into words and capitalise — better than raw 'hotelAddress'
+              const fallback = key.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).trim();
+              const label = FIELD_LABELS[key] ?? fallback;
               const formatted = formatValue(key, value);
               if (formatted === '—') return null;
               return (
@@ -417,6 +522,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const usdRate = parseFloat(usdRateStr);
   const taxPct = parseFloat(taxPctStr);
   const [visaFile, setVisaFile] = useState<File | null>(null);
+  const [replaceVisa, setReplaceVisa] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
@@ -682,23 +788,55 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 </select>
               </div>
 
-              {/* Upload visa — only when status = completed */}
+              {/* Visa file — when status = completed */}
               {status === 'completed' && (
                 <div>
-                  <label className="block text-sm text-gray-700 mb-2 font-medium">Загрузить готовую визу</label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center">
-                    <Upload className="mx-auto mb-2 text-gray-400" size={28} />
-                    <p className="text-sm text-gray-500 mb-2">Перетащите файл или нажмите для выбора</p>
-                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => setVisaFile(e.target.files?.[0] || null)}
-                      className="hidden" id="visa-upload"
-                    />
-                    <label htmlFor="visa-upload"
-                      className="inline-block px-4 py-2 bg-gray-100 text-sm rounded-lg cursor-pointer hover:bg-gray-200 transition">
-                      Выбрать файл
-                    </label>
-                    {visaFile && <p className="text-sm text-green-600 mt-2">✓ {visaFile.name}</p>}
-                  </div>
+                  <label className="block text-sm text-gray-700 mb-2 font-medium">Готовая виза</label>
+
+                  {/* Already uploaded — show preview + open + replace */}
+                  {application.visaFileUrl && !visaFile && !replaceVisa && (
+                    <div className="space-y-2">
+                      <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
+                          <ExternalLink className="w-4 h-4 text-emerald-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-[#0F2A36]">Виза отправлена клиенту</p>
+                          <a href={application.visaFileUrl} target="_blank" rel="noreferrer"
+                            className="text-xs text-[#3B5BFF] hover:underline">Открыть файл</a>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setReplaceVisa(true)}
+                        className="text-xs text-[#3B5BFF] hover:underline">
+                        Загрузить другой файл (если ошиблись)
+                      </button>
+                    </div>
+                  )}
+
+                  {/* No file yet, OR replacing — show upload form */}
+                  {(!application.visaFileUrl || replaceVisa || visaFile) && (
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center">
+                      <Upload className="mx-auto mb-2 text-gray-400" size={28} />
+                      <p className="text-sm text-gray-500 mb-2">
+                        {replaceVisa ? 'Выбери новый файл — заменит уже отправленный' : 'Перетащите файл или нажмите для выбора'}
+                      </p>
+                      <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => setVisaFile(e.target.files?.[0] || null)}
+                        className="hidden" id="visa-upload"
+                      />
+                      <label htmlFor="visa-upload"
+                        className="inline-block px-4 py-2 bg-gray-100 text-sm rounded-lg cursor-pointer hover:bg-gray-200 transition">
+                        Выбрать файл
+                      </label>
+                      {visaFile && <p className="text-sm text-green-600 mt-2">✓ {visaFile.name}</p>}
+                      {replaceVisa && (
+                        <button type="button" onClick={() => { setReplaceVisa(false); setVisaFile(null); }}
+                          className="block mx-auto mt-2 text-xs text-gray-500 hover:underline">
+                          Отмена — оставить текущий файл
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
