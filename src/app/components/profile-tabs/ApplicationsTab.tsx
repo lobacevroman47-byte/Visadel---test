@@ -3,6 +3,7 @@ import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Pl
 import {
   getUserApplications, getReviewedAppIds, submitReview,
   getUserHotelBookings, getUserFlightBookings,
+  markBookingReviewBonusGranted,
   type Application,
   type HotelBookingRow, type FlightBookingRow,
 } from '../../lib/db';
@@ -578,8 +579,28 @@ export default function ApplicationsTab({ onContinueDraft, onBonusChange }: Appl
               <Hotel className="w-5 h-5" /> Мои брони
             </h3>
             <div className="space-y-3">
-              {hotelBookings.map(b => <HotelBookingCard key={b.id} b={b} />)}
-              {flightBookings.map(b => <FlightBookingCard key={b.id} b={b} />)}
+              {hotelBookings.map(b => (
+                <HotelBookingCard
+                  key={b.id}
+                  b={b}
+                  isPartner={appUser?.is_influencer ?? false}
+                  telegramId={telegramId}
+                  username={(appUser as any)?.username ?? ''}
+                  onBonusChange={onBonusChange}
+                  onUpdate={(patch) => setHotelBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
+                />
+              ))}
+              {flightBookings.map(b => (
+                <FlightBookingCard
+                  key={b.id}
+                  b={b}
+                  isPartner={appUser?.is_influencer ?? false}
+                  telegramId={telegramId}
+                  username={(appUser as any)?.username ?? ''}
+                  onBonusChange={onBonusChange}
+                  onUpdate={(patch) => setFlightBookings(prev => prev.map(x => x.id === b.id ? { ...x, ...patch } : x))}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -612,7 +633,121 @@ const fmtBookingDate = (s: string) =>
 const fmtBookingDateTime = (s: string) =>
   new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 
-function HotelBookingCard({ b }: { b: HotelBookingRow }) {
+interface BookingCardCommon {
+  isPartner: boolean;
+  telegramId: number;
+  username: string;
+  onBonusChange?: (newBalance: number) => void;
+}
+
+// Shared "Download + Review" footer — works for both hotel and flight bookings.
+function BookingActions({
+  table, booking, isPartner, telegramId, username, onBonusChange, onUpdate, kindLabel,
+}: BookingCardCommon & {
+  table: 'hotel_bookings' | 'flight_bookings';
+  booking: { id: string; status: string; confirmation_url?: string | null; review_bonus_granted?: boolean };
+  onUpdate: (patch: Partial<HotelBookingRow & FlightBookingRow>) => void;
+  kindLabel: string;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const reviewed = !!booking.review_bonus_granted;
+  const canReview = booking.status === 'confirmed' && !reviewed;
+  const ready = !!booking.confirmation_url;
+
+  const handleReview = async () => {
+    if (submitting || !canReview) return;
+    setSubmitting(true);
+
+    try {
+      // 1) Save review to reviews table (best-effort)
+      await submitReview({
+        telegramId,
+        applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
+        country: kindLabel,
+        rating: 5,
+        text: 'Отзыв оставлен в Telegram-канале',
+        username,
+      });
+
+      // 2) Grant +200₽ review bonus (skipped for partners, deduped server-side)
+      if (telegramId && !isPartner) {
+        try {
+          const res = await fetch('/api/grant-bonus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: telegramId,
+              type: 'review',
+              amount: 200,
+              description: `+200₽ за отзыв о брони (${kindLabel}, ${booking.id})`,
+              application_id: `booking_${booking.id}`,
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (!data.skipped && data.newBalance != null) {
+              try {
+                const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+                ud.bonusBalance = data.newBalance;
+                localStorage.setItem('userData', JSON.stringify(ud));
+              } catch {}
+              onBonusChange?.(data.newBalance);
+            }
+          }
+        } catch (e) { console.error('booking review bonus error', e); }
+      }
+
+      // 3) Mark on the booking row so we don't show the button again
+      await markBookingReviewBonusGranted(table, booking.id);
+      onUpdate({ review_bonus_granted: true });
+
+      // 4) Open Telegram channel
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/visadel_recall');
+      else window.open('https://t.me/visadel_recall', '_blank');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!ready && !canReview) return null;
+
+  return (
+    <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col sm:flex-row gap-2">
+      {ready && booking.confirmation_url && (
+        <a
+          href={booking.confirmation_url}
+          target="_blank" rel="noreferrer"
+          className="flex-1 py-2.5 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition hover:bg-[#DCE7FF]"
+        >
+          <Download className="w-4 h-4" />
+          Скачать подтверждение
+        </a>
+      )}
+      {canReview && (
+        <button
+          type="button"
+          onClick={handleReview}
+          disabled={submitting}
+          className="flex-1 py-2.5 rounded-lg vd-grad text-white text-sm font-bold flex items-center justify-center gap-1.5 active:scale-[0.98] transition shadow-md vd-shadow-cta disabled:opacity-60"
+        >
+          {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+          {isPartner ? 'Оставить отзыв' : 'Оставить отзыв · +200 ₽'}
+        </button>
+      )}
+      {reviewed && (
+        <div className="flex-1 py-2.5 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-semibold flex items-center justify-center gap-1.5">
+          <Check className="w-4 h-4" />
+          Отзыв оставлен
+        </div>
+      )}
+    </div>
+  );
+}
+
+function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCardCommon & {
+  onUpdate: (patch: Partial<HotelBookingRow>) => void;
+}) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -644,11 +779,14 @@ function HotelBookingCard({ b }: { b: HotelBookingRow }) {
           </div>
         </div>
       </div>
+      <BookingActions table="hotel_bookings" booking={b} kindLabel="Бронь отеля" {...common} />
     </div>
   );
 }
 
-function FlightBookingCard({ b }: { b: FlightBookingRow }) {
+function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCardCommon & {
+  onUpdate: (patch: Partial<FlightBookingRow>) => void;
+}) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
@@ -679,6 +817,7 @@ function FlightBookingCard({ b }: { b: FlightBookingRow }) {
           </div>
         </div>
       </div>
+      <BookingActions table="flight_bookings" booking={b} kindLabel="Бронь авиабилета" {...common} />
     </div>
   );
 }

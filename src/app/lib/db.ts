@@ -344,6 +344,8 @@ export interface HotelBookingRow {
   telegram_login: string;
   passport_url: string | null;
   payment_screenshot_url: string | null;
+  confirmation_url?: string | null;
+  review_bonus_granted?: boolean;
   price: number | null;
   status: string;
   extra_fields?: Record<string, string> | null;
@@ -364,9 +366,20 @@ export interface FlightBookingRow {
   telegram_login: string;
   passport_url: string | null;
   payment_screenshot_url: string | null;
+  confirmation_url?: string | null;
+  review_bonus_granted?: boolean;
   price: number | null;
   status: string;
   extra_fields?: Record<string, string> | null;
+}
+
+// Mark booking as having received the review bonus (idempotency flag).
+export async function markBookingReviewBonusGranted(
+  table: 'hotel_bookings' | 'flight_bookings',
+  id: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+  await supabase.from(table).update({ review_bonus_granted: true }).eq('id', id);
 }
 
 export async function getUserHotelBookings(telegramId: number): Promise<HotelBookingRow[]> {

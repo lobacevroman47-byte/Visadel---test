@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2,
+  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { uploadFile } from '../../lib/db';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ interface HotelBooking {
   telegram_login: string;
   passport_url: string | null;
   payment_screenshot_url: string | null;
+  confirmation_url: string | null;
   price: number | null;
   status: string;
 }
@@ -43,6 +45,7 @@ interface FlightBooking {
   telegram_login: string;
   passport_url: string | null;
   payment_screenshot_url: string | null;
+  confirmation_url: string | null;
   price: number | null;
   status: string;
 }
@@ -167,6 +170,10 @@ export const Bookings: React.FC = () => {
           b={selectedHotel}
           onClose={() => setSelectedHotel(null)}
           onStatusChange={(status) => updateStatus('hotel_bookings', selectedHotel.id, status)}
+          onConfirmationUploaded={(url) => {
+            setSelectedHotel(s => s ? { ...s, confirmation_url: url, status: 'confirmed' } : s);
+            void refresh();
+          }}
         />
       )}
       {selectedFlight && (
@@ -174,6 +181,10 @@ export const Bookings: React.FC = () => {
           b={selectedFlight}
           onClose={() => setSelectedFlight(null)}
           onStatusChange={(status) => updateStatus('flight_bookings', selectedFlight.id, status)}
+          onConfirmationUploaded={(url) => {
+            setSelectedFlight(s => s ? { ...s, confirmation_url: url, status: 'confirmed' } : s);
+            void refresh();
+          }}
         />
       )}
     </div>
@@ -266,6 +277,63 @@ function FlightRow({ b, onClick }: { b: FlightBooking; onClick: () => void }) {
   );
 }
 
+function ConfirmationUploader({
+  url, table, id, onUploaded,
+}: {
+  url: string | null;
+  table: 'hotel_bookings' | 'flight_bookings';
+  id: string;
+  onUploaded: (newUrl: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFile = async (file: File) => {
+    if (!file) return;
+    setUploading(true);
+    try {
+      const newUrl = await uploadFile(file, 'visas');
+      if (!newUrl) { alert('Не удалось загрузить файл'); return; }
+      if (isSupabaseConfigured()) {
+        await supabase.from(table).update({ confirmation_url: newUrl, status: 'confirmed' }).eq('id', id);
+      }
+      onUploaded(newUrl);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Подтверждение брони (для клиента)</p>
+      {url ? (
+        <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center">
+            <Check className="w-4 h-4 text-emerald-600" strokeWidth={3} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-[#0F2A36]">Загружено</p>
+            <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть</a>
+          </div>
+          <label className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs font-semibold text-[#3B5BFF] hover:bg-[#EAF1FF] cursor-pointer transition active:scale-95 flex items-center gap-1 shrink-0">
+            <Upload className="w-3.5 h-3.5" />
+            Заменить
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden"
+              onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+          </label>
+        </div>
+      ) : (
+        <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+          {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
+          <p className="text-xs text-[#0F2A36]">{uploading ? 'Загружаем…' : 'Загрузить подтверждение'}</p>
+          <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">PDF/JPG/PNG · автоматически переключит статус в «Подтверждена»</p>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
+            onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+        </label>
+      )}
+    </div>
+  );
+}
+
 function PaymentBlock({ price, screenshotUrl }: { price: number | null; screenshotUrl: string | null }) {
   return (
     <div>
@@ -352,7 +420,10 @@ function PassportBlock({ url }: { url: string | null }) {
   );
 }
 
-function HotelDetail({ b, onClose, onStatusChange }: { b: HotelBooking; onClose: () => void; onStatusChange: (s: string) => void }) {
+function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
+  b: HotelBooking; onClose: () => void; onStatusChange: (s: string) => void;
+  onConfirmationUploaded: (url: string) => void;
+}) {
   return (
     <ModalShell onClose={onClose}>
       {/* Header */}
@@ -385,12 +456,21 @@ function HotelDetail({ b, onClose, onStatusChange }: { b: HotelBooking; onClose:
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
         <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
+        <ConfirmationUploader
+          url={b.confirmation_url}
+          table="hotel_bookings"
+          id={b.id}
+          onUploaded={onConfirmationUploaded}
+        />
       </div>
     </ModalShell>
   );
 }
 
-function FlightDetail({ b, onClose, onStatusChange }: { b: FlightBooking; onClose: () => void; onStatusChange: (s: string) => void }) {
+function FlightDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
+  b: FlightBooking; onClose: () => void; onStatusChange: (s: string) => void;
+  onConfirmationUploaded: (url: string) => void;
+}) {
   return (
     <ModalShell onClose={onClose}>
       <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100">
@@ -416,6 +496,12 @@ function FlightDetail({ b, onClose, onStatusChange }: { b: FlightBooking; onClos
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
         <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
+        <ConfirmationUploader
+          url={b.confirmation_url}
+          table="flight_bookings"
+          id={b.id}
+          onUploaded={onConfirmationUploaded}
+        />
       </div>
     </ModalShell>
   );
