@@ -11,6 +11,7 @@ import { Settings } from '../pages/Settings';
 import { AdditionalServices } from '../pages/AdditionalServices';
 import { Reviews } from '../pages/Reviews';
 import { BonusLogs } from '../pages/BonusLogs';
+import { Bookings } from '../pages/Bookings';
 import { useAdmin } from '../contexts/AdminContext';
 import { Menu, ArrowLeft } from 'lucide-react';
 
@@ -106,6 +107,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         return <Dashboard onNavigate={handleNavigate} />;
       case 'applications':
         return <Applications filter={sectionFilter} />;
+      case 'bookings':
+        return <Bookings />;
       case 'product-bookings':
         return <ComingSoonAdmin tab="bookings" />;
       case 'product-flights':

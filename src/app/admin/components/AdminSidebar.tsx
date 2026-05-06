@@ -12,6 +12,7 @@ import {
   Package,
   MessageSquare,
   Gift,
+  Calendar,
   X
 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
@@ -133,6 +134,12 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="Заявки"
           active={activeSection === 'applications'}
           onClick={() => onSectionChange('applications')}
+        />
+        <SidebarItem
+          icon={<Calendar size={20} />}
+          label="Брони"
+          active={activeSection === 'bookings'}
+          onClick={() => onSectionChange('bookings')}
         />
         <SidebarItem
           icon={<Users size={20} />}
