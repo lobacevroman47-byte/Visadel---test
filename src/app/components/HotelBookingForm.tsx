@@ -37,7 +37,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
   const [cardCopied, setCardCopied] = useState(false);
 
   // Live settings from app_settings (admin-editable)
-  const [price, setPrice] = useState(2000);
+  const [price, setPrice] = useState(1000);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
   const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
@@ -46,7 +46,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
     let alive = true;
     getAppSettings().then(s => {
       if (!alive) return;
-      setPrice(s.hotel_booking_price ?? 2000);
+      setPrice(s.hotel_booking_price ?? 1000);
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
     }).catch(() => { /* defaults stay */ });

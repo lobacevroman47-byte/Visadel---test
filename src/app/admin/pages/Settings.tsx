@@ -191,7 +191,7 @@ export const Settings: React.FC = () => {
           </div>
           <NumberRow
             label="Цена услуги"
-            hint="Стоимость, которую клиент платит за подтверждение брони отеля"
+            hint="Стоимость, которую клиент платит за подтверждение брони отеля. По умолчанию 1000 ₽."
             value={settings.hotel_booking_price}
             onChange={v => set('hotel_booking_price', v)}
           />

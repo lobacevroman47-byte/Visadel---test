@@ -1149,7 +1149,7 @@ const SETTINGS_DEFAULTS: AppSettings = {
   bonus_expiration_days: 365,
   payment_card_number: '5536 9140 3834 6908',
   payment_card_holder: '',
-  hotel_booking_price: 2000,
+  hotel_booking_price: 1000,
   flight_booking_price: 2000,
   hotel_extra_fields: [],
   flight_extra_fields: [],

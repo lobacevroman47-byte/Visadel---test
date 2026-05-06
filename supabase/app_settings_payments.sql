@@ -4,7 +4,7 @@
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_number    text    DEFAULT '5536 9140 3834 6908';
 -- payment_card_holder kept for backwards compat; not displayed in current UI
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_holder    text    DEFAULT '';
-ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hotel_booking_price    integer DEFAULT 2000;
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hotel_booking_price    integer DEFAULT 1000;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS flight_booking_price   integer DEFAULT 2000;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hotel_extra_fields     jsonb   DEFAULT '[]'::jsonb;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS flight_extra_fields    jsonb   DEFAULT '[]'::jsonb;
