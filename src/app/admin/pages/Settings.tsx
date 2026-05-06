@@ -169,29 +169,17 @@ export const Settings: React.FC = () => {
             <h3>Реквизиты оплаты</h3>
           </div>
           <p className="text-sm text-gray-600 mb-4">
-            Используются на всех формах: визы, бронь отеля, бронь авиабилета. Изменения подтянутся клиентам сразу.
+            Используется на всех формах: визы, бронь отеля, бронь авиабилета. Изменения подтянутся клиентам сразу.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Номер карты</label>
-              <input
-                type="text" value={settings.payment_card_number}
-                onChange={e => set('payment_card_number', e.target.value)}
-                placeholder="2200 0000 0000 0000"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
-              />
-              <p className="text-xs text-gray-500 mt-1">Можно с пробелами. Клиенты копируют без пробелов автоматически.</p>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-700 mb-1">Получатель (ФИО на карте)</label>
-              <input
-                type="text" value={settings.payment_card_holder}
-                onChange={e => set('payment_card_holder', e.target.value)}
-                placeholder="IVANOV IVAN"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
-              />
-              <p className="text-xs text-gray-500 mt-1">Отображается под номером карты.</p>
-            </div>
+          <div>
+            <label className="block text-sm text-gray-700 mb-1">Номер карты</label>
+            <input
+              type="text" value={settings.payment_card_number}
+              onChange={e => set('payment_card_number', e.target.value)}
+              placeholder="5536 9140 3834 6908"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+            />
+            <p className="text-xs text-gray-500 mt-1">Можно с пробелами. Клиенты копируют без пробелов автоматически.</p>
           </div>
         </div>
 

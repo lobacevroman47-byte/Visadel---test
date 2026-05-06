@@ -42,15 +42,13 @@ export default function Step7Payment({
   const hotelFee = data.hotelBooking ? 2000 : 0;
   const totalPrice = basePrice + urgentFee + ticketFee + hotelFee;
 
-  const [cardNumber, setCardNumber] = useState('2200 7007 1234 5678');
-  const [recipientName, setRecipientName] = useState('IVANOV IVAN');
+  const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
 
   useEffect(() => {
     let alive = true;
     getAppSettings().then(s => {
       if (!alive) return;
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
-      if (s.payment_card_holder) setRecipientName(s.payment_card_holder);
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
@@ -172,13 +170,6 @@ export default function Step7Payment({
             </div>
           </div>
           
-          <div>
-            <p className="text-sm opacity-80 mb-1">Получатель:</p>
-            <div className="bg-white/20 rounded-lg p-3">
-              <span>{recipientName}</span>
-            </div>
-          </div>
-
           <div>
             <p className="text-sm opacity-80 mb-1">Сумма:</p>
             <div className="bg-white/20 rounded-lg p-3">

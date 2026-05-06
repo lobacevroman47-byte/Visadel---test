@@ -38,8 +38,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
 
   // Live settings from app_settings (admin-editable)
   const [price, setPrice] = useState(2000);
-  const [cardNumber, setCardNumber] = useState('2200 7007 1234 5678');
-  const [cardHolder, setCardHolder] = useState('IVANOV IVAN');
+  const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
   const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
@@ -48,8 +47,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
     getAppSettings().then(s => {
       if (!alive) return;
       setPrice(s.hotel_booking_price ?? 2000);
-      setCardNumber(s.payment_card_number ?? '2200 7007 1234 5678');
-      setCardHolder(s.payment_card_holder ?? 'IVANOV IVAN');
+      if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
@@ -422,7 +420,6 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
                 {cardCopied ? 'Скопировано' : 'Копировать'}
               </button>
             </div>
-            <p className="text-xs text-[#0F2A36]/60 mt-2">Получатель: <span className="font-semibold">{cardHolder}</span></p>
           </div>
 
           {/* Screenshot upload */}

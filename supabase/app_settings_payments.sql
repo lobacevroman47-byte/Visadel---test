@@ -1,8 +1,9 @@
 -- Adds payment + booking columns to app_settings (single-row config table).
 -- Run once in Supabase SQL editor. Safe to re-run.
 
-ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_number    text    DEFAULT '2200 7007 1234 5678';
-ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_holder    text    DEFAULT 'IVANOV IVAN';
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_number    text    DEFAULT '5536 9140 3834 6908';
+-- payment_card_holder kept for backwards compat; not displayed in current UI
+ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS payment_card_holder    text    DEFAULT '';
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hotel_booking_price    integer DEFAULT 2000;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS flight_booking_price   integer DEFAULT 2000;
 ALTER TABLE app_settings ADD COLUMN IF NOT EXISTS hotel_extra_fields     jsonb   DEFAULT '[]'::jsonb;

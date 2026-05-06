@@ -32,8 +32,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
 
   // Live settings (admin-editable)
   const [price, setPrice] = useState(2000);
-  const [cardNumber, setCardNumber] = useState('2200 7007 1234 5678');
-  const [cardHolder, setCardHolder] = useState('IVANOV IVAN');
+  const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
   const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
@@ -42,8 +41,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
     getAppSettings().then(s => {
       if (!alive) return;
       setPrice(s.flight_booking_price ?? 2000);
-      setCardNumber(s.payment_card_number ?? '2200 7007 1234 5678');
-      setCardHolder(s.payment_card_holder ?? 'IVANOV IVAN');
+      if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
@@ -372,7 +370,6 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
                 {cardCopied ? 'Скопировано' : 'Копировать'}
               </button>
             </div>
-            <p className="text-xs text-[#0F2A36]/60 mt-2">Получатель: <span className="font-semibold">{cardHolder}</span></p>
           </div>
 
           <p className="text-xs font-semibold text-[#0F2A36]/70 mb-2">Скриншот оплаты <span className="text-red-500">*</span></p>
