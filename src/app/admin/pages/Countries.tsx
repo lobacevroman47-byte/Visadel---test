@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Loader2, RefreshCw, Eye, EyeOff,
-  Database, Save, Globe,
+  Database, Save, Globe, FileText, Package, Hotel,
 } from 'lucide-react';
 import {
   getVisaProducts,
@@ -12,8 +12,54 @@ import {
   type VisaProduct,
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
+import { AdditionalServices } from './AdditionalServices';
+import { BookingsTab } from './FormBuilder';
+
+// ── Top-level tab nav: Визы / Доп. услуги / Брони
+type TopTab = 'visas' | 'addons' | 'bookings';
+
+const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileText }[] = [
+  { id: 'visas',    label: 'Визы',         Icon: FileText },
+  { id: 'addons',   label: 'Доп. услуги',  Icon: Package },
+  { id: 'bookings', label: 'Брони',        Icon: Hotel },
+];
 
 export const Countries: React.FC = () => {
+  const [topTab, setTopTab] = useState<TopTab>('visas');
+  return (
+    <div>
+      {/* Top nav — same brand pattern as FormBuilder */}
+      <div className="bg-white border-b border-gray-200 px-4 md:px-8 pt-4">
+        <div className="flex gap-1.5 flex-wrap">
+          {TOP_TABS.map(({ id, label, Icon }) => {
+            const active = topTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTopTab(id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-t-lg text-sm font-semibold transition ${
+                  active
+                    ? 'vd-grad text-white shadow-md'
+                    : 'bg-gray-50 text-[#0F2A36]/65 hover:bg-gray-100'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${active ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {topTab === 'visas'    && <VisasSection />}
+      {topTab === 'addons'   && <AdditionalServices />}
+      {topTab === 'bookings' && <BookingsTab />}
+    </div>
+  );
+};
+
+const VisasSection: React.FC = () => {
   const [products, setProducts] = useState<VisaProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);

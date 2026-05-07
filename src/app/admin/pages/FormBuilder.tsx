@@ -60,7 +60,7 @@ export const FormBuilder: React.FC = () => {
 };
 
 // ── Sub-tab внутри «Брони»: Отель / Авиабилет
-const BookingsTab: React.FC = () => {
+export const BookingsTab: React.FC = () => {
   const [sub, setSub] = useState<'hotel' | 'flight'>('hotel');
   return (
     <div>
