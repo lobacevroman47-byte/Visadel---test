@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, User, FileText, Users, Star } from 'lucide-react';
+import { ChevronLeft, User, FileText, Users, Star, Info } from 'lucide-react';
 import ProfileTab from './profile-tabs/ProfileTab';
 import ApplicationsTab from './profile-tabs/ApplicationsTab';
 import ReferralsTab from './profile-tabs/ReferralsTab';
@@ -30,6 +30,7 @@ export default function UserProfile({
 }: UserProfileProps) {
   const [activeTab, setActiveTab]       = useState<Tab>(initialTab ?? 'profile');
   const [bonusBalance, setBonusBalance] = useState(0);
+  const [showBonusInfo, setShowBonusInfo] = useState(false);
 
   useEffect(() => {
     const userData = JSON.parse(localStorage.getItem('userData') || '{}');
@@ -75,8 +76,33 @@ export default function UserProfile({
             </span>
           </p>
           <p className="text-center text-[12px] text-[#0F2A36]/55 mt-1">
-            1 ₽ бонуса = 1 ₽ скидки на визу
+            1 ₽ бонуса = 1 ₽ скидки
           </p>
+
+          {/* Subtle disclaimer — small "где можно потратить бонусы" с раскрывашкой */}
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowBonusInfo(v => !v)}
+              className="inline-flex items-center gap-1 text-[11px] text-[#0F2A36]/45 hover:text-[#3B5BFF] transition"
+            >
+              <Info className="w-3 h-3" />
+              На что можно потратить
+            </button>
+          </div>
+          {showBonusInfo && (
+            <div className="mt-2 mx-auto max-w-md bg-white/60 border border-blue-100/50 rounded-xl px-3 py-2.5">
+              <p className="text-[11px] text-[#0F2A36]/75 leading-snug">
+                Бонусы можно использовать как скидку при оформлении{' '}
+                <span className="font-semibold">визы</span>,{' '}
+                <span className="font-semibold">брони отеля</span> и{' '}
+                <span className="font-semibold">брони авиабилета</span>.
+              </p>
+              <p className="text-[10px] text-[#0F2A36]/50 mt-1.5 leading-snug">
+                На страховки, экскурсии и другие услуги бонусы не распространяются. Лимит списания на одну заявку зависит от вашего уровня в реферальной программе.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Tab bar — sticky, brand-styled pill tabs */}
