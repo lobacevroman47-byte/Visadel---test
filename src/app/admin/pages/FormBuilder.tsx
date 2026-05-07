@@ -15,14 +15,13 @@ import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
 import { AdditionalServices } from './AdditionalServices';
 
-// ── Top-level tab nav: Анкеты виз / Доп. услуги / Бронь отеля / Бронь авиабилета
-type TopTab = 'visas' | 'addons' | 'hotel' | 'flight';
+// ── Top-level tab nav: Анкеты виз / Доп. услуги / Брони
+type TopTab = 'visas' | 'addons' | 'bookings';
 
 const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileEdit }[] = [
-  { id: 'visas',  label: 'Анкеты виз',         Icon: FileEdit },
-  { id: 'addons', label: 'Доп. услуги',        Icon: Package },
-  { id: 'hotel',  label: 'Бронь отеля',        Icon: Hotel },
-  { id: 'flight', label: 'Бронь авиабилета',   Icon: Plane },
+  { id: 'visas',    label: 'Анкеты виз',  Icon: FileEdit },
+  { id: 'addons',   label: 'Доп. услуги', Icon: Package },
+  { id: 'bookings', label: 'Брони',       Icon: Hotel },
 ];
 
 export const FormBuilder: React.FC = () => {
@@ -53,10 +52,37 @@ export const FormBuilder: React.FC = () => {
         </div>
       </div>
 
-      {topTab === 'visas'  && <VisaFormSection />}
-      {topTab === 'addons' && <AdditionalServices />}
-      {topTab === 'hotel'  && <BookingFormSection kind="hotel" />}
-      {topTab === 'flight' && <BookingFormSection kind="flight" />}
+      {topTab === 'visas'    && <VisaFormSection />}
+      {topTab === 'addons'   && <AdditionalServices />}
+      {topTab === 'bookings' && <BookingsTab />}
+    </div>
+  );
+};
+
+// ── Sub-tab внутри «Брони»: Отель / Авиабилет
+const BookingsTab: React.FC = () => {
+  const [sub, setSub] = useState<'hotel' | 'flight'>('hotel');
+  return (
+    <div>
+      <div className="px-4 md:px-8 pt-5 pb-2 flex gap-1.5">
+        <button type="button" onClick={() => setSub('hotel')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
+            sub === 'hotel'
+              ? 'bg-[#EAF1FF] text-[#3B5BFF]'
+              : 'bg-white border border-gray-200 text-[#0F2A36]/65 hover:bg-gray-50'
+          }`}>
+          <Hotel className="w-4 h-4" /> Бронь отеля
+        </button>
+        <button type="button" onClick={() => setSub('flight')}
+          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
+            sub === 'flight'
+              ? 'bg-[#EAF1FF] text-[#3B5BFF]'
+              : 'bg-white border border-gray-200 text-[#0F2A36]/65 hover:bg-gray-50'
+          }`}>
+          <Plane className="w-4 h-4" /> Бронь авиабилета
+        </button>
+      </div>
+      <BookingFormSection kind={sub} />
     </div>
   );
 };

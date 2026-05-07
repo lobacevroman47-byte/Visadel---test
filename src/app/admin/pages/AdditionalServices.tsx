@@ -36,86 +36,122 @@ export const AdditionalServices: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8">
+      {/* Hero — same brand pattern as cabinet/admin Bookings */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-        <div>
-          <h1>Дополнительные услуги</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            {services.length} услуг · {totalEnabled} активных · цены применяются на странице оплаты визы
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
+            <Package className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Дополнительные услуги</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {services.length} {services.length === 1 ? 'услуга' : 'услуг'} · {totalEnabled} активных · применяются при оформлении виз
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="px-3 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg flex items-center gap-1.5 text-sm select-none"
+            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
           >
-            <Plus size={16} /> Добавить услугу
+            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
           </button>
-          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg" title="Обновить">
+          <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
         </div>
       </div>
 
       {!loading && services.length === 0 && (
-        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-10 text-center">
-          <Package className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-gray-700 mb-2">Пока пусто</h3>
-          <p className="text-sm text-gray-500 mb-4">Добавь первую услугу — она появится в калькуляторе на странице визы</p>
+        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
+            📦
+          </div>
+          <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Пока пусто</h3>
+          <p className="text-sm text-[#0F2A36]/60 mb-5">Добавь первую услугу — она появится в калькуляторе на странице визы</p>
           <button
             type="button"
             onClick={() => setAdding(true)}
-            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg inline-flex items-center gap-2 select-none"
+            className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition"
           >
-            <Plus size={16} /> Добавить услугу
+            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
           </button>
         </div>
       )}
 
       {services.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="divide-y divide-gray-100">
-            {services.map(s => (
-              <div key={s.id} className={`px-4 py-3 flex flex-wrap items-center gap-3 ${!s.enabled ? 'opacity-50' : ''}`}>
-                <div className="text-3xl shrink-0">{s.icon ?? '⭐'}</div>
-                <div className="flex-1 min-w-[200px]">
-                  <p className="text-gray-800 font-medium">{s.name}</p>
-                  {s.description && <p className="text-xs text-gray-500 mt-0.5">{s.description}</p>}
-                  <p className="text-xs text-gray-400 font-mono mt-0.5">{s.id}</p>
+        <div className="space-y-2.5">
+          {services.map(s => {
+            const restricted = Array.isArray(s.countries) && s.countries.length > 0;
+            return (
+              <div
+                key={s.id}
+                className={`bg-white rounded-2xl border border-gray-100 hover:shadow-md transition p-4 flex flex-wrap items-start gap-3 ${!s.enabled ? 'opacity-55' : ''}`}
+              >
+                {/* Brand soft icon block */}
+                <div className="w-12 h-12 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-2xl shrink-0">
+                  {s.icon ?? '⭐'}
                 </div>
-                <div className="text-right whitespace-nowrap">
-                  <div className="text-blue-600 font-semibold">+{s.price.toLocaleString('ru-RU')} ₽</div>
+
+                <div className="flex-1 min-w-[200px]">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-[15px] font-bold text-[#0F2A36]">{s.name || <span className="text-gray-400 italic font-normal">Без названия</span>}</p>
+                    {!s.enabled && (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500">Скрыта</span>
+                    )}
+                  </div>
+                  {s.description && <p className="text-xs text-[#0F2A36]/65 mt-0.5">{s.description}</p>}
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                    <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{s.id}</span>
+                    {restricted && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
+                        🌍 {s.countries.length} {s.countries.length === 1 ? 'страна' : 'стран'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Price block */}
+                <div className="text-right whitespace-nowrap shrink-0">
+                  <div className="text-[#3B5BFF] text-[15px] font-bold">+{s.price.toLocaleString('ru-RU')} ₽</div>
                   {s.cost_rub > 0 && (
-                    <div className="text-xs text-gray-400">себест. {s.cost_rub.toLocaleString('ru-RU')} ₽</div>
+                    <div className="text-[11px] text-gray-400">себест. {s.cost_rub.toLocaleString('ru-RU')} ₽</div>
                   )}
                 </div>
-                <div className="flex items-center gap-1">
+
+                {/* Action buttons — brand soft style */}
+                <div className="flex items-center gap-1 shrink-0">
                   <button
                     onClick={() => handleToggle(s)}
-                    className={`p-2 rounded-lg ${s.enabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition active:scale-95 ${
+                      s.enabled
+                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    }`}
                     title={s.enabled ? 'Активна — скрыть' : 'Скрыта — показать'}
                   >
-                    {s.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                    {s.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
                   </button>
                   <button
                     onClick={() => setEditing(s)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                    className="w-9 h-9 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] hover:bg-[#DCE7FF] flex items-center justify-center transition active:scale-95"
                     title="Редактировать"
                   >
-                    <Edit2 size={16} />
+                    <Edit2 size={15} />
                   </button>
                   <button
                     onClick={() => handleDelete(s)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                    className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
                     title="Удалить"
                   >
-                    <Trash2 size={16} />
+                    <Trash2 size={15} />
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
+            );
+          })}
         </div>
       )}
 
