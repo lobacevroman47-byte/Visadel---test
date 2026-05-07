@@ -86,18 +86,24 @@ interface AddonPrices {
   ticket: number;
 }
 
-// Empty array == addon available for ALL countries (default).
+// null = аддон отключён в админке (enabled=false) либо строки нет в БД.
+// [] = аддон активен и доступен ВО ВСЕХ странах.
+// ['Индия','Корея'] = активен только в перечисленных.
 interface AddonAvailability {
-  urgent: string[];
-  hotel: string[];
-  ticket: string[];
+  urgent: string[] | null;
+  hotel:  string[] | null;
+  ticket: string[] | null;
 }
 
 const DEFAULT_ADDON_PRICES: AddonPrices = { urgent: 1000, hotel: 1000, ticket: 2000 };
 const DEFAULT_ADDON_AVAILABILITY: AddonAvailability = { urgent: [], hotel: [], ticket: [] };
 
-// True if addon is offered for the given visa country (empty list ⇒ everywhere).
-function isAddonForCountry(allowed: string[], country: string): boolean {
+// True if addon is offered for the given visa country.
+//   null  → выключен админом, не показываем
+//   []    → доступен во всех странах
+//   list  → доступен в конкретных
+function isAddonForCountry(allowed: string[] | null, country: string): boolean {
+  if (allowed === null) return false;
   if (!Array.isArray(allowed) || allowed.length === 0) return true;
   return allowed.some(c => c.trim().toLowerCase() === country.trim().toLowerCase());
 }
@@ -363,11 +369,14 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
           hotel:  byId.get('hotel-booking')     ?? DEFAULT_ADDON_PRICES.hotel,
           ticket: byId.get('flight-booking')    ?? DEFAULT_ADDON_PRICES.ticket,
         });
+        // Если строки нет в `enabled` (услуга отключена в админке) — null,
+        // → isAddonForCountry вернёт false → карточка не отрисуется на
+        // странице визы.
         const availabilityById = new Map(enabled.map(s => [s.id, Array.isArray(s.countries) ? s.countries : []] as const));
         setAddonAvailability({
-          urgent: availabilityById.get('urgent-processing') ?? [],
-          hotel:  availabilityById.get('hotel-booking')     ?? [],
-          ticket: availabilityById.get('flight-booking')    ?? [],
+          urgent: availabilityById.has('urgent-processing') ? (availabilityById.get('urgent-processing') ?? []) : null,
+          hotel:  availabilityById.has('hotel-booking')     ? (availabilityById.get('hotel-booking')     ?? []) : null,
+          ticket: availabilityById.has('flight-booking')    ? (availabilityById.get('flight-booking')    ?? []) : null,
         });
       } catch (e) {
         console.warn('Failed to load visa catalog:', e);
