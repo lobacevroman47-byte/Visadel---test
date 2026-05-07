@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
+import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface FlightBookingFormProps {
@@ -56,9 +56,11 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
 
   useEffect(() => {
     let alive = true;
-    getAppSettings().then(s => {
+    // Price comes from additional_services row (id=flight-booking).
+    Promise.all([getAppSettings(), getAdditionalServices()]).then(([s, services]) => {
       if (!alive) return;
-      setPrice(s.flight_booking_price ?? 2000);
+      const flight = services.find(x => x.id === 'flight-booking');
+      setPrice(flight?.price ?? s.flight_booking_price ?? 2000);
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
       setOverrides(s.flight_core_overrides && typeof s.flight_core_overrides === 'object' ? s.flight_core_overrides : {});

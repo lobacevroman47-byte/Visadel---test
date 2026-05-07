@@ -7,7 +7,16 @@ import {
   type AdditionalService,
 } from '../../lib/db';
 
-export const AdditionalServices: React.FC = () => {
+// IDs that represent standalone bookings (hotel + flight). When the page is
+// shown in 'bookings' mode we filter the catalog to just these rows; in
+// 'addons' mode we show everything else.
+const BOOKING_IDS = ['hotel-booking', 'flight-booking'];
+
+interface AdditionalServicesProps {
+  mode?: 'addons' | 'bookings';
+}
+
+export const AdditionalServices: React.FC<AdditionalServicesProps> = ({ mode = 'addons' }) => {
   const [services, setServices] = useState<AdditionalService[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AdditionalService | null>(null);
@@ -21,7 +30,19 @@ export const AdditionalServices: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const totalEnabled = useMemo(() => services.filter(s => s.enabled).length, [services]);
+  // Visible rows depend on mode:
+  //   'bookings' → only the two booking rows (hotel, flight) — predefined, no Add
+  //   'addons'   → everything else (urgent, custom services) — Add available
+  const visible = useMemo(() => {
+    if (mode === 'bookings') return services.filter(s => BOOKING_IDS.includes(s.id));
+    return services.filter(s => !BOOKING_IDS.includes(s.id));
+  }, [services, mode]);
+
+  const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
+  const HEADER_TITLE = mode === 'bookings' ? 'Брони' : 'Дополнительные услуги';
+  const HEADER_HINT  = mode === 'bookings'
+    ? `${visible.length} ${visible.length === 1 ? 'бронь' : 'броней'} · ${totalEnabled} активных`
+    : `${visible.length} ${visible.length === 1 ? 'услуга' : 'услуг'} · ${totalEnabled} активных · применяются при оформлении виз`;
 
   const handleToggle = async (s: AdditionalService) => {
     await upsertAdditionalService({ ...s, enabled: !s.enabled });
@@ -43,47 +64,54 @@ export const AdditionalServices: React.FC = () => {
             <Package className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Дополнительные услуги</h1>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {services.length} {services.length === 1 ? 'услуга' : 'услуг'} · {totalEnabled} активных · применяются при оформлении виз
-            </p>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{HEADER_TITLE}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{HEADER_HINT}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
-          >
-            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
-          </button>
+          {/* Bookings are predefined (hotel, flight) — no Add button */}
+          {mode === 'addons' && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
+            >
+              <Plus size={16} strokeWidth={2.5} /> Добавить услугу
+            </button>
+          )}
           <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
         </div>
       </div>
 
-      {!loading && services.length === 0 && (
+      {!loading && visible.length === 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
           <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
-            📦
+            {mode === 'bookings' ? '🏨' : '📦'}
           </div>
           <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Пока пусто</h3>
-          <p className="text-sm text-[#0F2A36]/60 mb-5">Добавь первую услугу — она появится в калькуляторе на странице визы</p>
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition"
-          >
-            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
-          </button>
+          <p className="text-sm text-[#0F2A36]/60 mb-5">
+            {mode === 'bookings'
+              ? 'Брони появятся после первой загрузки каталога'
+              : 'Добавь первую услугу — она появится в калькуляторе на странице визы'}
+          </p>
+          {mode === 'addons' && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition"
+            >
+              <Plus size={16} strokeWidth={2.5} /> Добавить услугу
+            </button>
+          )}
         </div>
       )}
 
-      {services.length > 0 && (
+      {visible.length > 0 && (
         <div className="space-y-2.5">
-          {services.map(s => {
+          {visible.map(s => {
             const restricted = Array.isArray(s.countries) && s.countries.length > 0;
             return (
               <div
@@ -113,12 +141,9 @@ export const AdditionalServices: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Price block */}
+                {/* Price block — себестоимость прячется, видна только в редакторе */}
                 <div className="text-right whitespace-nowrap shrink-0">
                   <div className="text-[#3B5BFF] text-[15px] font-bold">+{s.price.toLocaleString('ru-RU')} ₽</div>
-                  {s.cost_rub > 0 && (
-                    <div className="text-[11px] text-gray-400">себест. {s.cost_rub.toLocaleString('ru-RU')} ₽</div>
-                  )}
                 </div>
 
                 {/* Action buttons — brand soft style */}
@@ -141,13 +166,15 @@ export const AdditionalServices: React.FC = () => {
                   >
                     <Edit2 size={15} />
                   </button>
-                  <button
-                    onClick={() => handleDelete(s)}
-                    className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
-                    title="Удалить"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {mode === 'addons' && (
+                    <button
+                      onClick={() => handleDelete(s)}
+                      className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
+                      title="Удалить"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             );

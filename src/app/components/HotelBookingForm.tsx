@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
+import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface HotelBookingFormProps {
@@ -63,9 +63,13 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
 
   useEffect(() => {
     let alive = true;
-    getAppSettings().then(s => {
+    // Price now comes from additional_services row (id=hotel-booking) so it
+    // updates whenever admin edits via Каталог → Брони. Other settings
+    // (card number, extra fields, core overrides) still come from app_settings.
+    Promise.all([getAppSettings(), getAdditionalServices()]).then(([s, services]) => {
       if (!alive) return;
-      setPrice(s.hotel_booking_price ?? 1000);
+      const hotel = services.find(x => x.id === 'hotel-booking');
+      setPrice(hotel?.price ?? s.hotel_booking_price ?? 1000);
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
       setOverrides(s.hotel_core_overrides && typeof s.hotel_core_overrides === 'object' ? s.hotel_core_overrides : {});
