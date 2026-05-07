@@ -34,16 +34,10 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
 
   useEffect(() => { load(); }, []);
 
-  // mode='bookings' — только hotel-booking + flight-booking.
-  // mode='addons'   — все ОСТАЛЬНЫЕ услуги. Брони не показываем здесь чтобы
-  //                   не было путаницы: для них есть отдельный раздел «Брони»
-  //                   (один источник истины, но два UI-входа разделены).
-  const visible = useMemo(() => {
-    const bookingSet = new Set(BOOKING_IDS as readonly string[]);
-    return isBookings
-      ? services.filter(s => bookingSet.has(s.id))
-      : services.filter(s => !bookingSet.has(s.id));
-  }, [services, isBookings]);
+  const visible = useMemo(
+    () => isBookings ? services.filter(s => (BOOKING_IDS as readonly string[]).includes(s.id)) : services,
+    [services, isBookings],
+  );
   const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
   const HEADER_ICON = isBookings ? <Hotel className="w-5 h-5" /> : <Package className="w-5 h-5" />;
   const HEADER_TITLE = isBookings ? 'Брони' : 'Дополнительные услуги';
