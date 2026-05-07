@@ -163,13 +163,6 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
-          icon={<Package size={20} />}
-          label="Доп. услуги"
-          active={activeSection === 'additional-services'}
-          onClick={() => onSectionChange('additional-services')}
-          disabled={!hasPermission(['owner', 'admin'])}
-        />
-        <SidebarItem
           icon={<FileEdit size={20} />}
           label="Конструктор анкет"
           active={activeSection === 'form-builder'}

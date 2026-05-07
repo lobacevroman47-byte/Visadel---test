@@ -1,17 +1,65 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileEdit, Image as ImageIcon, Plus, Edit2, Trash2, X, Save, Loader2,
-  RefreshCw, Database, AlertCircle,
+  RefreshCw, Database, AlertCircle, Package, Hotel, Plane,
 } from 'lucide-react';
 import {
   getVisaProducts,
   getAllFormFields, upsertFormField, deleteFormField,
   getAllPhotoRequirements, upsertPhotoRequirement, deletePhotoRequirement,
   seedFormFieldsFromCode,
+  getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField,
   type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
+import { AdditionalServices } from './AdditionalServices';
+
+// ── Top-level tab nav: Анкеты виз / Доп. услуги / Бронь отеля / Бронь авиабилета
+type TopTab = 'visas' | 'addons' | 'hotel' | 'flight';
+
+const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileEdit }[] = [
+  { id: 'visas',  label: 'Анкеты виз',         Icon: FileEdit },
+  { id: 'addons', label: 'Доп. услуги',        Icon: Package },
+  { id: 'hotel',  label: 'Бронь отеля',        Icon: Hotel },
+  { id: 'flight', label: 'Бронь авиабилета',   Icon: Plane },
+];
+
+export const FormBuilder: React.FC = () => {
+  const [topTab, setTopTab] = useState<TopTab>('visas');
+  return (
+    <div>
+      {/* Top nav */}
+      <div className="bg-white border-b border-gray-200 px-4 md:px-8 pt-4">
+        <div className="flex gap-1.5 flex-wrap">
+          {TOP_TABS.map(({ id, label, Icon }) => {
+            const active = topTab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTopTab(id)}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-t-lg text-sm font-semibold transition ${
+                  active
+                    ? 'vd-grad text-white shadow-md'
+                    : 'bg-gray-50 text-[#0F2A36]/65 hover:bg-gray-100'
+                }`}
+              >
+                <Icon className={`w-4 h-4 ${active ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {topTab === 'visas'  && <VisaFormSection />}
+      {topTab === 'addons' && <AdditionalServices />}
+      {topTab === 'hotel'  && <BookingFormSection kind="hotel" />}
+      {topTab === 'flight' && <BookingFormSection kind="flight" />}
+    </div>
+  );
+};
 
 const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
   text: 'Текст',
@@ -27,7 +75,8 @@ const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
   'south-asia-visits': 'Визиты в Юж. Азию',
 };
 
-export const FormBuilder: React.FC = () => {
+// Существующий конструктор анкет виз — теперь вкладка внутри обёртки FormBuilder.
+const VisaFormSection: React.FC = () => {
   const [products, setProducts] = useState<VisaProduct[]>([]);
   const [allFields, setAllFields] = useState<VisaFormField[]>([]);
   const [allPhotos, setAllPhotos] = useState<VisaPhotoRequirement[]>([]);
@@ -325,6 +374,193 @@ export const FormBuilder: React.FC = () => {
           }}
         />
       )}
+    </div>
+  );
+};
+
+// ─── Booking form config (price + extra fields) ──────────────────────────────
+const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) => {
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [savedAt, setSavedAt] = useState<Date | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getAppSettings()
+      .then(s => { if (alive) setSettings(s); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, []);
+
+  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) => {
+    setSettings(prev => prev ? { ...prev, [k]: v } : prev);
+  };
+
+  const handleSave = async () => {
+    if (!settings || saving) return;
+    setSaving(true);
+    try {
+      const { id: _id, updated_at: _ts, ...rest } = settings;
+      void _id; void _ts;
+      await saveAppSettings(rest);
+      setSavedAt(new Date());
+    } catch (e) {
+      alert(`Ошибка сохранения: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading || !settings) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  const priceKey = kind === 'hotel' ? 'hotel_booking_price' : 'flight_booking_price';
+  const fieldsKey = kind === 'hotel' ? 'hotel_extra_fields' : 'flight_extra_fields';
+  const title = kind === 'hotel' ? 'Бронь отеля' : 'Бронь авиабилета';
+  const HeroIcon = kind === 'hotel' ? Hotel : Plane;
+  const extras: ExtraFormField[] = settings[fieldsKey] ?? [];
+
+  const addField = () => {
+    set(fieldsKey, [
+      ...extras,
+      { id: Math.random().toString(36).slice(2, 10), label: '', type: 'text', required: false },
+    ]);
+  };
+
+  const updateField = (idx: number, patch: Partial<ExtraFormField>) => {
+    set(fieldsKey, extras.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+  };
+
+  const removeField = (idx: number) => {
+    set(fieldsKey, extras.filter((_, i) => i !== idx));
+  };
+
+  const moveField = (idx: number, dir: -1 | 1) => {
+    const next = idx + dir;
+    if (next < 0 || next >= extras.length) return;
+    const arr = [...extras];
+    [arr[idx], arr[next]] = [arr[next], arr[idx]];
+    set(fieldsKey, arr);
+  };
+
+  return (
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
+            <HeroIcon className="w-5 h-5" />
+          </div>
+          <div>
+            <h1>{title}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">Настрой цену и дополнительные поля анкеты</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          {savedAt && !saving && (
+            <span className="text-xs text-emerald-600">✓ сохранено в {savedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
+          )}
+          <button type="button" onClick={handleSave} disabled={saving}
+            className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-lg flex items-center gap-2 select-none">
+            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+            {saving ? 'Сохраняем…' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div>
+          <label className="block text-sm text-gray-700 mb-1">Цена услуги (₽)</label>
+          <input
+            type="number" min={0} step={100}
+            value={settings[priceKey] as number}
+            onChange={e => set(priceKey, parseInt(e.target.value, 10) || 0)}
+            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            Сумма, которую видит клиент при оформлении этой брони. Изменения подтягиваются на лету.
+          </p>
+        </div>
+
+        <div className="pt-4 border-t border-gray-100">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-gray-700">Дополнительные поля анкеты</p>
+            <span className="text-xs text-gray-400">{extras.length} {extras.length === 1 ? 'поле' : 'полей'}</span>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Эти поля появятся внизу формы у клиента, перед оплатой. Могут быть текстовыми, числовыми или с датой.
+          </p>
+
+          {extras.length === 0 ? (
+            <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+              <p className="text-xs text-gray-400">Нет дополнительных полей</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {extras.map((f, idx) => (
+                <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                  <div className="flex items-start gap-2 mb-2">
+                    <div className="flex flex-col gap-0.5 pt-1">
+                      <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
+                        className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▲</button>
+                      <button type="button" onClick={() => moveField(idx, 1)} disabled={idx === extras.length - 1}
+                        className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▼</button>
+                    </div>
+                    <input
+                      type="text" value={f.label}
+                      onChange={e => updateField(idx, { label: e.target.value })}
+                      placeholder="Название поля"
+                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#5C7BFF]"
+                    />
+                    <button type="button" onClick={() => removeField(idx)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap pl-6">
+                    <select
+                      value={f.type}
+                      onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
+                      className="px-2 py-1 text-xs border border-gray-200 rounded-md bg-white"
+                    >
+                      <option value="text">Текст</option>
+                      <option value="textarea">Длинный текст</option>
+                      <option value="number">Число</option>
+                      <option value="date">Дата</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={f.placeholder ?? ''}
+                      onChange={e => updateField(idx, { placeholder: e.target.value })}
+                      placeholder="Подсказка"
+                      className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                    />
+                    <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
+                      <input
+                        type="checkbox" checked={f.required}
+                        onChange={e => updateField(idx, { required: e.target.checked })}
+                        className="accent-[#3B5BFF]"
+                      />
+                      Обязательное
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <button type="button" onClick={addField}
+            className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 hover:border-[#5C7BFF] hover:bg-[#EAF1FF] text-sm text-[#3B5BFF] font-semibold rounded-lg transition flex items-center justify-center gap-1">
+            <Plus size={14} strokeWidth={2.5} />
+            Добавить поле
+          </button>
+        </div>
+      </div>
     </div>
   );
 };

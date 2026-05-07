@@ -170,9 +170,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         ) : (
           <PermissionDenied />
         );
+      // Legacy redirect — раздел переехал в Конструктор анкет → вкладка «Доп. услуги»
       case 'additional-services':
         return hasPermission(['owner', 'admin']) ? (
-          <AdditionalServices />
+          <FormBuilder />
         ) : (
           <PermissionDenied />
         );
