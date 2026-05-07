@@ -18,6 +18,27 @@ interface ApplicationFormProps {
   onContinueDraft?: (draft: any) => void;
 }
 
+// When a user picks the «Бронь отеля для визы» / «Бронь обратного билета»
+// addons, we collect the same trip-specific fields here that the standalone
+// HotelBookingForm / FlightBookingForm collect — same source of truth.
+// Contact info and passport are intentionally NOT duplicated: the visa form
+// already collects those.
+export interface HotelAddonDetails {
+  country?: string;
+  city?: string;
+  checkIn?: string;
+  checkOut?: string;
+  guests?: number;
+  hasChildren?: 'yes' | 'no';
+  childrenCount?: number;
+}
+
+export interface FlightAddonDetails {
+  fromCity?: string;
+  toCity?: string;
+  bookingDate?: string;
+}
+
 export interface FormData {
   // Basic data (varies by country)
   basicData: Record<string, any>;
@@ -26,6 +47,8 @@ export interface FormData {
     hotelBooking: boolean;
     returnTicket: boolean;
     urgentProcessing: boolean;
+    hotelDetails?: HotelAddonDetails;
+    flightDetails?: FlightAddonDetails;
   };
   // How heard
   howHeard: string[];
