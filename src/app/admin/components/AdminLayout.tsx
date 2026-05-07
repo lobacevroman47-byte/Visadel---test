@@ -14,6 +14,7 @@ import { AdditionalServices } from '../pages/AdditionalServices';
 import { Reviews } from '../pages/Reviews';
 import { BonusLogs } from '../pages/BonusLogs';
 import { Bookings } from '../pages/Bookings';
+import { AuditLog } from '../pages/AuditLog';
 import { useAdmin } from '../contexts/AdminContext';
 import { Menu, ArrowLeft } from 'lucide-react';
 
@@ -21,7 +22,7 @@ interface AdminLayoutProps {
   onBackToApp?: () => void;
 }
 
-type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels' | 'product-insurance';
+type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels';
 
 const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: string; description: string; emoji: string }> = {
   bookings: {
@@ -38,11 +39,6 @@ const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: s
     title: 'Отели',
     description: 'Каталог отелей с динамическими ценами через API. Будет работать так же, как раздел виз: каталог, заявки, статусы, выручка/прибыль.',
     emoji: '🏨',
-  },
-  insurance: {
-    title: 'Страховки',
-    description: 'Туристические страховки через API. Скоро появятся типы полисов, оформление и связка с визовой заявкой.',
-    emoji: '🛡️',
   },
 };
 
@@ -121,8 +117,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         return <Bookings initialTab="flights" />;
       case 'product-hotels':
         return <Bookings initialTab="hotels" />;
-      case 'product-insurance':
-        return <ComingSoonAdmin tab="insurance" />;
       case 'users':
         return hasPermission(['owner', 'admin']) ? (
           <Users filter={sectionFilter} />
@@ -169,6 +163,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       case 'bonus-logs':
         return hasPermission(['owner', 'admin']) ? (
           <BonusLogs />
+        ) : (
+          <PermissionDenied />
+        );
+      case 'audit-log':
+        return hasPermission(['owner', 'admin']) ? (
+          <AuditLog />
         ) : (
           <PermissionDenied />
         );

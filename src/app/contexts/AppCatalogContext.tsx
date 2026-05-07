@@ -3,6 +3,7 @@ import {
   getAppSettings, getAdditionalServices,
   type AppSettings, type AdditionalService,
 } from '../lib/db';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 // Контекст глобального каталога: app_settings + additional_services.
 // Данные стянуты ОДИН раз при mount root-провайдера, кешируются на время
@@ -46,6 +47,25 @@ export const AppCatalogProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => { void revalidate(); }, []);
+
+  // Real-time подписка на изменения каталога. Когда админ в одном
+  // окне меняет цену услуги или поля app_settings — клиенты во всех
+  // других открытых мини-аппах через 1-2 сек видят новую цену без
+  // ручного refresh. Требует включённую Realtime на таблицах в
+  // Supabase Dashboard → Replication → Set up Realtime.
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const channel = supabase
+      .channel('catalog-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'additional_services' },
+        () => { void revalidate(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'app_settings' },
+        () => { void revalidate(); })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'visa_products' },
+        () => { void revalidate(); })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 
   return (
     <AppCatalogContext.Provider value={{ settings, services, loading, revalidate }}>

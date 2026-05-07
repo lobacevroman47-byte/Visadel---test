@@ -1,13 +1,12 @@
-import { FileText, Calendar, Plane, Hotel, Shield, Map } from 'lucide-react';
+import { FileText, Calendar, Plane, Hotel, Map } from 'lucide-react';
 
-export type MainTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance' | 'excursions';
+export type MainTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'excursions';
 
 const TABS: { id: MainTab; label: string; Icon: typeof FileText }[] = [
   { id: 'visas',      label: 'Визы',       Icon: FileText },
   { id: 'bookings',   label: 'Брони',      Icon: Calendar },
   { id: 'flights',    label: 'Билеты',     Icon: Plane },
   { id: 'hotels',     label: 'Отели',      Icon: Hotel },
-  { id: 'insurance',  label: 'Страховки',  Icon: Shield },
   { id: 'excursions', label: 'Экскурсии',  Icon: Map },
 ];
 

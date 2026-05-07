@@ -6,6 +6,7 @@ import {
   getAdditionalServices, upsertAdditionalService, deleteAdditionalService,
   type AdditionalService,
 } from '../../lib/db';
+import { auditLog } from '../lib/audit';
 
 const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
 type Mode = 'addons' | 'bookings';
@@ -48,12 +49,20 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
   const handleToggle = async (s: AdditionalService) => {
     await upsertAdditionalService({ ...s, enabled: !s.enabled });
     setServices(prev => prev.map(x => x.id === s.id ? { ...x, enabled: !s.enabled } : x));
+    void auditLog('service.toggle', {
+      target_type: 'additional_service', target_id: s.id,
+      details: { name: s.name, from: s.enabled, to: !s.enabled },
+    });
   };
 
   const handleDelete = async (s: AdditionalService) => {
     if (!confirm(`Удалить «${s.name}»? Это нельзя отменить.`)) return;
     await deleteAdditionalService(s.id);
     setServices(prev => prev.filter(x => x.id !== s.id));
+    void auditLog('service.delete', {
+      target_type: 'additional_service', target_id: s.id,
+      details: { name: s.name, price: s.price },
+    });
   };
 
   return (
@@ -199,6 +208,10 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
           onClose={() => { setEditing(null); setAdding(false); }}
           onSaved={async (saved) => {
             await upsertAdditionalService(saved);
+            void auditLog('service.update', {
+              target_type: 'additional_service', target_id: saved.id,
+              details: { name: saved.name, price: saved.price, enabled: saved.enabled },
+            });
             setEditing(null); setAdding(false);
             load();
           }}

@@ -184,6 +184,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
+          icon={<MessageSquare size={20} />}
+          label="Журнал изменений"
+          active={activeSection === 'audit-log'}
+          onClick={() => onSectionChange('audit-log')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
           icon={<Settings size={20} />}
           label="Настройки"
           active={activeSection === 'settings'}

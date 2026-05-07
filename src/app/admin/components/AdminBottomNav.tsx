@@ -1,14 +1,13 @@
 import React from 'react';
-import { FileText, Calendar, Plane, Hotel, Shield } from 'lucide-react';
+import { FileText, Calendar, Plane, Hotel } from 'lucide-react';
 
-export type AdminProductTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance';
+export type AdminProductTab = 'visas' | 'bookings' | 'flights' | 'hotels';
 
 const TABS: { id: AdminProductTab; label: string; Icon: typeof FileText }[] = [
   { id: 'visas',      label: 'Визы',       Icon: FileText },
   { id: 'bookings',   label: 'Брони',      Icon: Calendar },
   { id: 'flights',    label: 'Билеты',     Icon: Plane },
   { id: 'hotels',     label: 'Отели',      Icon: Hotel },
-  { id: 'insurance',  label: 'Страховки',  Icon: Shield },
 ];
 
 interface AdminBottomNavProps {

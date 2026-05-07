@@ -134,16 +134,33 @@ function App() {
     if (tg) {
       const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;
 
-      // Track referral click (if user came via a referral link)
-      if (startParam) {
+      // Deeplink-команды: t.me/<bot>/app?startapp=<param>
+      //   booking_hotel    — открыть форму брони отеля
+      //   booking_flight   — открыть форму брони авиабилета
+      //   applications     — открыть «Мои заявки» в кабинете
+      //   referrals        — открыть реферальный таб
+      //   <реф.код>        — обычный referral-click (как раньше)
+      let referralCode: string | undefined = startParam;
+      if (startParam === 'booking_hotel') {
+        setCurrentScreen('hotel_booking'); referralCode = undefined;
+      } else if (startParam === 'booking_flight') {
+        setCurrentScreen('flight_booking'); referralCode = undefined;
+      } else if (startParam === 'applications') {
+        setInitialProfileTab('applications'); setCurrentScreen('profile'); referralCode = undefined;
+      } else if (startParam === 'referrals') {
+        setInitialProfileTab('referrals'); setCurrentScreen('profile'); referralCode = undefined;
+      }
+
+      // Track referral click (если действительно реф.код, а не deeplink-команда)
+      if (referralCode) {
         fetch('/api/track-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referral_code: startParam, telegram_id: tg.id }),
+          body: JSON.stringify({ referral_code: referralCode, telegram_id: tg.id }),
         }).catch(() => {});
       }
 
-      upsertUser(tg, startParam)
+      upsertUser(tg, referralCode)
         .then(async u => {
           setAppUser(u);
           localStorage.setItem('vd_user', JSON.stringify(u));
@@ -261,14 +278,6 @@ function App() {
                 title="Отели"
                 description="Бронирование отелей по всему миру. Подключим Островок и Booking — будет фильтр по звёздам, цене и удобствам."
                 emoji="🏨"
-                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-              />
-            )}
-            {mainTab === 'insurance' && (
-              <ComingSoon
-                title="Страховки"
-                description="Туристические страховки на любой бюджет. Базовая, Стандарт и Премиум — подбираем под страну поездки."
-                emoji="🛡️"
                 onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
               />
             )}

@@ -13,6 +13,7 @@ import {
 } from '../hooks/useAdminData';
 import { payReferralBonus } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
+import { auditLog } from '../lib/audit';
 import { useAdmin } from '../contexts/AdminContext';
 
 interface ApplicationsProps {
@@ -1060,13 +1061,34 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         prevStatus, adminInfo,
       );
 
+      if (prevStatus !== status) {
+        void auditLog('application.status_change', {
+          target_type: 'application', target_id: application.id,
+          details: { from: prevStatus, to: status, country: application.country, visa: application.visaType, visa_uploaded: !!visaUrl },
+        });
+      }
+      if (visaUrl) {
+        void auditLog('application.visa_uploaded', {
+          target_type: 'application', target_id: application.id,
+          details: { url: visaUrl },
+        });
+      }
+
       // Persist USD rate / tax % if admin changed them (used in finance reports).
       // Skip silently if input is empty / invalid — preserves the snapshot.
       if (Number.isFinite(usdRate) && usdRate > 0 && usdRate !== application.usdRateRub) {
         await updateApplicationUsdRate(application.id, usdRate);
+        void auditLog('application.usd_rate_change', {
+          target_type: 'application', target_id: application.id,
+          details: { from: application.usdRateRub, to: usdRate },
+        });
       }
       if (Number.isFinite(taxPct) && taxPct >= 0 && taxPct !== application.taxPct) {
         await updateApplicationTaxPct(application.id, taxPct);
+        void auditLog('application.tax_pct_change', {
+          target_type: 'application', target_id: application.id,
+          details: { from: application.taxPct, to: taxPct },
+        });
       }
 
       // Refresh log if status actually changed
