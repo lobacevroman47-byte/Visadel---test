@@ -13,6 +13,7 @@ const PartnerApplicationForm = lazy(() => import('./components/PartnerApplicatio
 const HotelBookingForm       = lazy(() => import('./components/HotelBookingForm'));
 const FlightBookingForm      = lazy(() => import('./components/FlightBookingForm'));
 const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
+const Flights                = lazy(() => import('./components/Flights'));
 const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
 import {
   getTelegramUser,
@@ -233,12 +234,11 @@ function App() {
               </Suspense>
             )}
             {mainTab === 'flights' && (
-              <ComingSoon
-                title="Авиабилеты"
-                description="Поиск и покупка авиабилетов в одном окне. Планируем подключить Aviasales API — будет полноценный поиск туда-обратно."
-                emoji="✈️"
-                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-              />
+              <Suspense fallback={<SplashScreen />}>
+                <Flights
+                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                />
+              </Suspense>
             )}
             {mainTab === 'hotels' && (
               <ComingSoon
