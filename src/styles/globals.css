@@ -42,30 +42,23 @@ p {
   line-height: 1.6;
 }
 
-/* Form Inputs — три размера, один источник истины.
-   .form-input    — стандарт (px-4 py-3, text-base) для визовых анкет
-   .form-input-sm — компакт (px-3 py-2, text-sm) для аддонов / inline mini-app
-   .vd-input      — alias на .form-input для legacy-кода в брони-формах
-                    (раньше был inline-стилем в HotelBookingForm/FlightBookingForm) */
-.form-input {
+/* Form Inputs — единый размер для всего mini-app
+   .form-input    — стандарт (px-4 py-3, text-base) — визовые анкеты, брони
+   .form-input-sm — компакт (px-3 py-2, text-sm) — аддоны inline
+   .vd-input      — alias .form-input. Раньше был отдельным компактным стилем,
+                    но из-за визуального расхождения с визовыми анкетами свели
+                    к одному. Можно постепенно заменить на .form-input в коде. */
+.form-input,
+.vd-input {
   @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] focus:border-transparent transition;
 }
 .form-input-sm {
   @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;
 }
-.vd-input {
-  @apply w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none transition;
-  border-color: #E1E5EC;
-}
-.vd-input:focus {
-  border-color: #5C7BFF;
-  box-shadow: 0 0 0 3px rgba(92, 123, 255, 0.15);
-}
-.vd-input::placeholder {
-  color: #9ca3af;
-}
 
-.form-input:disabled, .form-input-sm:disabled, .vd-input:disabled {
+.form-input:disabled,
+.form-input-sm:disabled,
+.vd-input:disabled {
   @apply bg-gray-100 cursor-not-allowed;
 }
 
