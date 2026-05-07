@@ -45,7 +45,7 @@ export interface AdminUser {
 const FLAG_MAP: Record<string, string> = {
   'Индия': '🇮🇳', 'Вьетнам': '🇻🇳', 'Шри-Ланка': '🇱🇰',
   'Южная Корея': '🇰🇷', 'Израиль': '🇮🇱', 'Пакистан': '🇵🇰',
-  'Камбоджа': '🇰🇭', 'Кения': '🇰🇪',
+  'Камбоджа': '🇰🇭', 'Кения': '🇰🇪', 'Филиппины': '🇵🇭',
 };
 
 const STATUS_MAP: Record<string, AdminApplication['status']> = {

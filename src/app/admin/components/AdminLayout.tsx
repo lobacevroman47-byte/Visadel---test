@@ -19,7 +19,7 @@ interface AdminLayoutProps {
   onBackToApp?: () => void;
 }
 
-type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels' | 'product-insurance' | 'product-excursions';
+type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels' | 'product-insurance';
 
 const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: string; description: string; emoji: string }> = {
   bookings: {
@@ -43,25 +43,6 @@ const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: s
     emoji: '🛡️',
   },
 };
-
-const ExcursionsPlaceholder: React.FC = () => (
-  <div className="min-h-screen pb-32 lg:pb-12 px-5 pt-8 flex flex-col items-center text-center">
-    <div className="w-24 h-24 rounded-3xl vd-grad-soft border border-blue-100 flex items-center justify-center text-5xl shadow-sm mb-6">
-      🗺️
-    </div>
-    <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Скоро</p>
-    <h1 className="text-[28px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Экскурсии</h1>
-    <p className="text-sm text-[#0F2A36]/60 mt-3 max-w-md leading-relaxed">
-      Каталог экскурсий по странам с местными гидами. После запуска появятся бронирования, заявки клиентов и финансовая аналитика — как у виз и броней.
-    </p>
-    <div className="mt-8 vd-grad-soft border border-blue-100 rounded-2xl px-5 py-4 max-w-md">
-      <p className="text-[11px] uppercase tracking-widest text-[#3B5BFF] font-bold">Что уже работает</p>
-      <p className="text-sm text-[#0F2A36] mt-1">
-        Раздел <strong>«Брони»</strong> — отель и авиабилет для виз. Полноценные экскурсии добавим следующим релизом.
-      </p>
-    </div>
-  </div>
-);
 
 const ComingSoonAdmin: React.FC<{ tab: Exclude<AdminProductTab, 'visas'> }> = ({ tab }) => {
   const data = PRODUCT_PLACEHOLDERS[tab];
@@ -136,10 +117,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         return <Bookings initialTab="hotels" />;
       case 'product-insurance':
         return <ComingSoonAdmin tab="insurance" />;
-      case 'product-excursions':
-        return <ExcursionsPlaceholder />;
-      case 'excursions':
-        return <ExcursionsPlaceholder />;
       case 'users':
         return hasPermission(['owner', 'admin']) ? (
           <Users filter={sectionFilter} />

@@ -52,12 +52,22 @@ interface FlightBooking {
 
 type Tab = 'hotels' | 'flights';
 
+// Те же лейблы и цвета, что у статусов виз — единый стиль во всём админ-интерфейсе.
+// Underlying enum в БД для броней: 'new' / 'in_progress' / 'confirmed' / 'cancelled'.
+// Дополнительно поддерживаем 'pending_payment' / 'pending_confirmation' если они появятся
+// в будущем — список options остаётся консистентным с визовой формой.
 const STATUS_OPTIONS = [
-  { value: 'new',         label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  { value: 'in_progress', label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
-  { value: 'confirmed',   label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
-  { value: 'cancelled',   label: 'Отменена',              color: 'bg-red-100 text-red-700' },
+  { value: 'pending_payment',      label: 'Ожидает оплаты',         color: 'bg-amber-100 text-amber-700' },
+  { value: 'new',                  label: 'Ожидает подтверждения',  color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  { value: 'pending_confirmation', label: 'Ожидает подтверждения',  color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  { value: 'in_progress',          label: 'В работе',               color: 'bg-amber-100 text-amber-700' },
+  { value: 'confirmed',            label: 'Готово',                 color: 'bg-emerald-100 text-emerald-700' },
+  { value: 'cancelled',            label: 'Отменена',               color: 'bg-red-100 text-red-700' },
 ];
+
+// Что показывать в селекте — без дублирующего pending_confirmation
+// (он маппится в БД на 'new' для броней, но визуально один и тот же лейбл).
+const STATUS_DROPDOWN = STATUS_OPTIONS.filter(s => s.value !== 'pending_confirmation');
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 const fmtDateTime = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -419,25 +429,25 @@ function StatusSelector({ status, onChange }: { status: string; onChange: (s: st
 
   return (
     <div>
-      <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Статус</p>
+      <label className="block text-sm text-gray-700 mb-2 font-medium">Статус заявки</label>
       <select
         value={draft}
         onChange={e => setDraft(e.target.value)}
-        className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] focus:ring-2 focus:ring-[#5C7BFF]/20 bg-white"
+        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
       >
-        {STATUS_OPTIONS.map(opt => (
+        {STATUS_DROPDOWN.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-      <div className="flex items-center gap-3 mt-2">
+      <div className="flex items-center gap-3 mt-3">
         <button
           type="button"
           onClick={handleSave}
           disabled={!dirty || saving}
-          className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition"
+          className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition"
         >
           {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          {saving ? 'Сохраняем…' : 'Сохранить'}
+          {saving ? 'Сохраняем…' : 'Сохранить изменения'}
         </button>
         {savedAt && !saving && !dirty && (
           <span className="text-xs text-emerald-600">✓ сохранено</span>

@@ -1,7 +1,7 @@
 import React from 'react';
-import { FileText, Calendar, Plane, Hotel, Shield, Map } from 'lucide-react';
+import { FileText, Calendar, Plane, Hotel, Shield } from 'lucide-react';
 
-export type AdminProductTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance' | 'excursions';
+export type AdminProductTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'insurance';
 
 const TABS: { id: AdminProductTab; label: string; Icon: typeof FileText }[] = [
   { id: 'visas',      label: 'Визы',       Icon: FileText },
@@ -9,7 +9,6 @@ const TABS: { id: AdminProductTab; label: string; Icon: typeof FileText }[] = [
   { id: 'flights',    label: 'Билеты',     Icon: Plane },
   { id: 'hotels',     label: 'Отели',      Icon: Hotel },
   { id: 'insurance',  label: 'Страховки',  Icon: Shield },
-  { id: 'excursions', label: 'Экскурсии',  Icon: Map },
 ];
 
 interface AdminBottomNavProps {
