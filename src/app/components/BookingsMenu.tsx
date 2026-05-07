@@ -10,30 +10,52 @@ interface BookingsMenuProps {
 
 // Текстовые дефолты — используются пока не загрузились данные из БД,
 // и как фолбэк если админ не задал имя/описание в Каталог → Брони.
-const HOTEL_DEFAULTS  = { name: 'Бронь отеля',     description: 'Подтверждение для визы и границы' };
-const FLIGHT_DEFAULTS = { name: 'Бронь авиабилета', description: 'Подтверждение рейса для визы и границы' };
+const HOTEL_DEFAULTS  = { name: 'Бронь отеля для визы',  description: 'Подтверждение для визы и границы' };
+const FLIGHT_DEFAULTS = { name: 'Бронь обратного билета', description: 'Подтверждение рейса для визы и границы' };
+
+// localStorage-кеш загруженных значений: при следующих заходах подписи
+// появятся мгновенно без свапа на дефолты → загрузка → подмена.
+const CACHE_KEY = 'visadel:bookings-menu-cache:v1';
+type Cached = { hotel: Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null;
+                flight: Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null };
+
+const readCache = (): Cached | null => {
+  try {
+    const raw = typeof window !== 'undefined' ? window.localStorage.getItem(CACHE_KEY) : null;
+    return raw ? JSON.parse(raw) as Cached : null;
+  } catch { return null; }
+};
+
+const writeCache = (c: Cached) => {
+  try { window.localStorage.setItem(CACHE_KEY, JSON.stringify(c)); } catch { /* ignore quota */ }
+};
 
 export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpenFlightBooking }: BookingsMenuProps) {
-  const [hotel,  setHotel]  = useState<AdditionalService | null>(null);
-  const [flight, setFlight] = useState<AdditionalService | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  // Initial render берёт значения из кеша — нет свапа при повторных заходах.
+  const cached = readCache();
+  const [hotel,  setHotel]  = useState<Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null>(cached?.hotel  ?? null);
+  const [flight, setFlight] = useState<Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null>(cached?.flight ?? null);
 
   useEffect(() => {
     let alive = true;
     getAdditionalServices()
       .then(rows => {
         if (!alive) return;
-        setHotel(rows.find(x => x.id === 'hotel-booking')  ?? null);
-        setFlight(rows.find(x => x.id === 'flight-booking') ?? null);
+        const h = rows.find(x => x.id === 'hotel-booking')  ?? null;
+        const f = rows.find(x => x.id === 'flight-booking') ?? null;
+        const slim = (s: AdditionalService | null) => s ? { name: s.name, description: s.description, enabled: s.enabled } : null;
+        setHotel(slim(h));
+        setFlight(slim(f));
+        writeCache({ hotel: slim(h), flight: slim(f) });
       })
-      .finally(() => { if (alive) setLoaded(true); });
+      .catch(() => { /* network error — keep current/cached values */ });
     return () => { alive = false; };
   }, []);
 
   // Если админ скрыл услугу в Каталог → Брони (enabled=false), кнопку не показываем.
-  // До загрузки показываем оба варианта с дефолтными подписями (чтобы не было визуального скачка).
-  const showHotel  = !loaded || (hotel?.enabled  ?? true);
-  const showFlight = !loaded || (flight?.enabled ?? true);
+  // Если данных ещё нет (нет кеша и не загрузилось) — показываем кнопку с дефолтным текстом.
+  const showHotel  = hotel  ? hotel.enabled  : true;
+  const showFlight = flight ? flight.enabled : true;
 
   const hotelName        = hotel?.name        || HOTEL_DEFAULTS.name;
   const hotelDescription = hotel?.description || HOTEL_DEFAULTS.description;
