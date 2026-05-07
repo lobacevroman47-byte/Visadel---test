@@ -750,19 +750,27 @@ function BookingActions({
   const ready = booking.status === 'confirmed' && !!booking.confirmation_url;
 
   const handleReview = async () => {
-    if (submitting || !canReview) return;
+    if (submitting || reviewed || !ready) return;
     setSubmitting(true);
 
     try {
-      // 1) Save review to reviews table (best-effort)
-      await submitReview({
-        telegramId,
-        applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
-        country: kindLabel,
-        rating: 5,
-        text: 'Отзыв оставлен в Telegram-канале',
-        username,
-      });
+      // 1) Save review to reviews table — best-effort. The reviews.application_id
+      //    column is uuid for visa applications; passing a 'hotel_<uuid>' / 'flight_<uuid>'
+      //    string would throw, which used to silently abort the whole flow. Wrap it
+      //    locally so the bonus + Telegram redirect still happen even if the row
+      //    doesn't fit the legacy schema.
+      try {
+        await submitReview({
+          telegramId,
+          applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
+          country: kindLabel,
+          rating: 5,
+          text: 'Отзыв оставлен в Telegram-канале',
+          username,
+        });
+      } catch (e) {
+        console.warn('submitReview for booking failed (likely uuid mismatch — expected):', e);
+      }
 
       // 2) Grant +200₽ review bonus (skipped for partners, deduped server-side)
       if (telegramId && !isPartner) {

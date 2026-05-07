@@ -323,31 +323,35 @@ function ConfirmationUploader({
       <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Подтверждение брони (для клиента)</p>
 
       {!ready && !url && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-900">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-900 mb-2">
           ℹ️ Чтобы прикрепить файл, сначала переведи статус в <span className="font-bold">«Готово»</span> (выше).
         </div>
       )}
 
-      {(ready || url) && (
-        url ? (
-          <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center">
-              <Check className="w-4 h-4 text-emerald-600" strokeWidth={3} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-[#0F2A36]">Загружено</p>
-              <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline">Открыть файл</a>
-            </div>
-          </div>
-        ) : (
-          <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
-            {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
-            <p className="text-xs text-[#0F2A36]">{uploading ? 'Загружаем…' : 'Загрузить подтверждение'}</p>
-            <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете</p>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
-              onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
-          </label>
-        )
+      {/* Existing file — small green pill above the dropzone */}
+      {url && (
+        <div className="vd-grad-soft border border-blue-100 rounded-xl p-2.5 flex items-center gap-2 mb-2">
+          <Check className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={3} />
+          <p className="text-xs font-semibold text-[#0F2A36] flex-1">Загружено</p>
+          <a href={url} target="_blank" rel="noreferrer" className="text-xs text-[#3B5BFF] hover:underline shrink-0">Открыть файл</a>
+        </div>
+      )}
+
+      {/* Dropzone — visible whenever status is "Готово" (replaces or adds) */}
+      {ready && (
+        <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+          {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
+          <p className="text-xs text-[#0F2A36]">
+            {uploading ? 'Загружаем…' : url ? 'Загрузить другое подтверждение' : 'Загрузить подтверждение'}
+          </p>
+          <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">
+            {url
+              ? 'PDF/JPG/PNG · заменит уже загруженный файл'
+              : 'PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете'}
+          </p>
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
+            onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+        </label>
       )}
     </div>
   );
