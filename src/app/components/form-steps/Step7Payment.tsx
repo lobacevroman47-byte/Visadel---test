@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } from 'lucide-react';
+import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2, Check } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { saveApplication, uploadFile, updateUser, getAppSettings } from '../../lib/db';
@@ -23,6 +23,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
   const [bonusAmount, setBonusAmount] = useState(0);
   const [finalPrice, setFinalPrice] = useState(totalPrice);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
 
   useEffect(() => {
@@ -208,8 +209,9 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       }).catch(console.error);
 
       haptic('success');
-      alert('Заявка отправлена! Мы свяжемся с вами в ближайшее время.');
-      onComplete();
+      // Показываем full-screen success экран (как у Бронь отеля/билета).
+      // Раньше был alert + onComplete — выглядело как в браузере, не premium.
+      setSubmitted(true);
     } catch (err) {
       console.error('Submit error:', err);
       haptic('error');
@@ -224,6 +226,27 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
   if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') breakdown.push({ label: 'Срочное оформление', amount: addonPrices.urgent });
   if (formData.additionalDocs.hotelBooking) breakdown.push({ label: 'Подтверждение бронирования', amount: addonPrices.hotel });
   if (formData.additionalDocs.returnTicket) breakdown.push({ label: 'Бронирование авиабилета', amount: addonPrices.ticket });
+
+  // Полноэкранный success-экран — единый стиль с бронями отеля/билета.
+  if (submitted) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-5 py-12">
+        <div className="w-20 h-20 rounded-full vd-grad flex items-center justify-center text-white shadow-lg vd-shadow-cta mb-5">
+          <Check className="w-10 h-10" strokeWidth={3} />
+        </div>
+        <h1 className="text-[24px] font-extrabold tracking-tight text-[#0F2A36] text-center">Заявка отправлена!</h1>
+        <p className="text-center text-sm text-[#0F2A36]/65 mt-3 max-w-xs">
+          Мы получили вашу заявку на визу в {visa.country} и свяжемся в Telegram в течение нескольких часов.
+        </p>
+        <button
+          onClick={onComplete}
+          className="mt-8 px-6 py-3 rounded-xl vd-grad text-white font-semibold shadow-md vd-shadow-cta active:scale-[0.98] transition"
+        >
+          На главную
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">

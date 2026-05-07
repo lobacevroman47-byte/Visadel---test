@@ -7,7 +7,7 @@
 //   - Обычный user — может уведомить ТОЛЬКО себя (telegram_id из подписи).
 // Без auth (анонимно) — отказ. Иначе любой мог бы спамить чужой Telegram.
 
-const { requireTelegramUser, isAdminId, AuthError } = require('./_lib/telegram-auth');
+import { requireTelegramUser, isAdminId, AuthError } from './_lib/telegram-auth.js';
 //
 // Dedup strategy (3 layers — any one prevents duplicates):
 //   1. In-memory Map (same Vercel warm instance, 30s)

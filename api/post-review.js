@@ -7,7 +7,7 @@
 // Required env var: TELEGRAM_BOT_TOKEN
 // The bot must be admin in @visadel_recall channel
 
-const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
+import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 
 const CHANNEL = '@visadel_recall';
 const STARS = ['', '⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'];

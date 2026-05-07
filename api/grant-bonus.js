@@ -12,7 +12,7 @@
 //   {} (telegram_id берётся из initData)            — пользовательский кейс
 //   { telegram_id, type, amount, description, application_id }  — admin/cron (с X-Service-Key)
 
-const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
+import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;

@@ -48,9 +48,13 @@ p {
    .vd-input      — alias .form-input. Раньше был отдельным компактным стилем,
                     но из-за визуального расхождения с визовыми анкетами свели
                     к одному. Можно постепенно заменить на .form-input в коде. */
+/* Focus state — смена цвета бордера, БЕЗ ring-shadow.
+   На iPhone WebView ring-shadow в 2px вылазил за правую границу
+   родительской карточки → юзер обводил карандашом. Border-only
+   focus уверенно влезает в любые узкие колонки. */
 .form-input,
 .vd-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] focus:border-transparent transition;
+  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;
 }
 .form-input-sm {
   @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;

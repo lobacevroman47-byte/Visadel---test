@@ -9,7 +9,8 @@
 //   const { telegramId, user } = requireTelegramUser(req);
 //   // дальше пишем от имени telegramId, никогда не из body
 
-const crypto = require('crypto');
+// package.json type:module → этот файл ESM. import обязателен.
+import crypto from 'node:crypto';
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const MAX_AUTH_AGE_SEC = 24 * 60 * 60; // 24 часа
@@ -144,4 +145,4 @@ function withTelegramAuth(handler) {
   };
 }
 
-module.exports = { verifyInitData, requireTelegramUser, requireAdminUser, withTelegramAuth, isAdminId, AuthError };
+export { verifyInitData, requireTelegramUser, requireAdminUser, withTelegramAuth, isAdminId, AuthError };

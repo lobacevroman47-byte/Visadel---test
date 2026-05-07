@@ -6,7 +6,7 @@
 //
 // POST { event, ... } or POST { type: 'hotel_booking' | 'flight_booking', customer_name, details }
 
-const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
+import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;

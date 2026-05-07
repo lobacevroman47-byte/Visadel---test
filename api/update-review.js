@@ -3,7 +3,7 @@
 // Auth: admin-only. Без проверки любой мог бы апрувить/реджектить отзывы
 // или выставлять любой статус.
 
-const { requireAdminUser, AuthError } = require('./_lib/telegram-auth');
+import { requireAdminUser, AuthError } from './_lib/telegram-auth.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
