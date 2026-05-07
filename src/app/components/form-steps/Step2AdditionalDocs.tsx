@@ -25,10 +25,11 @@ const FLIGHT_ADDON_FIELDS = [
   { key: 'bookingDate', defaultLabel: 'Дата бронирования', defaultRequired: true, defaultPlaceholder: '' },
 ];
 
-// Чуть компактнее .form-input (px-4 py-3) — поле с активным focus-ring + клавиатура
-// в Telegram WebView влезали впритык. Та же визуальная анатомия, но 14px текст и
-// 10px вертикальный padding оставляют больше места для контента.
-const ADDON_INPUT = 'w-full px-3.5 py-2.5 text-[15px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition';
+// Компактнее .form-input — поле с активным focus-ring вылезало за правую
+// границу карточки на iOS Telegram WebView (юзер обводил карандашом).
+// Используем смену цвета бордера вместо ring, и меньше padding — поле и
+// контент уверенно влезают даже при открытой клавиатуре.
+const ADDON_INPUT = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition';
 
 // Lookup утилита: применяет override (label/required/visible) если есть, иначе дефолт.
 const resolveOverride = (overrides: CoreFieldOverrides, key: string, defaultLabel: string, defaultRequired: boolean) => {
@@ -238,11 +239,14 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                                 >
                                   <FieldLabel label="Количество детей" required />
                                   <input
-                                    type="number"
-                                    min={1}
+                                    type="text"
                                     inputMode="numeric"
-                                    value={h.childrenCount ?? ''}
-                                    onChange={e => updateHotel('childrenCount', parseInt(e.target.value, 10) || 0)}
+                                    pattern="[0-9]*"
+                                    value={h.childrenCount && h.childrenCount > 0 ? String(h.childrenCount) : ''}
+                                    onChange={e => {
+                                      const v = e.target.value.replace(/\D/g, '');
+                                      updateHotel('childrenCount', v === '' ? undefined : parseInt(v, 10));
+                                    }}
                                     placeholder="1"
                                     className={ADDON_INPUT}
                                   />
@@ -259,12 +263,15 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                           <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                             <FieldLabel label={ov.label} required={ov.required} />
                             <input
-                              type="number"
-                              min={1}
+                              type="text"
                               inputMode="numeric"
-                              value={h.guests ?? 1}
-                              onChange={e => updateHotel('guests', parseInt(e.target.value, 10) || 0)}
-                              placeholder={f.defaultPlaceholder}
+                              pattern="[0-9]*"
+                              value={h.guests && h.guests > 0 ? String(h.guests) : ''}
+                              onChange={e => {
+                                const v = e.target.value.replace(/\D/g, '');
+                                updateHotel('guests', v === '' ? undefined : parseInt(v, 10));
+                              }}
+                              placeholder={f.defaultPlaceholder || '1'}
                               className={ADDON_INPUT}
                             />
                             {errors[errKey] && <ErrorLine text={errors[errKey]} />}
