@@ -16,6 +16,23 @@ CREATE INDEX IF NOT EXISTS idx_audit_created   ON public.admin_audit_log(created
 
 GRANT SELECT, INSERT ON public.admin_audit_log TO anon, authenticated;
 
+-- RLS политики для логов: admin'ы пишут с фронта через anon-key, поэтому
+-- нужны permissive политики (как у каталогов в 001). После полной миграции
+-- админских операций на /api/* их можно будет убрать.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY['admin_audit_log','status_log','bonus_logs'])
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS "anon_write" ON public.%I;', t);
+    EXECUTE format(
+      'CREATE POLICY "anon_write" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);',
+      t
+    );
+  END LOOP;
+END$$;
+
 -- 2) USD rate snapshot для cron'а (api/update-usd-rate.js)
 ALTER TABLE public.app_settings
   ADD COLUMN IF NOT EXISTS usd_rate_rub          NUMERIC,
