@@ -97,7 +97,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
 
     return (
       <div className="min-h-screen bg-[#F5F7FA] pb-20">
-        <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-6 sticky top-0 z-10 shadow-lg">
+        <div className="bg-gradient-to-r from-[#0D47A1] to-[#4F2FE6] text-white p-6 sticky top-0 z-10 shadow-lg">
           <div className="max-w-2xl mx-auto">
             <button onClick={onBack} className="mb-4 flex items-center gap-2 hover:opacity-80 transition">
               <ChevronLeft className="w-5 h-5" />
@@ -136,7 +136,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
                       localStorage.removeItem('partnerApplication');
                       window.location.reload();
                     }}
-                    className="bg-[#2196F3] text-white px-6 py-3 rounded-[16px] hover:bg-[#1E88E5] transition"
+                    className="bg-[#3B5BFF] text-white px-6 py-3 rounded-[16px] hover:bg-[#4F2FE6] transition"
                   >
                     Подать новую заявку
                   </button>
@@ -151,7 +151,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
-      <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-6 sticky top-0 z-10 shadow-lg">
+      <div className="bg-gradient-to-r from-[#0D47A1] to-[#4F2FE6] text-white p-6 sticky top-0 z-10 shadow-lg">
         <div className="max-w-2xl mx-auto">
           <button onClick={onBack} className="mb-4 flex items-center gap-2 hover:opacity-80 transition">
             <ChevronLeft className="w-5 h-5" />
@@ -174,7 +174,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="text"
               value={formData.fullName}
               onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3] ${
+              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] ${
                 errors.fullName ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="Иванов Иван Иванович"
@@ -192,7 +192,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="text"
               value={formData.telegram}
               onChange={(e) => setFormData({ ...formData, telegram: e.target.value.replace('@', '') })}
-              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3] ${
+              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] ${
                 errors.telegram ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="username"
@@ -210,7 +210,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3] ${
+              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] ${
                 errors.email ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="example@mail.com"
@@ -228,7 +228,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="tel"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
               placeholder="+7 (999) 123-45-67"
             />
           </div>
@@ -243,7 +243,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="url"
               value={formData.platformUrl}
               onChange={(e) => setFormData({ ...formData, platformUrl: e.target.value })}
-              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3] ${
+              className={`w-full px-4 py-3 border rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] ${
                 errors.platformUrl ? 'border-red-500' : 'border-gray-300'
               }`}
               placeholder="https://instagram.com/username"
@@ -260,7 +260,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="text"
               value={formData.audienceTheme}
               onChange={(e) => setFormData({ ...formData, audienceTheme: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
               placeholder="Путешествия, лайфстайл, образование..."
             />
           </div>
@@ -274,7 +274,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
               type="number"
               value={formData.subscribersCount}
               onChange={(e) => setFormData({ ...formData, subscribersCount: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
               placeholder="10000"
             />
           </div>
@@ -288,7 +288,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
             <textarea
               value={formData.comment}
               onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#2196F3] min-h-[100px]"
+              className="w-full px-4 py-3 border border-gray-300 rounded-[16px] focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] min-h-[100px]"
               placeholder="Расскажите о себе и почему хотите стать партнёром..."
             />
           </div>
@@ -300,7 +300,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
                 type="checkbox"
                 checked={formData.agreeToTerms}
                 onChange={(e) => setFormData({ ...formData, agreeToTerms: e.target.checked })}
-                className="mt-1 w-5 h-5 text-[#2196F3] rounded focus:ring-[#2196F3]"
+                className="mt-1 w-5 h-5 text-[#3B5BFF] rounded focus:ring-[#3B5BFF]"
               />
               <span className={`text-sm ${errors.agreeToTerms ? 'text-red-500' : 'text-gray-700'}`}>
                 Я согласен с условиями партнёрской программы и обязуюсь соблюдать правила сотрудничества

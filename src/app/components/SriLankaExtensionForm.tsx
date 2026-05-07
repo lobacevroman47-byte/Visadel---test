@@ -110,7 +110,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
     return (
       <div className="min-h-screen bg-[#F5F7FA] pb-20">
         {/* Header */}
-        <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-6 sticky top-0 z-10 shadow-lg">
+        <div className="bg-gradient-to-r from-[#0D47A1] to-[#4F2FE6] text-white p-6 sticky top-0 z-10 shadow-lg">
           <div className="max-w-2xl mx-auto">
             <button onClick={() => setCurrentStep('form')} className="mb-4 flex items-center gap-2 hover:opacity-80 transition">
               <ChevronLeft className="w-5 h-5" />
@@ -133,7 +133,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
             {/* Payment Details */}
             <div className="bg-white rounded-2xl p-5 mb-6 shadow-sm border border-gray-100">
               <div className="flex items-start gap-3">
-                <CreditCard className="w-6 h-6 text-[#2196F3] flex-shrink-0" />
+                <CreditCard className="w-6 h-6 text-[#3B5BFF] flex-shrink-0" />
                 <div className="flex-1">
                   <h3 className="text-[#212121] mb-2">Реквизиты для оплаты</h3>
                   <div className="space-y-1 text-sm text-[#212121]">
@@ -157,7 +157,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
               </div>
               <div className="border-t pt-3 flex justify-between">
                 <span className="text-[#212121]">Итого к оплате:</span>
-                <span className="text-2xl text-[#2196F3]">{visa.price}₽</span>
+                <span className="text-2xl text-[#3B5BFF]">{visa.price}₽</span>
               </div>
             </div>
 
@@ -168,7 +168,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                 <span className="text-red-500 ml-1">*</span>
               </label>
               {!paymentScreenshot ? (
-                <label className="block border-2 border-dashed border-gray-300 rounded-xl p-6 cursor-pointer hover:border-[#2196F3] hover:bg-[#E3F2FD] transition">
+                <label className="block border-2 border-dashed border-gray-300 rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#E3F2FD] transition">
                   <div className="flex flex-col items-center gap-2">
                     <Upload className="w-8 h-8 text-gray-400" />
                     <p className="text-sm text-gray-600">Нажмите для загрузки скриншота</p>
@@ -191,10 +191,10 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                   />
                 </label>
               ) : (
-                <div className="border-2 border-[#00C853] bg-green-50 rounded-xl p-4">
+                <div className="border-2 border-[#10B981] bg-green-50 rounded-xl p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-[#00C853]" />
+                      <CheckCircle2 className="w-6 h-6 text-[#10B981]" />
                       <div>
                         <p className="text-sm text-gray-800">{paymentScreenshot.name}</p>
                         <p className="text-xs text-gray-500">
@@ -204,7 +204,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                     </div>
                     <button
                       onClick={() => setPaymentScreenshot(null)}
-                      className="text-sm text-[#2196F3] hover:text-[#1E88E5]"
+                      className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
                     >
                       Изменить
                     </button>
@@ -216,7 +216,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
             {/* Submit Button */}
             <button
               onClick={handlePaymentComplete}
-              className="w-full bg-[#00C853] text-white py-4 rounded-[16px] hover:bg-[#00E676] hover:shadow-lg transition flex items-center justify-center gap-2"
+              className="w-full bg-[#10B981] text-white py-4 rounded-[16px] hover:bg-[#00E676] hover:shadow-lg transition flex items-center justify-center gap-2"
             >
               <CheckCircle2 className="w-5 h-5" />
               Оплатил
@@ -230,7 +230,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
       {/* Header */}
-      <div className="bg-gradient-to-r from-[#0D47A1] to-[#1976D2] text-white p-6 sticky top-0 z-10 shadow-lg">
+      <div className="bg-gradient-to-r from-[#0D47A1] to-[#4F2FE6] text-white p-6 sticky top-0 z-10 shadow-lg">
         <div className="max-w-2xl mx-auto">
           <button onClick={onBack} className="mb-4 flex items-center gap-2 hover:opacity-80 transition">
             <ChevronLeft className="w-5 h-5" />
@@ -339,7 +339,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
               <span className="text-red-500 ml-1">*</span>
             </label>
             {!formData.passportPhoto ? (
-              <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#2196F3] hover:bg-[#E3F2FD] transition ${
+              <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#E3F2FD] transition ${
                 errors.passportPhoto ? 'border-red-500' : 'border-gray-300'
               }`}>
                 <div className="flex flex-col items-center gap-2">
@@ -355,10 +355,10 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                 />
               </label>
             ) : (
-              <div className="border-2 border-[#00C853] bg-green-50 rounded-xl p-4">
+              <div className="border-2 border-[#10B981] bg-green-50 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-[#00C853]" />
+                    <CheckCircle2 className="w-6 h-6 text-[#10B981]" />
                     <div>
                       <p className="text-sm text-gray-800">{formData.passportPhoto.name}</p>
                       <p className="text-xs text-gray-500">
@@ -368,7 +368,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                   </div>
                   <button
                     onClick={() => handleFileUpload('passportPhoto', null)}
-                    className="text-sm text-[#2196F3] hover:text-[#1E88E5]"
+                    className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
                   >
                     Изменить
                   </button>
@@ -387,7 +387,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
               <span className="text-red-500 ml-1">*</span>
             </label>
             {!formData.facePhoto ? (
-              <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#2196F3] hover:bg-[#E3F2FD] transition ${
+              <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#E3F2FD] transition ${
                 errors.facePhoto ? 'border-red-500' : 'border-gray-300'
               }`}>
                 <div className="flex flex-col items-center gap-2">
@@ -403,10 +403,10 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                 />
               </label>
             ) : (
-              <div className="border-2 border-[#00C853] bg-green-50 rounded-xl p-4">
+              <div className="border-2 border-[#10B981] bg-green-50 rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-6 h-6 text-[#00C853]" />
+                    <CheckCircle2 className="w-6 h-6 text-[#10B981]" />
                     <div>
                       <p className="text-sm text-gray-800">{formData.facePhoto.name}</p>
                       <p className="text-xs text-gray-500">
@@ -416,7 +416,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                   </div>
                   <button
                     onClick={() => handleFileUpload('facePhoto', null)}
-                    className="text-sm text-[#2196F3] hover:text-[#1E88E5]"
+                    className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
                   >
                     Изменить
                   </button>
@@ -432,7 +432,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
           <div className="bg-[#E3F2FD] rounded-xl p-4 border border-[#D1E3F5]">
             <div className="flex justify-between items-center mb-3">
               <span className="text-[#212121]">Стоимость продления:</span>
-              <span className="text-2xl text-[#2196F3]">{visa.price}₽</span>
+              <span className="text-2xl text-[#3B5BFF]">{visa.price}₽</span>
             </div>
             <p className="text-sm text-[#616161]">
               После проверки заявки вы перейдёте к оплате
@@ -442,7 +442,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
           {/* Submit Button */}
           <button
             onClick={handleGoToPayment}
-            className="w-full bg-[#2196F3] text-white py-4 rounded-[16px] hover:bg-[#1E88E5] transition"
+            className="w-full bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition"
           >
             Перейти к оплате
           </button>

@@ -244,7 +244,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={() => handleContinueDraft(draft)}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2196F3] text-white rounded-lg hover:bg-[#1E88E5] transition-colors"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#3B5BFF] text-white rounded-lg hover:bg-[#4F2FE6] transition-colors"
                 >
                   <Play className="w-4 h-4" />
                   Продолжить
@@ -334,7 +334,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
                     {!app.hasReview ? (
                       <button
                         onClick={() => handleLeaveReview(app.id)}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#2196F3] text-white rounded-lg hover:bg-[#1E88E5] transition-colors"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#3B5BFF] text-white rounded-lg hover:bg-[#4F2FE6] transition-colors"
                       >
                         <MessageSquare className="w-4 h-4" />
                         Оставить отзыв (получить 200₽)
@@ -444,7 +444,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
               </button>
               <button
                 onClick={submitReview}
-                className="flex-1 px-4 py-3 bg-[#2196F3] text-white rounded-lg hover:bg-[#1E88E5] transition-colors"
+                className="flex-1 px-4 py-3 bg-[#3B5BFF] text-white rounded-lg hover:bg-[#4F2FE6] transition-colors"
               >
                 Отправить отзыв
               </button>

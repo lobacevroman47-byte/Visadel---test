@@ -262,7 +262,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
           </div>
           <button
             onClick={() => setUseBonuses(!useBonuses)}
-            className={`w-full rounded-[14px] py-3 px-4 transition-all flex items-center justify-between ${useBonuses ? 'bg-[#00C853] text-white' : 'bg-gray-100 text-[#616161]'}`}
+            className={`w-full rounded-[14px] py-3 px-4 transition-all flex items-center justify-between ${useBonuses ? 'bg-[#10B981] text-white' : 'bg-gray-100 text-[#616161]'}`}
           >
             <span className="text-sm">{useBonuses ? `Списать ${bonusAmount}₽` : 'Не использовать'}</span>
             <div className={`w-10 h-5 rounded-full flex items-center transition-colors ${useBonuses ? 'bg-white/40' : 'bg-gray-300'}`}>
@@ -284,8 +284,8 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
           ))}
           {useBonuses && bonusAmount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="text-[#00C853]">Бонусы</span>
-              <span className="text-[#00C853] font-semibold">−{bonusAmount.toLocaleString('ru-RU')} ₽</span>
+              <span className="text-[#10B981]">Бонусы</span>
+              <span className="text-[#10B981] font-semibold">−{bonusAmount.toLocaleString('ru-RU')} ₽</span>
             </div>
           )}
         </div>

@@ -180,7 +180,7 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
         </button>
         <button
           onClick={validateAndNext}
-          className="flex-1 bg-[#2196F3] text-white py-4 rounded-[16px] hover:bg-[#1E88E5] transition flex items-center justify-center gap-2"
+          className="flex-1 bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition flex items-center justify-center gap-2"
         >
           Далее
           <ChevronRight className="w-5 h-5" />

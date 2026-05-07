@@ -25,11 +25,10 @@ const FLIGHT_ADDON_FIELDS = [
   { key: 'bookingDate', defaultLabel: 'Дата бронирования', defaultRequired: true, defaultPlaceholder: '' },
 ];
 
-// Компактнее .form-input — поле с активным focus-ring вылезало за правую
-// границу карточки на iOS Telegram WebView (юзер обводил карандашом).
-// Используем смену цвета бордера вместо ring, и меньше padding — поле и
-// контент уверенно влезают даже при открытой клавиатуре.
-const ADDON_INPUT = 'w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition';
+// .form-input-sm — глобальный класс из styles/globals.css для компактных
+// инпутов внутри аддон-карточек. Раньше тут был локальный ADDON_INPUT
+// дубль; теперь весь mini-app использует один и тот же класс.
+const ADDON_INPUT = 'form-input-sm';
 
 // Lookup утилита: применяет override (label/required/visible) если есть, иначе дефолт.
 const resolveOverride = (overrides: CoreFieldOverrides, key: string, defaultLabel: string, defaultRequired: boolean) => {

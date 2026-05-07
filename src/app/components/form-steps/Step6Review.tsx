@@ -165,7 +165,7 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
           </div>
           <div className="flex justify-between items-center border-t pt-3">
             <span className="text-gray-700">Итого:</span>
-            <span className="text-2xl text-[#2196F3]">{totalPrice}₽</span>
+            <span className="text-2xl text-[#3B5BFF]">{totalPrice}₽</span>
           </div>
         </div>
       </div>
@@ -180,7 +180,7 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
         </button>
         <button
           onClick={onNext}
-          className="flex-1 bg-[#2196F3] text-white py-4 rounded-[16px] hover:bg-[#1E88E5] transition flex items-center justify-center gap-2"
+          className="flex-1 bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition flex items-center justify-center gap-2"
         >
           Подтвердить
           <ChevronRight className="w-5 h-5" />

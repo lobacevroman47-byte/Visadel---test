@@ -457,7 +457,7 @@ function ResultsStep({
                 </div>
                 <div className="flex flex-col items-end gap-1 shrink-0">
                   {isCheapest && (
-                    <span className="bg-[#00C853]/10 text-[#00C853] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg">
+                    <span className="bg-[#10B981]/10 text-[#10B981] text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg">
                       Дешевле
                     </span>
                   )}

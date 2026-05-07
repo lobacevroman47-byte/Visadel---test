@@ -130,24 +130,24 @@ function AddonToggle({ icon, label, hint, price, active, onToggle }: {
       onClick={onToggle}
       className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all ${
         active
-          ? 'bg-blue-50 border-[#2196F3] shadow-sm'
+          ? 'bg-blue-50 border-[#3B5BFF] shadow-sm'
           : 'bg-white border-gray-200 hover:border-gray-300'
       }`}
     >
       <span className="text-xl shrink-0">{icon}</span>
       <div className="flex-1 text-left min-w-0">
-        <div className={`text-sm font-medium ${active ? 'text-[#1976D2]' : 'text-gray-800'}`}>
+        <div className={`text-sm font-medium ${active ? 'text-[#4F2FE6]' : 'text-gray-800'}`}>
           {label}
         </div>
         {hint && <div className="text-xs text-gray-500 mt-0.5">{hint}</div>}
       </div>
       <div className="text-right shrink-0">
-        <div className={`text-sm font-semibold ${active ? 'text-[#2196F3]' : 'text-gray-600'}`}>
+        <div className={`text-sm font-semibold ${active ? 'text-[#3B5BFF]' : 'text-gray-600'}`}>
           +{price.toLocaleString('ru-RU')}₽
         </div>
       </div>
       <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
-        active ? 'bg-[#2196F3] border-[#2196F3]' : 'border-gray-300 bg-white'
+        active ? 'bg-[#3B5BFF] border-[#3B5BFF]' : 'border-gray-300 bg-white'
       }`}>
         {active && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
       </div>
@@ -210,7 +210,7 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
                 className="text-right"
               >
                 <div className="text-[10px] text-[#0F2A36]/60 mb-0.5 uppercase tracking-wider font-semibold">Итого</div>
-                <div className="text-3xl text-[#00C853] font-extrabold leading-none tracking-tight">
+                <div className="text-3xl text-[#10B981] font-extrabold leading-none tracking-tight">
                   {total.toLocaleString('ru-RU')}<span className="text-xl">₽</span>
                 </div>
               </motion.div>
@@ -225,11 +225,11 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
           onClick={() => setShowCalc(!showCalc)}
           className="w-full flex items-center justify-between py-2.5 px-3 bg-gray-50 hover:bg-gray-100 rounded-xl text-sm mb-3 transition"
         >
-          <span className="flex items-center gap-2 font-medium text-[#1976D2]">
+          <span className="flex items-center gap-2 font-medium text-[#4F2FE6]">
             <Calculator className="w-4 h-4" />
             <span>{showCalc ? 'Свернуть калькулятор' : 'Калькулятор стоимости'}</span>
           </span>
-          <ChevronDown className={`w-4 h-4 text-[#1976D2] transition-transform ${showCalc ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`w-4 h-4 text-[#4F2FE6] transition-transform ${showCalc ? 'rotate-180' : ''}`} />
         </button>
       )}
 
@@ -599,7 +599,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                 {selectedCountry.extensionOptions && (
                   <button
                     onClick={() => setShowExtensions(true)}
-                    className="w-full bg-gradient-to-r from-[#00C853] to-[#00E676] text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
+                    className="w-full bg-gradient-to-r from-[#10B981] to-[#00E676] text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
                   >
                     Продление визы
                     <ChevronRight className="w-5 h-5" />

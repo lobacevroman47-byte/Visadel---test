@@ -296,7 +296,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard icon={<FileText size={24} />}    label="Всего заявок"   value={totalApplications}        color="#3B5BFF" onClick={() => onNavigate?.('applications', { filter: 'all' })} />
         <StatCard icon={<TrendingUp size={24} />}  label="В работе"       value={inProgressApplications}   color="#FF9800" onClick={() => onNavigate?.('applications', { filter: 'in_progress' })} />
-        <StatCard icon={<Users size={24} />}       label="Пользователи"   value={totalUsers}               color="#00C853" onClick={() => onNavigate?.('users', { filter: 'regular' })} />
+        <StatCard icon={<Users size={24} />}       label="Пользователи"   value={totalUsers}               color="#10B981" onClick={() => onNavigate?.('users', { filter: 'regular' })} />
         <StatCard icon={<Globe size={24} />}       label="Партнёры"       value={partnersCount}            color="#9C27B0" onClick={() => onNavigate?.('users', { filter: 'partners' })} />
       </div>
 

@@ -435,21 +435,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем…</> : 'Оплатил — отправить заявку'}
         </button>
 
-        <style>{`
-          .vd-input {
-            width: 100%;
-            padding: 0.75rem 0.875rem;
-            border-radius: 0.75rem;
-            border: 1px solid #E1E5EC;
-            font-size: 0.875rem;
-            color: #0F2A36;
-            background: #fff;
-            outline: none;
-            transition: border-color .15s, box-shadow .15s;
-          }
-          .vd-input:focus { border-color: #5C7BFF; box-shadow: 0 0 0 3px rgba(92,123,255,0.15); }
-          .vd-input::placeholder { color: #9ca3af; }
-        `}</style>
+        {/* .vd-input now lives globally in src/styles/globals.css */}
       </form>
     </div>
   );

@@ -23,6 +23,7 @@ import {
   type TelegramUser,
 } from './lib/telegram';
 import { upsertUser, getAdminRole, type AppUser, type AdminRole } from './lib/db';
+import { AppCatalogProvider } from './contexts/AppCatalogContext';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
 
@@ -208,6 +209,7 @@ function App() {
 
   return (
     <TelegramCtx.Provider value={{ tgUser, appUser, isLoading, refreshUser }}>
+      <AppCatalogProvider>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
         {currentScreen === 'splash' && <SplashScreen />}
         {currentScreen === 'home' && (
@@ -328,6 +330,7 @@ function App() {
           </Suspense>
         )}
       </div>
+      </AppCatalogProvider>
     </TelegramCtx.Provider>
   );
 }

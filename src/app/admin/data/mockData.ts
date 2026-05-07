@@ -346,8 +346,8 @@ export const statusColors: Record<Application['status'], string> = {
   draft: '#9E9E9E',
   pending_payment: '#FFC400',
   pending_confirmation: '#FF9800',
-  in_progress: '#2196F3',
-  completed: '#00C853'
+  in_progress: '#3B5BFF',
+  completed: '#10B981'
 };
 
 // Tailwind chip classes for status badges — matches the Bookings admin page,

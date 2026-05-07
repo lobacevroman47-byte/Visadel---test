@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminBottomNav, type AdminProductTab } from './AdminBottomNav';
-import { Dashboard } from '../pages/Dashboard';
+// Dashboard тащит recharts (~65KB gzipped). Грузим только когда админ
+// открывает дашборд, а не на старте AdminApp.
+const Dashboard = lazy(() => import('../pages/Dashboard').then(m => ({ default: m.Dashboard })));
 import { Applications } from '../pages/Applications';
 import { Users } from '../pages/Users';
 import { Countries } from '../pages/Countries';
@@ -104,7 +106,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard':
-        return <Dashboard onNavigate={handleNavigate} />;
+        return (
+          <Suspense fallback={<div className="p-8 text-sm text-gray-400">Загружаем дашборд…</div>}>
+            <Dashboard onNavigate={handleNavigate} />
+          </Suspense>
+        );
       case 'applications':
         return <Applications filter={sectionFilter} />;
       case 'bookings':
@@ -167,7 +173,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
           <PermissionDenied />
         );
       default:
-        return <Dashboard onNavigate={handleNavigate} />;
+        return (
+          <Suspense fallback={<div className="p-8 text-sm text-gray-400">Загружаем дашборд…</div>}>
+            <Dashboard onNavigate={handleNavigate} />
+          </Suspense>
+        );
     }
   };
 

@@ -1,18 +1,20 @@
 @import "tailwindcss";
 
-/* Brand Colors */
+/* Brand Colors — синхронизировано с index.html / vd-grad.
+   Старые legacy-цвета (#2196F3 Material blue, #10B981 Material green)
+   удалены — везде используется фирменный градиент VISADEL. */
 :root {
-  --brand-primary: #2196F3;
-  --brand-primary-dark: #1E88E5;
-  --brand-shadow: #1565C0;
+  --brand-primary: #3B5BFF;
+  --brand-primary-dark: #4F2FE6;
+  --brand-shadow: #4F2FE6;
   --brand-white: #FFFFFF;
   --brand-gray-light: #F5F7FA;
-  --brand-sky: #E3F2FD;
-  --brand-border: #D1E3F5;
-  --brand-accent-green: #00C853;
-  --brand-lightning: #FFC400;
-  --brand-text-primary: #212121;
-  --brand-text-secondary: #616161;
+  --brand-sky: #EAF1FF;
+  --brand-border: #DCE7FF;
+  --brand-accent-green: #10B981;   /* tailwind emerald-500 для статусов "успех" */
+  --brand-lightning: #F59E0B;      /* tailwind amber-500 для "срочно" */
+  --brand-text-primary: #0F2A36;
+  --brand-text-secondary: #6B7280;
 }
 
 /* Typography */
@@ -40,16 +42,36 @@ p {
   line-height: 1.6;
 }
 
-/* Form Inputs */
+/* Form Inputs — три размера, один источник истины.
+   .form-input    — стандарт (px-4 py-3, text-base) для визовых анкет
+   .form-input-sm — компакт (px-3 py-2, text-sm) для аддонов / inline mini-app
+   .vd-input      — alias на .form-input для legacy-кода в брони-формах
+                    (раньше был inline-стилем в HotelBookingForm/FlightBookingForm) */
 .form-input {
-  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition;
+  @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF] focus:border-transparent transition;
+}
+.form-input-sm {
+  @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;
+}
+.vd-input {
+  @apply w-full px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl focus:outline-none transition;
+  border-color: #E1E5EC;
+}
+.vd-input:focus {
+  border-color: #5C7BFF;
+  box-shadow: 0 0 0 3px rgba(92, 123, 255, 0.15);
+}
+.vd-input::placeholder {
+  color: #9ca3af;
 }
 
-.form-input:disabled {
+.form-input:disabled, .form-input-sm:disabled, .vd-input:disabled {
   @apply bg-gray-100 cursor-not-allowed;
 }
 
-textarea.form-input {
+textarea.form-input,
+textarea.form-input-sm,
+textarea.vd-input {
   @apply resize-none;
 }
 
