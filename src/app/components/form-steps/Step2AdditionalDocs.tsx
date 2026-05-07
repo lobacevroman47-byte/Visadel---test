@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, Check, Hotel, Plane, Zap } from 'lucide-react';
 import { getAppSettings, getAdditionalServices, type CoreFieldOverrides } from '../../lib/db';
 import type { HotelAddonDetails, FlightAddonDetails } from '../ApplicationForm';
+import DateInput from '../shared/DateInput';
 
 // Бронь-аддоны в визовой форме читают **те же** core overrides что и
 // standalone HotelBookingForm/FlightBookingForm — admin меняет лейбл/required
@@ -293,17 +294,24 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                         );
                       }
 
-                      const inputType = f.key === 'checkIn' || f.key === 'checkOut' ? 'date' : 'text';
+                      const isDate = f.key === 'checkIn' || f.key === 'checkOut';
                       return (
                         <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                           <FieldLabel label={ov.label} required={ov.required} />
-                          <input
-                            type={inputType}
-                            value={(h as any)[f.key] ?? ''}
-                            onChange={e => updateHotel(f.key as keyof HotelAddonDetails, e.target.value as any)}
-                            placeholder={f.defaultPlaceholder}
-                            className={ADDON_INPUT}
-                          />
+                          {isDate ? (
+                            <DateInput
+                              value={(h as any)[f.key] ?? ''}
+                              onChange={(v) => updateHotel(f.key as keyof HotelAddonDetails, v as any)}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={(h as any)[f.key] ?? ''}
+                              onChange={e => updateHotel(f.key as keyof HotelAddonDetails, e.target.value as any)}
+                              placeholder={f.defaultPlaceholder}
+                              className={ADDON_INPUT}
+                            />
+                          )}
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
                       );
@@ -340,17 +348,24 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                       if (!ov.visible) return null;
                       const errKey = `flight.${f.key}`;
                       const fl = formData.flightDetails ?? {};
-                      const inputType = f.key === 'bookingDate' ? 'date' : 'text';
+                      const isDate = f.key === 'bookingDate';
                       return (
                         <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                           <FieldLabel label={ov.label} required={ov.required} />
-                          <input
-                            type={inputType}
-                            value={(fl as any)[f.key] ?? ''}
-                            onChange={e => updateFlight(f.key as keyof FlightAddonDetails, e.target.value as any)}
-                            placeholder={f.defaultPlaceholder}
-                            className={ADDON_INPUT}
-                          />
+                          {isDate ? (
+                            <DateInput
+                              value={(fl as any)[f.key] ?? ''}
+                              onChange={(v) => updateFlight(f.key as keyof FlightAddonDetails, v as any)}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              value={(fl as any)[f.key] ?? ''}
+                              onChange={e => updateFlight(f.key as keyof FlightAddonDetails, e.target.value as any)}
+                              placeholder={f.defaultPlaceholder}
+                              className={ADDON_INPUT}
+                            />
+                          )}
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
                       );

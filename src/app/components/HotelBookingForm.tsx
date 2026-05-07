@@ -3,6 +3,7 @@ import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, Fi
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
+import DateInput from './shared/DateInput';
 import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
@@ -299,12 +300,12 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(() => { const f = ov('checkIn', 'Дата заезда', true); return f.visible && (
                 <Field label={f.label} required={f.required}>
-                  <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="form-input" />
+                  <DateInput value={checkIn} onChange={setCheckIn} />
                 </Field>
               ); })()}
               {(() => { const f = ov('checkOut', 'Дата выезда', true); return f.visible && (
                 <Field label={f.label} required={f.required}>
-                  <input type="date" value={checkOut} min={checkIn || undefined} onChange={e => setCheckOut(e.target.value)} className="form-input" />
+                  <DateInput value={checkOut} min={checkIn || undefined} onChange={setCheckOut} />
                 </Field>
               ); })()}
             </div>

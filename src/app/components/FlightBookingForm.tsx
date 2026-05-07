@@ -3,6 +3,7 @@ import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, Fi
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
+import DateInput from './shared/DateInput';
 import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
@@ -267,7 +268,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
             ); })()}
             {(() => { const f = ov('bookingDate', 'Дата брони', true); return f.visible && (
               <Field label={f.label} required={f.required} icon={<Calendar className="w-3.5 h-3.5" />}>
-                <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="form-input" />
+                <DateInput value={bookingDate} onChange={setBookingDate} />
               </Field>
             ); })()}
           </div>
