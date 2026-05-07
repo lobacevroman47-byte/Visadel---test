@@ -142,11 +142,28 @@ const ServiceFormModal: React.FC<{
   onSaved: (s: Omit<AdditionalService, 'created_at' | 'updated_at'>) => Promise<void>;
 }> = ({ service, existingIds, onClose, onSaved }) => {
   const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
-    service ?? {
-      id: '', name: '', icon: '⭐', description: '',
-      price: 0, cost_rub: 0, enabled: true, sort_order: 0,
-    }
+    service
+      ? { ...service, countries: Array.isArray(service.countries) ? service.countries : [] }
+      : {
+          id: '', name: '', icon: '⭐', description: '',
+          price: 0, cost_rub: 0, enabled: true, sort_order: 0, countries: [],
+        }
   );
+
+  // List of countries to choose from — same names used elsewhere in the app
+  const ALL_COUNTRIES = [
+    'Индия', 'Вьетнам', 'Шри-Ланка', 'Южная Корея', 'Израиль',
+    'Пакистан', 'Камбоджа', 'Кения', 'Филиппины',
+  ];
+
+  const toggleCountry = (c: string) => {
+    setForm(p => ({
+      ...p,
+      countries: p.countries.includes(c)
+        ? p.countries.filter(x => x !== c)
+        : [...p.countries, c],
+    }));
+  };
   const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof typeof form>(k: K, v: typeof form[K]) => setForm(p => ({ ...p, [k]: v }));
@@ -260,6 +277,41 @@ const ServiceFormModal: React.FC<{
               />
               <span className="text-sm">{form.enabled ? 'Активна' : 'Скрыта'}</span>
             </label>
+          </div>
+
+          {/* Страны, для которых эта услуга показывается как доп. опция */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-gray-700">Страны, где услуга доступна</p>
+              {form.countries.length > 0 && (
+                <button type="button" onClick={() => set('countries', [])}
+                  className="text-xs text-[#3B5BFF] hover:underline">Сбросить</button>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-3">
+              {form.countries.length === 0
+                ? 'Сейчас услуга доступна во всех странах. Выберите конкретные страны, чтобы ограничить.'
+                : `Услуга появится только при оформлении виз для: ${form.countries.join(', ')}`}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {ALL_COUNTRIES.map(c => {
+                const checked = form.countries.includes(c);
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => toggleCountry(c)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 ${
+                      checked
+                        ? 'vd-grad text-white shadow-sm'
+                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {checked && '✓ '}{c}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="flex gap-2 pt-2">

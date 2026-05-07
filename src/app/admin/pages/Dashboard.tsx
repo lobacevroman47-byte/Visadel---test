@@ -281,7 +281,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const inProgressApplications = applications.filter(a => a.status === 'in_progress').length;
   const totalUsers = users.filter(u => u.status === 'regular').length;
   const partnersCount = users.filter(u => u.status === 'partner').length;
-  const recentApplications = applications.slice(0, 10);
+  // (Removed: "Последние 10 заявок" — admin manages real apps in the dedicated Заявки section.)
 
   const newUsers24h = users.filter(u => {
     const t = new Date(u.registeredAt).getTime();
@@ -331,36 +331,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         )}
       </div>
 
-      {/* Recent Applications */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-        <div className="p-6 border-b border-gray-200"><h3>Последние 10 заявок</h3></div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-[#F5F7FA]">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">ID</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Страна</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Клиент</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Стоимость</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Статус</th>
-                <th className="px-6 py-3 text-left text-xs text-gray-600">Дата</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {recentApplications.map((app) => (
-                <tr key={app.id} className="hover:bg-[#F5F7FA]">
-                  <td className="px-6 py-4 text-sm">{app.id.slice(0, 8)}</td>
-                  <td className="px-6 py-4 text-sm"><span className="mr-2">{app.countryFlag}</span>{app.country}</td>
-                  <td className="px-6 py-4 text-sm">{app.clientName}</td>
-                  <td className="px-6 py-4 text-sm">{app.cost.toLocaleString('ru-RU')} ₽</td>
-                  <td className="px-6 py-4 text-sm"><span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>{statusLabels[app.status]}</span></td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{new Date(app.date).toLocaleDateString('ru-RU')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 };

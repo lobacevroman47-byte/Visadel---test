@@ -1180,8 +1180,16 @@ export interface AdditionalService {
   cost_rub: number;       // что платим мы (себестоимость, ₽). Учитывается в финансах
   enabled: boolean;
   sort_order: number;
+  countries: string[];    // Если пусто — услуга доступна во всех странах. Если заполнено — только для перечисленных.
   created_at?: string;
   updated_at?: string;
+}
+
+// True if the addon should be offered for this visa country.
+export function isAddonAvailableForCountry(s: Pick<AdditionalService, 'countries'> | undefined, country: string): boolean {
+  if (!s) return false;
+  if (!Array.isArray(s.countries) || s.countries.length === 0) return true;
+  return s.countries.some(c => c.trim().toLowerCase() === country.trim().toLowerCase());
 }
 
 // Бизнес-модель аддонов (источник истины — таблица additional_services):
