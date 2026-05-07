@@ -661,11 +661,31 @@ function FilePreview({ url, label }: { url: string; label: string }) {
 }
 
 // ── Form Data (Анкета tab) ────────────────────────────────────────────────────
+function DetailItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-gray-50 rounded-lg p-2.5">
+      <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/50">{label}</p>
+      <p className="text-sm text-[#0F2A36] font-semibold mt-0.5 whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
 const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
   const fd = app.formData as {
     basicData?: Record<string, unknown>;
     contactInfo?: Record<string, string>;
-    additionalDocs?: Record<string, boolean>;
+    additionalDocs?: {
+      urgentProcessing?: boolean;
+      hotelBooking?: boolean;
+      returnTicket?: boolean;
+      hotelDetails?: {
+        country?: string; city?: string; checkIn?: string; checkOut?: string;
+        guests?: number; hasChildren?: 'yes' | 'no'; childrenCount?: number;
+      };
+      flightDetails?: {
+        fromCity?: string; toCity?: string; bookingDate?: string;
+      };
+    };
     howHeard?: string[];
   };
 
@@ -676,8 +696,14 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
 
   const extras: string[] = [];
   if (additionalDocs.urgentProcessing) extras.push('Срочное оформление');
-  if (additionalDocs.hotelBooking) extras.push('Подтверждение бронирования');
-  if (additionalDocs.returnTicket) extras.push('Бронирование авиабилета');
+  if (additionalDocs.hotelBooking) extras.push('Бронь отеля для визы');
+  if (additionalDocs.returnTicket) extras.push('Бронь обратного билета');
+
+  const fmtBookingDate = (s?: string) => s ? new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'long', year: 'numeric' }) : '—';
+  const hotelDetails = additionalDocs.hotelDetails;
+  const flightDetails = additionalDocs.flightDetails;
+  const hasHotelDetails = hotelDetails && Object.values(hotelDetails).some(v => v !== undefined && v !== '' && v !== null);
+  const hasFlightDetails = flightDetails && Object.values(flightDetails).some(v => v !== undefined && v !== '' && v !== null);
 
   return (
     <div className="space-y-6">
@@ -758,6 +784,38 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
           <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Доп. услуги</h4>
           <div className="flex flex-wrap gap-2">
             {extras.map(e => <span key={e} className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">{e}</span>)}
+          </div>
+        </section>
+      )}
+
+      {hasHotelDetails && (
+        <section>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">🏨 Бронь отеля для визы — детали поездки</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {hotelDetails!.country && <DetailItem label="Страна назначения" value={hotelDetails!.country} />}
+            {hotelDetails!.city && <DetailItem label="Город" value={hotelDetails!.city} />}
+            {hotelDetails!.checkIn && <DetailItem label="Дата заезда" value={fmtBookingDate(hotelDetails!.checkIn)} />}
+            {hotelDetails!.checkOut && <DetailItem label="Дата выезда" value={fmtBookingDate(hotelDetails!.checkOut)} />}
+            {hotelDetails!.guests !== undefined && <DetailItem label="Количество гостей" value={String(hotelDetails!.guests)} />}
+            {hotelDetails!.hasChildren && (
+              <DetailItem
+                label="Есть ли дети"
+                value={hotelDetails!.hasChildren === 'yes'
+                  ? `Да${hotelDetails!.childrenCount ? ` · ${hotelDetails!.childrenCount}` : ''}`
+                  : 'Нет'}
+              />
+            )}
+          </div>
+        </section>
+      )}
+
+      {hasFlightDetails && (
+        <section>
+          <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">✈️ Бронь обратного билета — детали</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {flightDetails!.fromCity && <DetailItem label="Из какого города" value={flightDetails!.fromCity} />}
+            {flightDetails!.toCity && <DetailItem label="В какой город" value={flightDetails!.toCity} />}
+            {flightDetails!.bookingDate && <DetailItem label="Дата бронирования" value={fmtBookingDate(flightDetails!.bookingDate)} />}
           </div>
         </section>
       )}

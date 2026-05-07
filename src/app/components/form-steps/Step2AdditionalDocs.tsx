@@ -223,7 +223,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                                     value={h.childrenCount ?? ''}
                                     onChange={e => updateHotel('childrenCount', parseInt(e.target.value, 10) || 0)}
                                     placeholder="1"
-                                    className="vd-input"
+                                    className="form-input"
                                   />
                                   {errors['hotel.childrenCount'] && <ErrorLine text={errors['hotel.childrenCount']} />}
                                 </motion.div>
@@ -243,7 +243,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                               value={h.guests ?? 1}
                               onChange={e => updateHotel('guests', parseInt(e.target.value, 10) || 0)}
                               placeholder={f.defaultPlaceholder}
-                              className="vd-input"
+                              className="form-input"
                             />
                             {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                           </div>
@@ -259,7 +259,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                             value={(h as any)[f.key] ?? ''}
                             onChange={e => updateHotel(f.key as keyof HotelAddonDetails, e.target.value as any)}
                             placeholder={f.defaultPlaceholder}
-                            className="vd-input"
+                            className="form-input"
                           />
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
@@ -304,7 +304,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                             value={(fl as any)[f.key] ?? ''}
                             onChange={e => updateFlight(f.key as keyof FlightAddonDetails, e.target.value as any)}
                             placeholder={f.defaultPlaceholder}
-                            className="vd-input"
+                            className="form-input"
                           />
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
