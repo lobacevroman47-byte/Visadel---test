@@ -94,9 +94,16 @@ function CityInput({
     if (value && value.display !== term) setTerm(value.display);
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-focus when caller flips the key (e.g. after swap)
+  // Auto-focus when caller flips the key (e.g. after swap).
+  // Skip the very first run — иначе мобильная клавиатура открывается сразу
+  // при заходе на вкладку «Билеты», даже если юзер ничего не нажимал.
+  const firstAutoFocusRef = useRef(true);
   useEffect(() => {
     if (autoFocusKey === undefined) return;
+    if (firstAutoFocusRef.current) {
+      firstAutoFocusRef.current = false;
+      return;
+    }
     inputRef.current?.focus();
   }, [autoFocusKey]);
 
