@@ -61,28 +61,102 @@ export const FormBuilder: React.FC = () => {
 
 // ── Sub-tab внутри «Брони»: Отель / Авиабилет
 export const BookingsTab: React.FC = () => {
-  const [sub, setSub] = useState<'hotel' | 'flight'>('hotel');
-  return (
-    <div>
-      <div className="px-4 md:px-8 pt-5 pb-2 flex gap-1.5">
-        <button type="button" onClick={() => setSub('hotel')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
-            sub === 'hotel'
-              ? 'bg-[#EAF1FF] text-[#3B5BFF]'
-              : 'bg-white border border-gray-200 text-[#0F2A36]/65 hover:bg-gray-50'
-          }`}>
-          <Hotel className="w-4 h-4" /> Бронь отеля
-        </button>
-        <button type="button" onClick={() => setSub('flight')}
-          className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-sm font-semibold transition ${
-            sub === 'flight'
-              ? 'bg-[#EAF1FF] text-[#3B5BFF]'
-              : 'bg-white border border-gray-200 text-[#0F2A36]/65 hover:bg-gray-50'
-          }`}>
-          <Plane className="w-4 h-4" /> Бронь авиабилета
-        </button>
+  const [sub, setSub] = useState<'hotel' | 'flight' | null>(null);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+
+  // Lightweight load just for the list summary (price + extras count)
+  useEffect(() => {
+    let alive = true;
+    getAppSettings().then(s => { if (alive) setSettings(s); }).catch(() => {});
+    return () => { alive = false; };
+  }, [sub]); // refresh when leaving an editor
+
+  // Editor view
+  if (sub) {
+    return (
+      <div>
+        <div className="px-4 md:px-8 pt-5">
+          <button type="button" onClick={() => setSub(null)}
+            className="text-xs text-[#3B5BFF] hover:underline flex items-center gap-1 mb-2">
+            ← Назад к списку броней
+          </button>
+        </div>
+        <BookingFormSection kind={sub} />
       </div>
-      <BookingFormSection kind={sub} />
+    );
+  }
+
+  // List view — same card pattern as Доп. услуги
+  const hotelExtras = settings?.hotel_extra_fields?.length ?? 0;
+  const flightExtras = settings?.flight_extra_fields?.length ?? 0;
+  const hotelPrice = settings?.hotel_booking_price ?? 1000;
+  const flightPrice = settings?.flight_booking_price ?? 2000;
+
+  const cards: Array<{
+    kind: 'hotel' | 'flight';
+    name: string;
+    description: string;
+    Icon: typeof Hotel;
+    price: number;
+    extrasCount: number;
+  }> = [
+    { kind: 'hotel',  name: 'Бронь отеля',      description: 'Подтверждение проживания для визы',     Icon: Hotel, price: hotelPrice,  extrasCount: hotelExtras },
+    { kind: 'flight', name: 'Бронь авиабилета', description: 'Подтверждение брони рейса для визы',     Icon: Plane, price: flightPrice, extrasCount: flightExtras },
+  ];
+
+  return (
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
+            <Hotel className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Брони</h1>
+            <p className="text-xs text-gray-500 mt-0.5">{cards.length} услуги · цена и поля анкеты — клик по карточке</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-2.5">
+        {cards.map(c => (
+          <button
+            key={c.kind}
+            type="button"
+            onClick={() => setSub(c.kind)}
+            className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md transition p-4 flex flex-wrap items-start gap-3 text-left active:scale-[0.99]"
+          >
+            <div className="w-12 h-12 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+              <c.Icon className="w-5 h-5" strokeWidth={2.2} />
+            </div>
+
+            <div className="flex-1 min-w-[200px]">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-[15px] font-bold text-[#0F2A36]">{c.name}</p>
+              </div>
+              <p className="text-xs text-[#0F2A36]/65 mt-0.5">{c.description}</p>
+              <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{c.kind === 'hotel' ? 'hotel-booking' : 'flight-booking'}</span>
+                {c.extrasCount > 0 && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
+                    + {c.extrasCount} {c.extrasCount === 1 ? 'доп. поле' : 'доп. полей'}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <div className="text-right whitespace-nowrap shrink-0">
+              <div className="text-[#3B5BFF] text-[15px] font-bold">{c.price.toLocaleString('ru-RU')} ₽</div>
+            </div>
+
+            <div className="flex items-center gap-1 shrink-0">
+              <span className="w-9 h-9 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] flex items-center justify-center">
+                <Edit2 size={15} />
+              </span>
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   );
 };

@@ -129,36 +129,43 @@ const VisasSection: React.FC = () => {
 
   return (
     <div className="p-4 md:p-8">
+      {/* Hero — same brand pattern as Доп. услуги */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-        <div>
-          <h1>Каталог продуктов</h1>
-          <p className="text-xs text-gray-500 mt-1">
-            {products.length} виз · {totalEnabled} активных
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
+            <FileText className="w-5 h-5" />
+          </div>
+          <div>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Визы</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {products.length} {products.length === 1 ? 'виза' : 'виз'} · {totalEnabled} активных · показываются клиенту в каталоге
+            </p>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
           <button
+            type="button"
             onClick={() => setAdding(true)}
-            className="px-3 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg transition flex items-center gap-1.5 text-sm"
+            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
           >
-            <Plus size={16} /> Добавить
+            <Plus size={16} strokeWidth={2.5} /> Добавить визу
           </button>
-          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg" title="Обновить">
+          <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="bg-white p-4 rounded-xl border border-gray-200 mb-5 flex flex-wrap gap-3 items-center">
+      {/* Filters — brand pill style */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-5 flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
             type="text" placeholder="Поиск по стране или названию..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-9 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
           />
           {search && (
             <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
@@ -166,78 +173,114 @@ const VisasSection: React.FC = () => {
             </button>
           )}
         </div>
-        <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer text-sm ${showOnlyEnabled ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-50 text-gray-600 border border-gray-200'}`}>
-          <input type="checkbox" checked={showOnlyEnabled} onChange={e => setShowOnlyEnabled(e.target.checked)} className="hidden" />
+        <button
+          type="button"
+          onClick={() => setShowOnlyEnabled(v => !v)}
+          className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition active:scale-95 ${
+            showOnlyEnabled
+              ? 'vd-grad text-white shadow-sm'
+              : 'bg-white border border-gray-200 text-[#0F2A36]/65 hover:bg-gray-50'
+          }`}
+        >
           <Eye size={14} /> Только активные
-        </label>
+        </button>
       </div>
 
-      {/* Empty state with seed CTA */}
+      {/* Empty state with seed CTA — brand-styled */}
       {!loading && products.length === 0 && (
-        <div className="bg-white border border-dashed border-gray-200 rounded-xl p-10 text-center">
-          <Database className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-          <h3 className="text-gray-700 mb-2">Каталог пустой</h3>
-          <p className="text-sm text-gray-500 mb-4">Импортируй визы из текущего кода — это разовая операция.</p>
+        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
+            🌍
+          </div>
+          <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Каталог пустой</h3>
+          <p className="text-sm text-[#0F2A36]/60 mb-5">Импортируй визы из текущего кода — это разовая операция</p>
           <button
             onClick={handleSeed}
             disabled={seeding}
-            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-lg flex items-center gap-2 mx-auto disabled:opacity-60"
+            className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition disabled:opacity-60"
           >
-            {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} />}
-            {seeding ? 'Импортируем...' : 'Импортировать из кода'}
+            {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database size={16} strokeWidth={2.5} />}
+            {seeding ? 'Импортируем…' : 'Импортировать из кода'}
           </button>
         </div>
       )}
 
-      {/* Grouped product list */}
       {grouped.length === 0 && products.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-xl p-10 text-center text-sm text-gray-400">
+        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center text-sm text-gray-400 shadow-sm">
           По выбранным фильтрам ничего не найдено
         </div>
       )}
-      <div className="space-y-4">
+
+      {/* Country groups — each group's title is a brand subheader, visas are stand-alone cards */}
+      <div className="space-y-6">
         {grouped.map(([country, items]) => (
-          <div key={country} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex items-center gap-2">
+          <div key={country} className="space-y-2.5">
+            <div className="flex items-center gap-2 px-1">
               <span className="text-xl">{items[0].flag ?? '🌍'}</span>
-              <h3 className="text-gray-800 font-medium">{country}</h3>
-              <span className="ml-auto text-xs text-gray-400">{items.length} виз</span>
+              <h3 className="text-sm font-extrabold tracking-tight text-[#0F2A36]">{country}</h3>
+              <span className="text-xs text-gray-400">· {items.length} {items.length === 1 ? 'виза' : 'виз'}</span>
             </div>
-            <div className="divide-y divide-gray-100">
+            <div className="space-y-2.5">
               {items.map(p => (
-                <div key={p.id} className={`px-4 py-3 flex flex-wrap items-center gap-3 ${!p.enabled ? 'opacity-50' : ''}`}>
+                <div
+                  key={p.id}
+                  className={`bg-white rounded-2xl border border-gray-100 hover:shadow-md transition p-4 flex flex-wrap items-start gap-3 ${!p.enabled ? 'opacity-55' : ''}`}
+                >
+                  <div className="w-12 h-12 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-2xl shrink-0">
+                    {p.flag ?? '🌍'}
+                  </div>
+
                   <div className="flex-1 min-w-[200px]">
-                    <p className="text-gray-800 font-medium">{p.name}</p>
-                    <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
-                      <span className="font-mono">{p.id}</span>
-                      {p.processing_time && <span>· {p.processing_time}</span>}
-                      <span className="text-gray-400">· партнёрам {p.partner_commission_pct}%</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-[15px] font-bold text-[#0F2A36]">{p.name}</p>
+                      {!p.enabled && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500">Скрыта</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                      <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{p.id}</span>
+                      {p.processing_time && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
+                          ⏱ {p.processing_time}
+                        </span>
+                      )}
+                      {(p.partner_commission_pct ?? 0) > 0 && (
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                          партнёрам {p.partner_commission_pct}%
+                        </span>
+                      )}
                     </div>
                   </div>
-                  <div className="text-blue-600 font-semibold whitespace-nowrap">
-                    {p.price.toLocaleString('ru-RU')} ₽
+
+                  <div className="text-right whitespace-nowrap shrink-0">
+                    <div className="text-[#3B5BFF] text-[15px] font-bold">{p.price.toLocaleString('ru-RU')} ₽</div>
                   </div>
-                  <div className="flex items-center gap-1">
+
+                  <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => handleToggle(p)}
-                      className={`p-2 rounded-lg transition ${p.enabled ? 'text-emerald-600 hover:bg-emerald-50' : 'text-gray-400 hover:bg-gray-100'}`}
+                      className={`w-9 h-9 rounded-lg flex items-center justify-center transition active:scale-95 ${
+                        p.enabled
+                          ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
                       title={p.enabled ? 'Активна — скрыть' : 'Скрыта — показать'}
                     >
-                      {p.enabled ? <Eye size={16} /> : <EyeOff size={16} />}
+                      {p.enabled ? <Eye size={15} /> : <EyeOff size={15} />}
                     </button>
                     <button
                       onClick={() => setEditing(p)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                      className="w-9 h-9 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] hover:bg-[#DCE7FF] flex items-center justify-center transition active:scale-95"
                       title="Редактировать"
                     >
-                      <Edit2 size={16} />
+                      <Edit2 size={15} />
                     </button>
                     <button
                       onClick={() => handleDelete(p)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition"
+                      className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
                       title="Удалить"
                     >
-                      <Trash2 size={16} />
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
