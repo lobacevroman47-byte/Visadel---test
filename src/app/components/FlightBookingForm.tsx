@@ -267,7 +267,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
             ); })()}
             {(() => { const f = ov('bookingDate', 'Дата брони', true); return f.visible && (
               <Field label={f.label} required={f.required} icon={<Calendar className="w-3.5 h-3.5" />}>
-                <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="vd-input" />
+                <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="form-input" />
               </Field>
             ); })()}
           </div>

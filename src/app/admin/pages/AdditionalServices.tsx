@@ -323,16 +323,26 @@ const ServiceFormModal: React.FC<{
             <div>
               <label className="block text-sm text-gray-700 mb-1">Цена для клиента ₽ *</label>
               <input
-                type="number" value={form.price} min={0}
-                onChange={e => set('price', parseInt(e.target.value, 10) || 0)}
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={form.price ? String(form.price) : ''}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  set('price', v === '' ? 0 : parseInt(v, 10));
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
               />
             </div>
             <div>
               <label className="block text-sm text-gray-700 mb-1">Себестоимость ₽</label>
               <input
-                type="number" value={form.cost_rub} min={0}
-                onChange={e => set('cost_rub', parseFloat(e.target.value) || 0)}
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={form.cost_rub ? String(form.cost_rub) : ''}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  set('cost_rub', v === '' ? 0 : parseFloat(v));
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
               <p className="text-xs text-gray-400 mt-1">Сколько мы тратим на эту услугу (для финансов)</p>
@@ -342,8 +352,13 @@ const ServiceFormModal: React.FC<{
             <div>
               <label className="block text-sm text-gray-700 mb-1">Комиссия партнёра %</label>
               <input
-                type="number" value={form.partner_commission_pct ?? 0} step="0.5" min={0} max={100}
-                onChange={e => set('partner_commission_pct', parseFloat(e.target.value) || 0)}
+                type="text" inputMode="decimal"
+                value={form.partner_commission_pct === undefined ? '' : String(form.partner_commission_pct)}
+                onChange={e => {
+                  const v = e.target.value.replace(',', '.').replace(/[^0-9.]/g, '');
+                  set('partner_commission_pct', v === '' ? 0 : parseFloat(v));
+                }}
+                placeholder="15"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
               <p className="text-xs text-gray-400 mt-1">% от цены услуги, который получит партнёр-реферрер. 0 = не платим.</p>
@@ -351,8 +366,13 @@ const ServiceFormModal: React.FC<{
             <div>
               <label className="block text-sm text-gray-700 mb-1">Порядок отображения</label>
               <input
-                type="number" value={form.sort_order} min={0}
-                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={form.sort_order ? String(form.sort_order) : ''}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  set('sort_order', v === '' ? 0 : parseInt(v, 10));
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>

@@ -294,15 +294,17 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
                 <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Стамбул" className="vd-input" />
               </Field>
             ); })()}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Даты ─ на mobile stack-ом (как в визовых анкетах), на desktop ─ в две колонки.
+               Узкие date-инпуты на iPhone выглядели зажато и обрезались системным пикером. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(() => { const f = ov('checkIn', 'Дата заезда', true); return f.visible && (
                 <Field label={f.label} required={f.required}>
-                  <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="vd-input" />
+                  <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="form-input" />
                 </Field>
               ); })()}
               {(() => { const f = ov('checkOut', 'Дата выезда', true); return f.visible && (
                 <Field label={f.label} required={f.required}>
-                  <input type="date" value={checkOut} min={checkIn || undefined} onChange={e => setCheckOut(e.target.value)} className="vd-input" />
+                  <input type="date" value={checkOut} min={checkIn || undefined} onChange={e => setCheckOut(e.target.value)} className="form-input" />
                 </Field>
               ); })()}
             </div>
