@@ -55,9 +55,18 @@ p {
 .form-input,
 .vd-input {
   @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;
+  caret-color: #3B5BFF;
 }
 .form-input-sm {
   @apply w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-[#3B5BFF] transition;
+  caret-color: #3B5BFF;
+}
+
+/* Глобально — на всех нативных input/textarea/contenteditable, чтобы
+   курсор всегда был виден на iPhone WebView. iOS Safari иногда
+   рендерит курсор прозрачным когда у элемента есть transition. */
+input, textarea, [contenteditable] {
+  caret-color: #3B5BFF;
 }
 
 .form-input:disabled,
