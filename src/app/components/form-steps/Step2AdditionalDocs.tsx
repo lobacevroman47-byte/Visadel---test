@@ -25,10 +25,10 @@ const FLIGHT_ADDON_FIELDS = [
   { key: 'bookingDate', defaultLabel: 'Дата бронирования', defaultRequired: true, defaultPlaceholder: '' },
 ];
 
-// .form-input-sm — глобальный класс из styles/globals.css для компактных
-// инпутов внутри аддон-карточек. Раньше тут был локальный ADDON_INPUT
-// дубль; теперь весь mini-app использует один и тот же класс.
-const ADDON_INPUT = 'form-input-sm';
+// .form-input — тот же класс что у визовой анкеты Step 1, чтобы поля
+// аддонов (страна, город, даты, гости и т.п.) визуально совпадали с
+// основным шагом «Основные данные» — единый стиль mini-app.
+const ADDON_INPUT = 'form-input';
 
 // Lookup утилита: применяет override (label/required/visible) если есть, иначе дефолт.
 const resolveOverride = (overrides: CoreFieldOverrides, key: string, defaultLabel: string, defaultRequired: boolean) => {
