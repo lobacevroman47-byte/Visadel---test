@@ -339,6 +339,32 @@ INSERT INTO storage.buckets (id, name, public)
 VALUES ('visadel-files', 'visadel-files', false)
 ON CONFLICT (id) DO NOTHING;
 
+-- ── GRANTs для anon/authenticated ───────────────────────────────────────────
+-- В Supabase при создании таблицы через UI grants ставятся автоматически.
+-- При создании raw SQL через SQL Editor — нет, нужно делать руками. Иначе
+-- мини-апп с anon-ключом получит пустые ответы (визы / доп. услуги пропадут
+-- с главного экрана).
+GRANT SELECT ON public.visa_products              TO anon, authenticated;
+GRANT SELECT ON public.additional_services        TO anon, authenticated;
+GRANT SELECT ON public.app_settings               TO anon, authenticated;
+GRANT SELECT ON public.visa_form_fields           TO anon, authenticated;
+GRANT SELECT ON public.visa_photo_requirements    TO anon, authenticated;
+
+-- Чувствительные таблицы — anon может ВСЁ пока не запущена 004 (legacy mode).
+-- После 004 эти GRANTы остаются, но RLS закроет реальный доступ.
+GRANT SELECT, INSERT, UPDATE ON public.users               TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.applications        TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.tasks               TO anon, authenticated;
+GRANT SELECT, INSERT             ON public.reviews         TO anon, authenticated;
+GRANT SELECT, INSERT             ON public.bonus_logs      TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.hotel_bookings      TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.flight_bookings     TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE ON public.notification_dedup  TO anon, authenticated;
+GRANT SELECT, INSERT             ON public.referral_clicks TO anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.reminders   TO anon, authenticated;
+GRANT SELECT, INSERT             ON public.status_log      TO anon, authenticated;
+GRANT SELECT                     ON public.admin_users     TO anon, authenticated;
+
 -- ── ВНИМАНИЕ: RLS политики НЕ создаются здесь.
 -- Открытые политики (USING true) лежат в legacy-режиме до 004_rls_telegram_id.sql.
 -- Не запускай 004 пока фронт не задеплоен с initData verification.
