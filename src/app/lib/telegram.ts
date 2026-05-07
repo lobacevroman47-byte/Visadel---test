@@ -29,10 +29,17 @@ export interface TelegramWebApp {
     button_color?: string;
     button_text_color?: string;
     secondary_bg_color?: string;
+    section_bg_color?: string;
+    accent_text_color?: string;
+    destructive_text_color?: string;
   };
   isExpanded: boolean;
   viewportHeight: number;
   viewportStableHeight: number;
+  enableClosingConfirmation?: () => void;
+  disableClosingConfirmation?: () => void;
+  onEvent?: (event: string, handler: (...args: unknown[]) => void) => void;
+  offEvent?: (event: string, handler: (...args: unknown[]) => void) => void;
   MainButton: {
     text: string;
     color: string;
@@ -101,6 +108,31 @@ export function initTelegramApp(): void {
   if (!tg) return;
   tg.ready();
   tg.expand();
+  applyTelegramTheme();
+  // Реагируем на смену темы пока мини-апп открыт
+  tg.onEvent?.('themeChanged', applyTelegramTheme);
+  tg.onEvent?.('viewportChanged', () => { /* trigger re-layout if needed */ });
+}
+
+// Прокидываем Telegram themeParams в CSS-переменные:
+//   --tg-bg          → body background (внешняя «рамка» вокруг приложения)
+//   --tg-text        → доступно компонентам если захотят синхронизироваться
+//   --tg-link        → линки в светлой теме автоматически окрашиваются
+// Само ядро приложения остаётся светлым (#F5F7FA) — брендовый выбор;
+// в тёмном Telegram пользователь видит светлый app внутри dark chrome.
+export function applyTelegramTheme(): void {
+  const tg = getTelegramWebApp();
+  if (!tg) return;
+  const root = document.documentElement;
+  const p = tg.themeParams ?? {};
+  if (p.bg_color)            root.style.setProperty('--tg-bg', p.bg_color);
+  if (p.text_color)          root.style.setProperty('--tg-text', p.text_color);
+  if (p.link_color)          root.style.setProperty('--tg-link', p.link_color);
+  if (p.button_color)        root.style.setProperty('--tg-button', p.button_color);
+  if (p.button_text_color)   root.style.setProperty('--tg-button-text', p.button_text_color);
+  if (p.secondary_bg_color)  root.style.setProperty('--tg-secondary-bg', p.secondary_bg_color);
+  // data-атрибут чтобы CSS-селекторы могли тонко настраивать стили
+  root.setAttribute('data-tg-theme', tg.colorScheme === 'dark' ? 'dark' : 'light');
 }
 
 export function haptic(type: 'light' | 'medium' | 'heavy' | 'success' | 'error' | 'warning' = 'light'): void {
@@ -125,6 +157,18 @@ export function hideBackButton(onClick?: () => void): void {
   if (!tg) return;
   if (onClick) tg.BackButton.offClick(onClick);
   tg.BackButton.hide();
+}
+
+// Включает подтверждение перед закрытием Telegram-окна. Защищает от потери
+// данных в формах с черновиком (визовая анкета, бронь отеля/билета).
+export function enableClosingConfirmation(): void {
+  const tg = getTelegramWebApp();
+  tg?.enableClosingConfirmation?.();
+}
+
+export function disableClosingConfirmation(): void {
+  const tg = getTelegramWebApp();
+  tg?.disableClosingConfirmation?.();
 }
 
 export function showMainButton(text: string, onClick: () => void): void {

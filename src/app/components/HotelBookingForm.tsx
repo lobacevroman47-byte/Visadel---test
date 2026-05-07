@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
+import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import { apiFetch } from '../lib/apiFetch';
+import {
+  showBackButton, hideBackButton,
+  enableClosingConfirmation, disableClosingConfirmation,
+} from '../lib/telegram';
+import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProduct';
 
 interface HotelBookingFormProps {
   onBack: () => void;
@@ -46,38 +51,26 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [cardCopied, setCardCopied] = useState(false);
 
-  // Live settings from app_settings (admin-editable)
-  const [price, setPrice] = useState(1000);
-  const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
-  const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
-  const [overrides, setOverrides] = useState<CoreFieldOverrides>({});
-
-  // Helper: read label / required / visibility for a core field key
-  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) => {
-    const o = overrides[key] ?? {};
-    return {
-      label: o.label ?? fallbackLabel,
-      required: o.required ?? fallbackRequired,
-      visible: o.visible !== false,
-    };
-  };
+  // Все настройки бронь-аддона (цена, карта, поля анкеты, overrides) из
+  // единого источника — useBookingProduct. См. hooks/useBookingProduct.ts.
+  const product = useBookingProduct('hotel');
+  const price = product.price;
+  const cardNumber = product.cardNumber;
+  const extraFields = product.extraFields;
+  const overrides = product.overrides;
+  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) =>
+    resolveFieldOverride(overrides, key, fallbackLabel, fallbackRequired);
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
+  // Telegram BackButton + closing confirmation: главный сценарий потери черновика.
   useEffect(() => {
-    let alive = true;
-    // Price now comes from additional_services row (id=hotel-booking) so it
-    // updates whenever admin edits via Каталог → Брони. Other settings
-    // (card number, extra fields, core overrides) still come from app_settings.
-    Promise.all([getAppSettings(), getAdditionalServices()]).then(([s, services]) => {
-      if (!alive) return;
-      const hotel = services.find(x => x.id === 'hotel-booking');
-      setPrice(hotel?.price ?? s.hotel_booking_price ?? 1000);
-      if (s.payment_card_number) setCardNumber(s.payment_card_number);
-      setExtraFields(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
-      setOverrides(s.hotel_core_overrides && typeof s.hotel_core_overrides === 'object' ? s.hotel_core_overrides : {});
-    }).catch(() => { /* defaults stay */ });
-    return () => { alive = false; };
-  }, []);
+    enableClosingConfirmation();
+    showBackButton(onBack);
+    return () => {
+      hideBackButton(onBack);
+      disableClosingConfirmation();
+    };
+  }, [onBack]);
 
   // Auto-save draft to localStorage on every change.
   // Only files (passport, paymentScreenshot) are excluded — they can't be serialised.

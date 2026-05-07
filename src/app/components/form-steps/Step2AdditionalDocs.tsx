@@ -62,6 +62,10 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
   const [hotelOverrides, setHotelOverrides] = useState<CoreFieldOverrides>({});
   const [flightOverrides, setFlightOverrides] = useState<CoreFieldOverrides>({});
   const [prices, setPrices] = useState({ urgent: 1000, hotel: 1000, ticket: 2000 });
+  // enabled-флаги аддонов из additional_services — если админ скрыл услугу
+  // в Каталог → Брони / Доп. услуги, чекбокс не должен показываться в Step2.
+  // Дефолт true чтобы не моргало при первой загрузке.
+  const [addonAvail, setAddonAvail] = useState({ urgent: true, hotel: true, ticket: true });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Подтягиваем overrides + цены — единый source of truth с конструктором
@@ -71,12 +75,17 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
       if (!alive) return;
       setHotelOverrides(s.hotel_core_overrides ?? {});
       setFlightOverrides(s.flight_core_overrides ?? {});
-      const enabled = services.filter(x => x.enabled);
-      const byId = new Map(enabled.map(x => [x.id, x.price] as const));
+      const byId = new Map(services.map(x => [x.id, x] as const));
       setPrices({
-        urgent: byId.get('urgent-processing') ?? 1000,
-        hotel:  byId.get('hotel-booking')     ?? 1000,
-        ticket: byId.get('flight-booking')    ?? 2000,
+        urgent: byId.get('urgent-processing')?.price ?? 1000,
+        hotel:  byId.get('hotel-booking')?.price     ?? 1000,
+        ticket: byId.get('flight-booking')?.price    ?? 2000,
+      });
+      setAddonAvail({
+        // Если строки нет — считаем что доступна (дефолт). Если есть — смотрим enabled.
+        urgent: byId.get('urgent-processing')?.enabled ?? true,
+        hotel:  byId.get('hotel-booking')?.enabled     ?? true,
+        ticket: byId.get('flight-booking')?.enabled    ?? true,
       });
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
@@ -175,16 +184,22 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
 
       {showOptions && (
         <div className="space-y-3 mb-5">
-          <AddonCard
-            icon={<Zap className="w-5 h-5" />}
-            emoji="⚡"
-            title="Срочное оформление"
-            description="Приоритетная обработка в течение 2 рабочих дней"
-            price={prices.urgent}
-            checked={formData.urgentProcessing}
-            onToggle={() => toggleAddon('urgentProcessing')}
-          />
+          {/* Каждый аддон рендерим только если он enabled в админке.
+             Если админ вернёт галочку «Активна» в Каталог → Брони —
+             карточка появится автоматически при следующем открытии Step2. */}
+          {addonAvail.urgent && (
+            <AddonCard
+              icon={<Zap className="w-5 h-5" />}
+              emoji="⚡"
+              title="Срочное оформление"
+              description="Приоритетная обработка в течение 2 рабочих дней"
+              price={prices.urgent}
+              checked={formData.urgentProcessing}
+              onToggle={() => toggleAddon('urgentProcessing')}
+            />
+          )}
 
+          {addonAvail.hotel && (
           <AddonCard
             icon={<Hotel className="w-5 h-5" />}
             emoji="🏨"
@@ -299,7 +314,9 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
               )}
             </AnimatePresence>
           </AddonCard>
+          )}
 
+          {addonAvail.ticket && (
           <AddonCard
             icon={<Plane className="w-5 h-5" />}
             emoji="✈️"
@@ -344,6 +361,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
               )}
             </AnimatePresence>
           </AddonCard>
+          )}
         </div>
       )}
 

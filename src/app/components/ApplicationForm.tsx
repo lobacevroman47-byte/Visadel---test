@@ -5,6 +5,10 @@ import type { VisaOption } from '../App';
 import Step1BasicData from './form-steps/Step1BasicData';
 import { getAdditionalServices } from '../lib/db';
 import { apiFetch } from '../lib/apiFetch';
+import {
+  showBackButton, hideBackButton,
+  enableClosingConfirmation, disableClosingConfirmation,
+} from '../lib/telegram';
 import Step2AdditionalDocs from './form-steps/Step2AdditionalDocs';
 import Step4ContactInfo from './form-steps/Step4ContactInfo';
 import Step5PhotoUpload from './form-steps/Step5PhotoUpload';
@@ -239,6 +243,26 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStep, draftId]);
+
+  // Native Telegram BackButton — на iOS юзеры свайпают назад из системного
+  // жеста, не из in-app chevron'a. Без этого мы теряем заполненные поля.
+  // На Step 0 кнопка возвращает к каталогу (onBack), на остальных — к
+  // предыдущему шагу. Также включаем closing confirmation чтобы свайп
+  // вниз / закрытие WebView показал диалог сохранения.
+  useEffect(() => {
+    enableClosingConfirmation();
+    return () => disableClosingConfirmation();
+  }, []);
+
+  useEffect(() => {
+    const handler = () => {
+      if (currentStep === 0) onBack();
+      else setCurrentStep(s => Math.max(0, s - 1));
+    };
+    showBackButton(handler);
+    return () => hideBackButton(handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep]);
 
   const updateFormData = (step: keyof FormData, data: any) => {
     setFormData(prev => ({

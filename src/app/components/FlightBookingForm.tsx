@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
+import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import { apiFetch } from '../lib/apiFetch';
+import {
+  showBackButton, hideBackButton,
+  enableClosingConfirmation, disableClosingConfirmation,
+} from '../lib/telegram';
+import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProduct';
 
 interface FlightBookingFormProps {
   onBack: () => void;
@@ -40,35 +45,25 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [cardCopied, setCardCopied] = useState(false);
 
-  // Live settings (admin-editable)
-  const [price, setPrice] = useState(2000);
-  const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
-  const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
-  const [overrides, setOverrides] = useState<CoreFieldOverrides>({});
-
-  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) => {
-    const o = overrides[key] ?? {};
-    return {
-      label: o.label ?? fallbackLabel,
-      required: o.required ?? fallbackRequired,
-      visible: o.visible !== false,
-    };
-  };
+  // Все настройки бронь-аддона из единого источника
+  const product = useBookingProduct('flight');
+  const price = product.price;
+  const cardNumber = product.cardNumber;
+  const extraFields = product.extraFields;
+  const overrides = product.overrides;
+  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) =>
+    resolveFieldOverride(overrides, key, fallbackLabel, fallbackRequired);
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
+  // Telegram BackButton + closing confirmation
   useEffect(() => {
-    let alive = true;
-    // Price comes from additional_services row (id=flight-booking).
-    Promise.all([getAppSettings(), getAdditionalServices()]).then(([s, services]) => {
-      if (!alive) return;
-      const flight = services.find(x => x.id === 'flight-booking');
-      setPrice(flight?.price ?? s.flight_booking_price ?? 2000);
-      if (s.payment_card_number) setCardNumber(s.payment_card_number);
-      setExtraFields(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
-      setOverrides(s.flight_core_overrides && typeof s.flight_core_overrides === 'object' ? s.flight_core_overrides : {});
-    }).catch(() => { /* defaults stay */ });
-    return () => { alive = false; };
-  }, []);
+    enableClosingConfirmation();
+    showBackButton(onBack);
+    return () => {
+      hideBackButton(onBack);
+      disableClosingConfirmation();
+    };
+  }, [onBack]);
 
   // Auto-save draft to localStorage
   useEffect(() => {

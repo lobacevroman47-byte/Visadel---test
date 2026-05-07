@@ -15,9 +15,10 @@ const FLIGHT_DEFAULTS = { name: 'Бронь обратного билета', de
 
 // localStorage-кеш загруженных значений: при следующих заходах подписи
 // появятся мгновенно без свапа на дефолты → загрузка → подмена.
-const CACHE_KEY = 'visadel:bookings-menu-cache:v1';
-type Cached = { hotel: Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null;
-                flight: Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null };
+// v2: добавлено поле icon — emoji из админки.
+const CACHE_KEY = 'visadel:bookings-menu-cache:v2';
+type Slim = Pick<AdditionalService, 'name' | 'description' | 'enabled' | 'icon'>;
+type Cached = { hotel: Slim | null; flight: Slim | null };
 
 const readCache = (): Cached | null => {
   try {
@@ -33,8 +34,8 @@ const writeCache = (c: Cached) => {
 export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpenFlightBooking }: BookingsMenuProps) {
   // Initial render берёт значения из кеша — нет свапа при повторных заходах.
   const cached = readCache();
-  const [hotel,  setHotel]  = useState<Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null>(cached?.hotel  ?? null);
-  const [flight, setFlight] = useState<Pick<AdditionalService, 'name' | 'description' | 'enabled'> | null>(cached?.flight ?? null);
+  const [hotel,  setHotel]  = useState<Slim | null>(cached?.hotel  ?? null);
+  const [flight, setFlight] = useState<Slim | null>(cached?.flight ?? null);
 
   useEffect(() => {
     let alive = true;
@@ -43,7 +44,9 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
         if (!alive) return;
         const h = rows.find(x => x.id === 'hotel-booking')  ?? null;
         const f = rows.find(x => x.id === 'flight-booking') ?? null;
-        const slim = (s: AdditionalService | null) => s ? { name: s.name, description: s.description, enabled: s.enabled } : null;
+        const slim = (s: AdditionalService | null): Slim | null => s
+          ? { name: s.name, description: s.description, enabled: s.enabled, icon: s.icon }
+          : null;
         setHotel(slim(h));
         setFlight(slim(f));
         writeCache({ hotel: slim(h), flight: slim(f) });
@@ -59,8 +62,10 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
 
   const hotelName        = hotel?.name        || HOTEL_DEFAULTS.name;
   const hotelDescription = hotel?.description || HOTEL_DEFAULTS.description;
+  const hotelIcon        = hotel?.icon || null;
   const flightName        = flight?.name        || FLIGHT_DEFAULTS.name;
   const flightDescription = flight?.description || FLIGHT_DEFAULTS.description;
+  const flightIcon        = flight?.icon || null;
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-24">
@@ -104,8 +109,8 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
               onClick={onOpenHotelBooking}
               className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
             >
-              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
-                <Hotel className="w-6 h-6" strokeWidth={2.2} />
+              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md text-2xl">
+                {hotelIcon ? <span aria-hidden>{hotelIcon}</span> : <Hotel className="w-6 h-6" strokeWidth={2.2} />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold text-[#0F2A36]">{hotelName}</p>
@@ -120,8 +125,8 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
               onClick={onOpenFlightBooking}
               className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
             >
-              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
-                <Plane className="w-6 h-6" strokeWidth={2.2} />
+              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md text-2xl">
+                {flightIcon ? <span aria-hidden>{flightIcon}</span> : <Plane className="w-6 h-6" strokeWidth={2.2} />}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[15px] font-bold text-[#0F2A36]">{flightName}</p>
