@@ -365,6 +365,28 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.reminders   TO anon, authenticate
 GRANT SELECT, INSERT             ON public.status_log      TO anon, authenticated;
 GRANT SELECT                     ON public.admin_users     TO anon, authenticated;
 
--- ── ВНИМАНИЕ: RLS политики НЕ создаются здесь.
+-- ── Открытые SELECT-политики для публичных каталогов ───────────────────────
+-- Supabase по умолчанию включает RLS на новых таблицах (или это уже могло
+-- быть включено руками раньше). Без явной политики anon-ключ получает []
+-- даже при наличии GRANT. Эти политики гарантируют что мини-апп всегда
+-- видит каталог виз, доп. услуг, поля анкет и т.д.
+DO $$
+DECLARE t TEXT;
+BEGIN
+  FOR t IN SELECT unnest(ARRAY[
+    'visa_products','additional_services','app_settings',
+    'visa_form_fields','visa_photo_requirements'
+  ])
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
+    EXECUTE format('DROP POLICY IF EXISTS "anon_read" ON public.%I;', t);
+    EXECUTE format(
+      'CREATE POLICY "anon_read" ON public.%I FOR SELECT TO anon, authenticated USING (true);',
+      t
+    );
+  END LOOP;
+END$$;
+
+-- ── ВНИМАНИЕ: RLS политики на чувствительных таблицах НЕ создаются здесь.
 -- Открытые политики (USING true) лежат в legacy-режиме до 004_rls_telegram_id.sql.
 -- Не запускай 004 пока фронт не задеплоен с initData verification.
