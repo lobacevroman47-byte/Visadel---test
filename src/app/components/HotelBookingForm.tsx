@@ -266,12 +266,12 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
           <div className="space-y-3">
             {(() => { const f = ov('firstName', 'Имя (как в загранпаспорте)', true); return f.visible && (
               <Field label={f.label} required={f.required}>
-                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="IVAN" className="vd-input" />
+                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="IVAN" className="form-input" />
               </Field>
             ); })()}
             {(() => { const f = ov('lastName', 'Фамилия (как в загранпаспорте)', true); return f.visible && (
               <Field label={f.label} required={f.required}>
-                <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="IVANOV" className="vd-input" />
+                <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="IVANOV" className="form-input" />
               </Field>
             ); })()}
           </div>
@@ -286,12 +286,12 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
           <div className="space-y-3">
             {(() => { const f = ov('country', 'Страна назначения', true); return f.visible && (
               <Field label={f.label} required={f.required}>
-                <input type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="Турция" className="vd-input" />
+                <input type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="Турция" className="form-input" />
               </Field>
             ); })()}
             {(() => { const f = ov('city', 'Город', true); return f.visible && (
               <Field label={f.label} required={f.required}>
-                <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Стамбул" className="vd-input" />
+                <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Стамбул" className="form-input" />
               </Field>
             ); })()}
             {/* Даты ─ на mobile stack-ом (как в визовых анкетах), на desktop ─ в две колонки.
@@ -315,7 +315,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
                   className="w-10 h-10 rounded-xl bg-[#EAF1FF] text-[#3B5BFF] flex items-center justify-center active:scale-95 transition">
                   <Minus size={16} strokeWidth={2.5} />
                 </button>
-                <div className="flex-1 vd-input text-center font-semibold text-base">{guests}</div>
+                <div className="flex-1 form-input text-center font-semibold text-base">{guests}</div>
                 <button type="button" onClick={() => setGuests(g => Math.min(20, g + 1))}
                   className="w-10 h-10 rounded-xl bg-[#EAF1FF] text-[#3B5BFF] flex items-center justify-center active:scale-95 transition">
                   <Plus size={16} strokeWidth={2.5} />
@@ -343,7 +343,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
                       type="number" min={0} max={17}
                       value={ch.age} onChange={e => updateChildAge(ch.id, e.target.value)}
                       placeholder="Возраст"
-                      className="vd-input flex-1"
+                      className="form-input flex-1"
                     />
                     <button type="button" onClick={() => removeChild(ch.id)}
                       className="w-9 h-9 rounded-xl bg-red-50 text-red-500 flex items-center justify-center active:scale-95 transition">
@@ -370,17 +370,17 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
           <div className="space-y-3">
             {(() => { const f = ov('email', 'E-mail', true); return f.visible && (
             <Field label={f.label} required={f.required} icon={<Mail className="w-3.5 h-3.5" />}>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="vd-input" />
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="form-input" />
             </Field>
             ); })()}
             {(() => { const f = ov('phone', 'Номер телефона', true); return f.visible && (
             <Field label={f.label} required={f.required} icon={<Phone className="w-3.5 h-3.5" />}>
-              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="vd-input" />
+              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="form-input" />
             </Field>
             ); })()}
             {(() => { const f = ov('telegramLogin', 'Логин в Telegram', true); return f.visible && (
             <Field label={f.label} required={f.required} icon={<Send className="w-3.5 h-3.5" />}>
-              <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="vd-input" />
+              <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="form-input" />
             </Field>
             ); })()}
           </div>

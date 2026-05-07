@@ -25,7 +25,7 @@ export default function BookingExtraField({ field, value, onChange }: Props) {
         onChange={e => onChange(e.target.value)}
         placeholder={field.placeholder}
         rows={3}
-        className="vd-input"
+        className="form-input"
       />
     );
   }
@@ -35,7 +35,7 @@ export default function BookingExtraField({ field, value, onChange }: Props) {
       <select
         value={value}
         onChange={e => onChange(e.target.value)}
-        className="vd-input"
+        className="form-input"
       >
         <option value="">{field.placeholder ?? 'Выбери вариант'}</option>
         {(field.options ?? []).map(opt => (
@@ -90,7 +90,7 @@ export default function BookingExtraField({ field, value, onChange }: Props) {
       value={value}
       onChange={e => onChange(e.target.value)}
       placeholder={field.placeholder}
-      className="vd-input"
+      className="form-input"
     />
   );
 }
