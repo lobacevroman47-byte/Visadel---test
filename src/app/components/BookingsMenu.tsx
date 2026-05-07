@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { User, ChevronRight, Hotel, Plane } from 'lucide-react';
+import { getAdditionalServices, type AdditionalService } from '../lib/db';
 
 interface BookingsMenuProps {
   onOpenProfile?: () => void;
@@ -6,7 +8,38 @@ interface BookingsMenuProps {
   onOpenFlightBooking: () => void;
 }
 
+// Текстовые дефолты — используются пока не загрузились данные из БД,
+// и как фолбэк если админ не задал имя/описание в Каталог → Брони.
+const HOTEL_DEFAULTS  = { name: 'Бронь отеля',     description: 'Подтверждение для визы и границы' };
+const FLIGHT_DEFAULTS = { name: 'Бронь авиабилета', description: 'Подтверждение рейса для визы и границы' };
+
 export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpenFlightBooking }: BookingsMenuProps) {
+  const [hotel,  setHotel]  = useState<AdditionalService | null>(null);
+  const [flight, setFlight] = useState<AdditionalService | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getAdditionalServices()
+      .then(rows => {
+        if (!alive) return;
+        setHotel(rows.find(x => x.id === 'hotel-booking')  ?? null);
+        setFlight(rows.find(x => x.id === 'flight-booking') ?? null);
+      })
+      .finally(() => { if (alive) setLoaded(true); });
+    return () => { alive = false; };
+  }, []);
+
+  // Если админ скрыл услугу в Каталог → Брони (enabled=false), кнопку не показываем.
+  // До загрузки показываем оба варианта с дефолтными подписями (чтобы не было визуального скачка).
+  const showHotel  = !loaded || (hotel?.enabled  ?? true);
+  const showFlight = !loaded || (flight?.enabled ?? true);
+
+  const hotelName        = hotel?.name        || HOTEL_DEFAULTS.name;
+  const hotelDescription = hotel?.description || HOTEL_DEFAULTS.description;
+  const flightName        = flight?.name        || FLIGHT_DEFAULTS.name;
+  const flightDescription = flight?.description || FLIGHT_DEFAULTS.description;
+
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-24">
       {/* Header — same shape as Home */}
@@ -42,38 +75,39 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
           </p>
         </div>
 
-        {/* Services list */}
+        {/* Services list — name/description/visibility синхронизированы с Каталог → Брони */}
         <div className="px-4 py-5 space-y-3">
-          {/* Hotel */}
-          <button
-            onClick={onOpenHotelBooking}
-            className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
-          >
-            <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
-              <Hotel className="w-6 h-6" strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-bold text-[#0F2A36]">Бронь отеля</p>
-              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Подтверждение для визы и границы</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-          </button>
+          {showHotel && (
+            <button
+              onClick={onOpenHotelBooking}
+              className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
+            >
+              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
+                <Hotel className="w-6 h-6" strokeWidth={2.2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-bold text-[#0F2A36]">{hotelName}</p>
+                <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">{hotelDescription}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+            </button>
+          )}
 
-          {/* Flight ticket */}
-          <button
-            onClick={onOpenFlightBooking}
-            className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
-          >
-            <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
-              <Plane className="w-6 h-6" strokeWidth={2.2} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-[15px] font-bold text-[#0F2A36]">Бронь авиабилета</p>
-              <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">Подтверждение рейса для визы и границы</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-          </button>
-
+          {showFlight && (
+            <button
+              onClick={onOpenFlightBooking}
+              className="w-full bg-white rounded-2xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition-all p-4 flex items-center gap-4 text-left"
+            >
+              <div className="w-12 h-12 rounded-xl vd-grad flex items-center justify-center text-white shrink-0 shadow-md">
+                <Plane className="w-6 h-6" strokeWidth={2.2} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[15px] font-bold text-[#0F2A36]">{flightName}</p>
+                <p className="text-[12px] text-[#0F2A36]/60 mt-0.5">{flightDescription}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+            </button>
+          )}
         </div>
 
         {/* Info card */}

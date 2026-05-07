@@ -194,6 +194,7 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
       {(editing || adding) && (
         <ServiceFormModal
           service={editing}
+          mode={mode}
           existingIds={services.map(s => s.id)}
           onClose={() => { setEditing(null); setAdding(false); }}
           onSaved={async (saved) => {
@@ -209,10 +210,14 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
 
 const ServiceFormModal: React.FC<{
   service: AdditionalService | null;
+  mode: Mode;
   existingIds: string[];
   onClose: () => void;
   onSaved: (s: Omit<AdditionalService, 'created_at' | 'updated_at'>) => Promise<void>;
-}> = ({ service, existingIds, onClose, onSaved }) => {
+}> = ({ service, mode, existingIds, onClose, onSaved }) => {
+  // Брони в нижнем меню оформляются без визы — поэтому ограничение по странам
+  // не имеет смысла. Поле видно только в режиме доп. услуг.
+  const showCountries = mode === 'addons';
   const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
     service
       ? {
@@ -369,6 +374,7 @@ const ServiceFormModal: React.FC<{
           </div>
 
           {/* Страны, для которых эта услуга показывается как доп. опция */}
+          {showCountries && (
           <div className="bg-gray-50 rounded-lg p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-700">Страны, где услуга доступна</p>
@@ -402,6 +408,7 @@ const ServiceFormModal: React.FC<{
               })}
             </div>
           </div>
+          )}
 
           <div className="flex gap-2 pt-2">
             <button
