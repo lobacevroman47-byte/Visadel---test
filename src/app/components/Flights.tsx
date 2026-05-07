@@ -13,6 +13,7 @@ import {
   type TpPlace,
 } from '../lib/travelpayouts';
 import { getTelegramWebApp, haptic } from '../lib/telegram';
+import DateInput from './shared/DateInput';
 
 interface FlightsProps {
   onOpenProfile: () => void;
@@ -285,29 +286,28 @@ function SearchStep({
           )}
 
           <div className="space-y-3 mb-3">
-            <label className="block">
+            <div>
               <span className="text-[10px] uppercase tracking-wider text-[#0F2A36]/55 font-bold">Туда</span>
-              <input
-                type="date"
-                value={f.departureDate}
-                min={todayPlus(0)}
-                onChange={(e) => set('departureDate', e.target.value)}
-                className="mt-1 form-input"
-              />
-            </label>
-            <label className="block">
+              <div className="mt-1">
+                <DateInput
+                  value={f.departureDate}
+                  onChange={(v) => set('departureDate', v)}
+                  min={todayPlus(0)}
+                />
+              </div>
+            </div>
+            <div>
               <span className="text-[10px] uppercase tracking-wider text-[#0F2A36]/55 font-bold">
                 {f.oneWay ? 'Без обратного' : 'Обратно'}
               </span>
-              <input
-                type="date"
-                value={f.oneWay ? '' : f.returnDate}
-                min={f.departureDate || todayPlus(0)}
-                disabled={f.oneWay}
-                onChange={(e) => set('returnDate', e.target.value)}
-                className="mt-1 form-input disabled:opacity-50"
-              />
-            </label>
+              <div className={`mt-1 ${f.oneWay ? 'opacity-50 pointer-events-none' : ''}`}>
+                <DateInput
+                  value={f.oneWay ? '' : f.returnDate}
+                  onChange={(v) => set('returnDate', v)}
+                  min={f.departureDate || todayPlus(0)}
+                />
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
