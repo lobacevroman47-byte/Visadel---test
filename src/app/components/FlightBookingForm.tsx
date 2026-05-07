@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
 import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import BookingExtraField from './booking/BookingExtraField';
 
 interface FlightBookingFormProps {
   onBack: () => void;
@@ -353,23 +354,11 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
             <div className="space-y-3">
               {extraFields.map(f => (
                 <Field key={f.id} label={f.label} required={f.required}>
-                  {f.type === 'textarea' ? (
-                    <textarea
-                      value={extraValues[f.id] ?? ''}
-                      onChange={e => setExtraValues({ ...extraValues, [f.id]: e.target.value })}
-                      placeholder={f.placeholder}
-                      rows={3}
-                      className="vd-input"
-                    />
-                  ) : (
-                    <input
-                      type={f.type === 'date' ? 'date' : f.type === 'number' ? 'number' : 'text'}
-                      value={extraValues[f.id] ?? ''}
-                      onChange={e => setExtraValues({ ...extraValues, [f.id]: e.target.value })}
-                      placeholder={f.placeholder}
-                      className="vd-input"
-                    />
-                  )}
+                  <BookingExtraField
+                    field={f}
+                    value={extraValues[f.id] ?? ''}
+                    onChange={v => setExtraValues({ ...extraValues, [f.id]: v })}
+                  />
                 </Field>
               ))}
             </div>

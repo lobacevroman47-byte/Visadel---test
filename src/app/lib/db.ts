@@ -1114,9 +1114,12 @@ export async function seedFormFieldsFromCode(
 export interface ExtraFormField {
   id: string;          // unique within the form
   label: string;       // human label
-  type: 'text' | 'textarea' | 'date' | 'number';
+  type: 'text' | 'textarea' | 'date' | 'number' | 'select' | 'radio' | 'checkbox' | 'file';
   required: boolean;
   placeholder?: string;
+  // Для select / radio — варианты выбора (одна строка = одна опция).
+  // Игнорируется для остальных типов.
+  options?: string[];
 }
 
 // Override for a built-in (core) field of the booking form: rename label,

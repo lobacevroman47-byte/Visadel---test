@@ -15,12 +15,13 @@ import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
 import { AdditionalServices } from './AdditionalServices';
 
-// ── Top-level tab nav: Анкеты виз / Доп. услуги
-type TopTab = 'visas' | 'addons';
+// ── Top-level tab nav: Анкеты виз / Доп. услуги / Брони
+type TopTab = 'visas' | 'addons' | 'bookings';
 
 const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileEdit }[] = [
-  { id: 'visas',  label: 'Анкеты виз',  Icon: FileEdit },
-  { id: 'addons', label: 'Доп. услуги', Icon: Package },
+  { id: 'visas',    label: 'Анкеты виз',  Icon: FileEdit },
+  { id: 'addons',   label: 'Доп. услуги', Icon: Package  },
+  { id: 'bookings', label: 'Брони',       Icon: Hotel    },
 ];
 
 export const FormBuilder: React.FC = () => {
@@ -51,8 +52,46 @@ export const FormBuilder: React.FC = () => {
         </div>
       </div>
 
-      {topTab === 'visas'  && <VisaFormSection />}
-      {topTab === 'addons' && <AdditionalServices />}
+      {topTab === 'visas'    && <VisaFormSection />}
+      {topTab === 'addons'   && <AdditionalServices />}
+      {topTab === 'bookings' && <BookingFormsHub />}
+    </div>
+  );
+};
+
+// «Брони» — переключатель между Отелями и Авиабилетами + редактор каждой
+// анкеты (цена, встроенные поля, доп. поля). Все правки сохраняются в
+// app_settings и подтягиваются клиенту в HotelBookingForm/FlightBookingForm
+// на лету — то же поведение, что и у анкет виз.
+const BookingFormsHub: React.FC = () => {
+  const [kind, setKind] = useState<'hotel' | 'flight'>('hotel');
+  return (
+    <div>
+      <div className="bg-white border-b border-gray-100 px-4 md:px-8 pt-4">
+        <div className="flex gap-2 flex-wrap pb-3">
+          <button
+            type="button"
+            onClick={() => setKind('hotel')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition active:scale-95 ${
+              kind === 'hotel' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-gray-50'
+            }`}
+          >
+            <Hotel className="w-4 h-4" />
+            Бронь отеля
+          </button>
+          <button
+            type="button"
+            onClick={() => setKind('flight')}
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition active:scale-95 ${
+              kind === 'flight' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-gray-50'
+            }`}
+          >
+            <Plane className="w-4 h-4" />
+            Бронь авиабилета
+          </button>
+        </div>
+      </div>
+      <BookingFormSection kind={kind} />
     </div>
   );
 };
@@ -622,7 +661,9 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
             </div>
           ) : (
             <div className="space-y-2">
-              {extras.map((f, idx) => (
+              {extras.map((f, idx) => {
+                const needsOptions = f.type === 'select' || f.type === 'radio';
+                return (
                 <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
                   <div className="flex items-start gap-2 mb-2">
                     <div className="flex flex-col gap-0.5 pt-1">
@@ -652,14 +693,20 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
                       <option value="textarea">Длинный текст</option>
                       <option value="number">Число</option>
                       <option value="date">Дата</option>
+                      <option value="select">Выпадающий список</option>
+                      <option value="radio">Радио-кнопки</option>
+                      <option value="checkbox">Чекбокс (да/нет)</option>
+                      <option value="file">Файл</option>
                     </select>
-                    <input
-                      type="text"
-                      value={f.placeholder ?? ''}
-                      onChange={e => updateField(idx, { placeholder: e.target.value })}
-                      placeholder="Подсказка"
-                      className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
-                    />
+                    {f.type !== 'checkbox' && f.type !== 'file' && (
+                      <input
+                        type="text"
+                        value={f.placeholder ?? ''}
+                        onChange={e => updateField(idx, { placeholder: e.target.value })}
+                        placeholder="Подсказка"
+                        className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                      />
+                    )}
                     <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
                       <input
                         type="checkbox" checked={f.required}
@@ -669,8 +716,21 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
                       Обязательное
                     </label>
                   </div>
+                  {needsOptions && (
+                    <div className="mt-2 pl-6">
+                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Варианты (по одному в строке)</label>
+                      <textarea
+                        value={(f.options ?? []).join('\n')}
+                        onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                        rows={3}
+                        placeholder="Эконом&#10;Бизнес&#10;Первый класс"
+                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
+                      />
+                    </div>
+                  )}
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
 

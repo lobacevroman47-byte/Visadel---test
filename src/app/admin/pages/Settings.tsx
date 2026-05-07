@@ -305,7 +305,9 @@ const ExtraFieldsEditor: React.FC<{
         </div>
       ) : (
         <div className="space-y-2">
-          {value.map((f, idx) => (
+          {value.map((f, idx) => {
+            const needsOptions = f.type === 'select' || f.type === 'radio';
+            return (
             <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
               <div className="flex items-start gap-2 mb-2">
                 <div className="flex flex-col gap-0.5 pt-1.5">
@@ -336,14 +338,20 @@ const ExtraFieldsEditor: React.FC<{
                   <option value="textarea">Длинный текст</option>
                   <option value="number">Число</option>
                   <option value="date">Дата</option>
+                  <option value="select">Выпадающий список</option>
+                  <option value="radio">Радио-кнопки</option>
+                  <option value="checkbox">Чекбокс (да/нет)</option>
+                  <option value="file">Файл</option>
                 </select>
-                <input
-                  type="text"
-                  value={f.placeholder ?? ''}
-                  onChange={e => updateField(idx, { placeholder: e.target.value })}
-                  placeholder="Подсказка"
-                  className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
-                />
+                {f.type !== 'checkbox' && f.type !== 'file' && (
+                  <input
+                    type="text"
+                    value={f.placeholder ?? ''}
+                    onChange={e => updateField(idx, { placeholder: e.target.value })}
+                    placeholder="Подсказка"
+                    className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                  />
+                )}
                 <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
                   <input
                     type="checkbox" checked={f.required}
@@ -353,8 +361,21 @@ const ExtraFieldsEditor: React.FC<{
                   Обязательное
                 </label>
               </div>
+              {needsOptions && (
+                <div className="mt-2 pl-6">
+                  <label className="block text-[11px] font-semibold text-gray-600 mb-1">Варианты (по одному в строке)</label>
+                  <textarea
+                    value={(f.options ?? []).join('\n')}
+                    onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                    rows={3}
+                    placeholder="Эконом&#10;Бизнес&#10;Первый класс"
+                    className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
+                  />
+                </div>
+              )}
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
