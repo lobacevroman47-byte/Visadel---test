@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
   enableClosingConfirmation, disableClosingConfirmation,
+  haptic,
 } from '../lib/telegram';
 import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProduct';
 
@@ -167,7 +168,10 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
         price,
         payment_screenshot_url: paymentUrl,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
-        status: 'new',
+        // Юзер прикрепил скриншот оплаты при сабмите → сразу
+        // pending_confirmation. Админ видит в инбоксе как «ожидает
+        // подтверждения», не как «новая без оплаты».
+        status: 'pending_confirmation',
       };
 
       if (isSupabaseConfigured()) {
@@ -192,9 +196,11 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
       // Clear draft now that the booking is successfully submitted
       try { localStorage.removeItem('hotel_booking_draft'); } catch { /* no-op */ }
 
+      haptic('success');
       setSubmitted(true);
     } catch (err) {
       console.error(err);
+      haptic('error');
       setError('Не удалось отправить заявку. Попробуйте ещё раз.');
     } finally {
       setSubmitting(false);
@@ -228,7 +234,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
         <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between">
           <button
             onClick={onBack}
-            className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+            className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
             aria-label="Назад"
           >
             <ChevronLeft className="w-5 h-5" />

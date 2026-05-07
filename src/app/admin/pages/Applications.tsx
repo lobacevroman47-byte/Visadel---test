@@ -682,9 +682,11 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
       hotelDetails?: {
         country?: string; city?: string; checkIn?: string; checkOut?: string;
         guests?: number; hasChildren?: 'yes' | 'no'; childrenCount?: number;
+        extra_fields?: Record<string, string>;
       };
       flightDetails?: {
         fromCity?: string; toCity?: string; bookingDate?: string;
+        extra_fields?: Record<string, string>;
       };
     };
     howHeard?: string[];
@@ -806,6 +808,9 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
                   : 'Нет'}
               />
             )}
+            {hotelDetails!.extra_fields && Object.entries(hotelDetails!.extra_fields).map(([k, v]) => v && (
+              <DetailItem key={`hex_${k}`} label={k} value={String(v)} />
+            ))}
           </div>
         </section>
       )}
@@ -817,6 +822,9 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
             {flightDetails!.fromCity && <DetailItem label="Из какого города" value={flightDetails!.fromCity} />}
             {flightDetails!.toCity && <DetailItem label="В какой город" value={flightDetails!.toCity} />}
             {flightDetails!.bookingDate && <DetailItem label="Дата бронирования" value={fmtBookingDate(flightDetails!.bookingDate)} />}
+            {flightDetails!.extra_fields && Object.entries(flightDetails!.extra_fields).map(([k, v]) => v && (
+              <DetailItem key={`fex_${k}`} label={k} value={String(v)} />
+            ))}
           </div>
         </section>
       )}

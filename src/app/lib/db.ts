@@ -419,6 +419,7 @@ export async function getApplication(id: string): Promise<Application | null> {
 }
 
 // ─── File Upload ──────────────────────────────────────────────────────────────
+import { compressImage } from './imageCompress';
 
 // Получаем telegram_id текущего юзера для prefix-RLS path.
 // Сначала из проверенного initDataUnsafe (быстро), фолбэк на localStorage userData.
@@ -447,6 +448,10 @@ export async function uploadFile(
   if (!isSupabaseConfigured()) {
     return URL.createObjectURL(file);
   }
+  // Сжимаем изображения перед заливкой — iPhone-фото 4-8MB → ~300KB JPEG.
+  // PDF и прочие не-image файлы compressImage пропускает как есть.
+  const compressed = await compressImage(file);
+  file = compressed;
   const ext = file.name.split('.').pop();
   // Path = <telegram_id>/<folder>/<timestamp>-<rand>.<ext>
   // Storage RLS политика разрешит чтение/запись только владельцу

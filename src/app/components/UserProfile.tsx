@@ -46,7 +46,7 @@ export default function UserProfile({
         <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between">
           <button
             onClick={onBack}
-            className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+            className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
             aria-label="Назад"
           >
             <ChevronLeft className="w-5 h-5" />

@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
   enableClosingConfirmation, disableClosingConfirmation,
+  haptic,
 } from '../lib/telegram';
 import Step2AdditionalDocs from './form-steps/Step2AdditionalDocs';
 import Step4ContactInfo from './form-steps/Step4ContactInfo';
@@ -36,12 +37,14 @@ export interface HotelAddonDetails {
   guests?: number;
   hasChildren?: 'yes' | 'no';
   childrenCount?: number;
+  extra_fields?: Record<string, string>;
 }
 
 export interface FlightAddonDetails {
   fromCity?: string;
   toCity?: string;
   bookingDate?: string;
+  extra_fields?: Record<string, string>;
 }
 
 export interface FormData {
@@ -273,6 +276,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
 
   const goToNextStep = () => {
     if (currentStep < STEPS.length - 1) {
+      haptic('light');
       setCurrentStep(prev => prev + 1);
       window.scrollTo(0, 0);
     }
@@ -280,6 +284,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
 
   const goToPrevStep = () => {
     if (currentStep > 0) {
+      haptic('light');
       setCurrentStep(prev => prev - 1);
       window.scrollTo(0, 0);
     }
@@ -310,7 +315,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
         <div className="max-w-2xl mx-auto">
           {/* Top row: back / brand / save */}
           <div className="flex items-center justify-between">
-            <button onClick={onBack} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" aria-label="Назад">
+            <button onClick={onBack} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" aria-label="Назад">
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="text-center leading-tight">
@@ -324,7 +329,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
                 <span className="block text-[11px] text-gray-500 mt-0.5">{visa.country} · {STEPS[currentStep]}</span>
               )}
             </div>
-            <button onClick={saveDraft} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" title="Сохранить черновик">
+            <button onClick={saveDraft} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" title="Сохранить черновик">
               <Save className="w-4 h-4" />
             </button>
           </div>

@@ -81,7 +81,7 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
           {onOpenProfile && (
             <button
               onClick={onOpenProfile}
-              className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
               aria-label="Профиль"
             >
               <User className="w-4 h-4" />

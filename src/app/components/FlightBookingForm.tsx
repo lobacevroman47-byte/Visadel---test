@@ -8,6 +8,7 @@ import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
   enableClosingConfirmation, disableClosingConfirmation,
+  haptic,
 } from '../lib/telegram';
 import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProduct';
 
@@ -137,7 +138,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
         price,
         payment_screenshot_url: paymentUrl,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
-        status: 'new',
+        status: 'pending_confirmation',
       };
 
       if (isSupabaseConfigured()) {
@@ -160,9 +161,11 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
 
       try { localStorage.removeItem('flight_booking_draft'); } catch { /* no-op */ }
 
+      haptic('success');
       setSubmitted(true);
     } catch (err) {
       console.error(err);
+      haptic('error');
       setError('Не удалось отправить заявку. Попробуйте ещё раз.');
     } finally {
       setSubmitting(false);
@@ -196,7 +199,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
         <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between">
           <button
             onClick={onBack}
-            className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+            className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
             aria-label="Назад"
           >
             <ChevronLeft className="w-5 h-5" />

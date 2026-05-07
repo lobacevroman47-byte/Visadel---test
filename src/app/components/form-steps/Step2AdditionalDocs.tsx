@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, Check, Hotel, Plane, Zap } from 'lucide-react';
-import { getAppSettings, getAdditionalServices, type CoreFieldOverrides } from '../../lib/db';
+import { getAppSettings, getAdditionalServices, type CoreFieldOverrides, type ExtraFormField } from '../../lib/db';
 import type { HotelAddonDetails, FlightAddonDetails } from '../ApplicationForm';
 import DateInput from '../shared/DateInput';
+import BookingExtraField from '../booking/BookingExtraField';
 
 // Бронь-аддоны в визовой форме читают **те же** core overrides что и
 // standalone HotelBookingForm/FlightBookingForm — admin меняет лейбл/required
@@ -61,6 +62,8 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
   const [formData, setFormData] = useState<Step2Data>(data);
   const [hotelOverrides, setHotelOverrides] = useState<CoreFieldOverrides>({});
   const [flightOverrides, setFlightOverrides] = useState<CoreFieldOverrides>({});
+  const [hotelExtras, setHotelExtras] = useState<ExtraFormField[]>([]);
+  const [flightExtras, setFlightExtras] = useState<ExtraFormField[]>([]);
   const [prices, setPrices] = useState({ urgent: 1000, hotel: 1000, ticket: 2000 });
   // enabled-флаги аддонов из additional_services — если админ скрыл услугу
   // в Каталог → Брони / Доп. услуги, чекбокс не должен показываться в Step2.
@@ -75,6 +78,8 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
       if (!alive) return;
       setHotelOverrides(s.hotel_core_overrides ?? {});
       setFlightOverrides(s.flight_core_overrides ?? {});
+      setHotelExtras(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
+      setFlightExtras(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
       const byId = new Map(services.map(x => [x.id, x] as const));
       setPrices({
         urgent: byId.get('urgent-processing')?.price ?? 1000,
@@ -113,6 +118,24 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
   const updateFlight = <K extends keyof FlightAddonDetails>(k: K, v: FlightAddonDetails[K]) => {
     setFormData(prev => ({ ...prev, flightDetails: { ...(prev.flightDetails ?? {}), [k]: v } }));
   };
+  const setHotelExtraValue = (id: string, v: string) => {
+    setFormData(prev => ({
+      ...prev,
+      hotelDetails: {
+        ...(prev.hotelDetails ?? {}),
+        extra_fields: { ...((prev.hotelDetails?.extra_fields) ?? {}), [id]: v },
+      },
+    }));
+  };
+  const setFlightExtraValue = (id: string, v: string) => {
+    setFormData(prev => ({
+      ...prev,
+      flightDetails: {
+        ...(prev.flightDetails ?? {}),
+        extra_fields: { ...((prev.flightDetails?.extra_fields) ?? {}), [id]: v },
+      },
+    }));
+  };
 
   const validate = (): boolean => {
     const next: Record<string, string> = {};
@@ -136,6 +159,11 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
       if (h.hasChildren === 'yes' && (!h.childrenCount || h.childrenCount < 1)) {
         next['hotel.childrenCount'] = 'Укажите количество детей';
       }
+      // Custom extra_fields (админ настроил в Конструктор → Брони → Доп. поля)
+      const hev = h.extra_fields ?? {};
+      for (const f of hotelExtras) {
+        if (f.required && !((hev[f.id] ?? '').trim())) next[`hotel.extra.${f.id}`] = `Заполните «${f.label}»`;
+      }
     }
 
     if (formData.returnTicket) {
@@ -145,6 +173,10 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
         if (!ov.visible || !ov.required) continue;
         const val = (fl as any)[f.key];
         if (!val || (typeof val === 'string' && !val.trim())) next[`flight.${f.key}`] = 'Заполните поле';
+      }
+      const fev = fl.extra_fields ?? {};
+      for (const f of flightExtras) {
+        if (f.required && !((fev[f.id] ?? '').trim())) next[`flight.extra.${f.id}`] = `Заполните «${f.label}»`;
       }
     }
 
@@ -316,6 +348,21 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                         </div>
                       );
                     })}
+                    {/* Custom extra_fields отеля — Конструктор → Брони → Бронь отеля → Доп. поля */}
+                    {hotelExtras.map(f => {
+                      const errKey = `hotel.extra.${f.id}`;
+                      return (
+                        <div key={f.id} data-step2-error={errors[errKey] ? 'true' : undefined}>
+                          <FieldLabel label={f.label} required={f.required} />
+                          <BookingExtraField
+                            field={f}
+                            value={(formData.hotelDetails?.extra_fields ?? {})[f.id] ?? ''}
+                            onChange={(v) => setHotelExtraValue(f.id, v)}
+                          />
+                          {errors[errKey] && <ErrorLine text={errors[errKey]} />}
+                        </div>
+                      );
+                    })}
                   </div>
                 </motion.div>
               )}
@@ -366,6 +413,21 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                               className={ADDON_INPUT}
                             />
                           )}
+                          {errors[errKey] && <ErrorLine text={errors[errKey]} />}
+                        </div>
+                      );
+                    })}
+                    {/* Custom extra_fields билета — Конструктор → Брони → Бронь авиабилета → Доп. поля */}
+                    {flightExtras.map(f => {
+                      const errKey = `flight.extra.${f.id}`;
+                      return (
+                        <div key={f.id} data-step2-error={errors[errKey] ? 'true' : undefined}>
+                          <FieldLabel label={f.label} required={f.required} />
+                          <BookingExtraField
+                            field={f}
+                            value={(formData.flightDetails?.extra_fields ?? {})[f.id] ?? ''}
+                            onChange={(v) => setFlightExtraValue(f.id, v)}
+                          />
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
                       );

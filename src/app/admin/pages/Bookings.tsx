@@ -28,6 +28,7 @@ interface HotelBooking {
   confirmation_url: string | null;
   price: number | null;
   status: string;
+  extra_fields: Record<string, string> | null;
 }
 
 interface FlightBooking {
@@ -48,6 +49,7 @@ interface FlightBooking {
   confirmation_url: string | null;
   price: number | null;
   status: string;
+  extra_fields: Record<string, string> | null;
 }
 
 type Tab = 'hotels' | 'flights';
@@ -586,6 +588,33 @@ function PassportBlock({ url }: { url: string | null }) {
   );
 }
 
+// Доп. поля — те что админ настроил в Конструктор анкет → Брони → Доп. поля
+// и юзер заполнил при сабмите. Лейблы хранятся в app_settings.{kind}_extra_fields,
+// но мы их сюда не тащим — показываем raw key=value. Если value начинается с
+// http(s):// — рендерим как ссылку (для file-полей).
+function ExtraFieldsBlock({ fields }: { fields: Record<string, string> | null }) {
+  if (!fields || Object.keys(fields).length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Доп. поля</p>
+      <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+        {Object.entries(fields).map(([k, v]) => (
+          <div key={k}>
+            <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/50">{k}</p>
+            {/^https?:\/\//.test(String(v)) ? (
+              <a href={String(v)} target="_blank" rel="noreferrer" className="text-sm text-[#3B5BFF] hover:underline break-all">
+                Открыть файл ↗
+              </a>
+            ) : (
+              <p className="text-sm text-[#0F2A36] mt-0.5 whitespace-pre-wrap">{String(v) || '—'}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
   b: HotelBooking; onClose: () => void; onStatusChange: (s: string) => void;
   onConfirmationUploaded: (url: string) => void;
@@ -622,6 +651,7 @@ function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
         <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
+        <ExtraFieldsBlock fields={b.extra_fields} />
         <ConfirmationUploader
           url={b.confirmation_url}
           status={b.status}
@@ -663,6 +693,7 @@ function FlightDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
         <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
         <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
         <PassportBlock url={b.passport_url} />
+        <ExtraFieldsBlock fields={b.extra_fields} />
         <ConfirmationUploader
           url={b.confirmation_url}
           status={b.status}

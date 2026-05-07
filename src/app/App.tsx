@@ -174,16 +174,30 @@ function App() {
       setIsLoading(false);
     }
 
-    const timer = setTimeout(() => {
+    // Splash минимум 600ms (плавность, чтобы не моргало), максимум 1500ms.
+    // Если upsertUser завершился раньше — диcмиссим как только сработает
+    // setIsLoading(false). Раньше всегда ждали 1500ms независимо от готовности.
+    const splashStart = Date.now();
+    const minSplash = 600;
+    const maxSplash = 1500;
+
+    const goNext = () => {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab && tab !== 'profile') {
-        setCurrentScreen('profile');
-      } else {
-        setCurrentScreen('home');
+      if (tab && tab !== 'profile') setCurrentScreen('profile');
+      else setCurrentScreen('home');
+    };
+
+    const earlyTimer = setTimeout(() => {
+      const elapsed = Date.now() - splashStart;
+      // Если данные уже загрузились — переходим сразу, иначе ждём.
+      if (!isLoading) goNext();
+      else {
+        // ждём до maxSplash и тогда переходим в любом случае
+        setTimeout(goNext, Math.max(0, maxSplash - elapsed));
       }
-    }, 1500);
-    return () => clearTimeout(timer);
+    }, minSplash);
+    return () => clearTimeout(earlyTimer);
   }, []);
 
   const handleVisaSelect = (visa: VisaOption, urgent = false, addons?: { urgent: boolean; hotel: boolean; ticket: boolean }) => {
