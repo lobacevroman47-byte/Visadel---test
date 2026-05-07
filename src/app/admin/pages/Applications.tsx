@@ -12,6 +12,7 @@ import {
   type StatusLogEntry,
 } from '../hooks/useAdminData';
 import { payReferralBonus } from '../../lib/db';
+import { apiFetch } from '../../lib/apiFetch';
 import { useAdmin } from '../contexts/AdminContext';
 
 interface ApplicationsProps {
@@ -1011,7 +1012,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   // Returns: 'sent' | 'skipped' — throws on error
   const sendNotify = async (overrideStatus?: string): Promise<'sent' | 'skipped'> => {
     const s = overrideStatus ?? application.status;
-    const res = await fetch('/api/notify-status', {
+    const res = await apiFetch('/api/notify-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -1,12 +1,12 @@
 // Vercel Serverless Function — notifies all admins about new submissions.
-// POST { event, ... } or POST { type: 'hotel_booking' | 'flight_booking', customer_name, details }
 //
-// event values:
-//   'new_application' (default) — visa applications
-//   'new_review' — review awaiting moderation
-// type values (legacy alt format, used by booking forms):
-//   'hotel_booking' — hotel reservation request
-//   'flight_booking' — flight reservation request
+// Auth: Authorization: tma <initData>. customer_telegram игнорируем из body —
+// берём из проверенной подписи. Иначе любой мог бы спамить админов от чужого
+// имени.
+//
+// POST { event, ... } or POST { type: 'hotel_booking' | 'flight_booking', customer_name, details }
+
+const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -53,10 +53,19 @@ async function sendTg(token, chat_id, text, reply_markup) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+  // Verified Telegram user — customer_telegram возьмём из подписи
+  let verified;
+  try { verified = requireTelegramUser(req); }
+  catch (err) {
+    const status = err instanceof AuthError ? (err.status || 401) : 500;
+    res.status(status).json({ error: err.message || 'auth failed' });
+    return;
+  }
 
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const appUrl = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL;
@@ -68,10 +77,14 @@ export default async function handler(req, res) {
     type, // alt routing key used by booking forms
     application_id,
     country, visa_type, price, urgent,
-    customer_name, customer_telegram,
+    customer_name,
     review_country, review_rating, review_text,
     details,
   } = body;
+  // customer_telegram заменяем на проверенный — никаких подделок
+  const customer_telegram = verified.user.username
+    ? `@${verified.user.username}`
+    : (verified.user.first_name || String(verified.telegramId));
 
   // Normalise: forms send `type: 'hotel_booking' | 'flight_booking'` instead of `event: 'new_application'`
   const resolvedEvent = type ?? event ?? 'new_application';

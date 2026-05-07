@@ -4,6 +4,7 @@ import {
   AlertTriangle, Plus, X, Check, Clock, Eye,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -265,7 +266,7 @@ export const Reviews: React.FC = () => {
   const handleApprove = async (id: string) => {
     setApproving(id);
     try {
-      const res = await fetch('/api/update-review', {
+      const res = await apiFetch('/api/update-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: 'approved' }),
@@ -322,7 +323,7 @@ export const Reviews: React.FC = () => {
         author_name: f.authorName.trim() || 'Клиент',
         avatar: f.avatar,
       };
-      const res = await fetch('/api/update-review', {
+      const res = await apiFetch('/api/update-review', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch),

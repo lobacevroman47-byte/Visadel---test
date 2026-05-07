@@ -1,6 +1,18 @@
 // Vercel Serverless — grant a bonus to a user (service key, bypasses RLS)
 // Also handles referral bonus automatically when type === 'payment'
-// POST body: { telegram_id, type, amount, description, application_id? }
+//
+// Auth: требует Authorization: tma <initData> от мини-аппа Telegram.
+// telegram_id берётся из проверенной подписи, а НЕ из тела запроса —
+// пресекает forge-атаки вида "начисли мне за чужого юзера".
+// Запросы из админки/cron, которым нужно начислить от имени любого
+// пользователя, должны слать заголовок X-Service-Key === SUPABASE_SERVICE_KEY
+// и явно указывать telegram_id в body.
+//
+// POST body:
+//   {} (telegram_id берётся из initData)            — пользовательский кейс
+//   { telegram_id, type, amount, description, application_id }  — admin/cron (с X-Service-Key)
+
+const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -35,82 +47,99 @@ async function dbInsert(table, body) {
   });
 }
 
-async function grantBonus(telegram_id, type, amount, description) {
-  // Insert log
-  await dbInsert('bonus_logs', { telegram_id, type, amount, description });
-
-  // Get current balance
-  const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=bonus_balance`);
-  const newBalance = ((user?.bonus_balance) ?? 0) + amount;
-
-  // Update balance
-  await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
-
-  return newBalance;
+// Атомарный insert через unique constraint (telegram_id, type, dedupe_key).
+// Возвращает {alreadyGranted: bool}: при конфликте Postgres вернёт пустой массив,
+// что мы трактуем как "уже было начисление".
+async function tryInsertBonusLog(telegram_id, type, amount, description, dedupe_key) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/bonus_logs?on_conflict=telegram_id,type,dedupe_key`, {
+    method: 'POST',
+    headers: headers({ Prefer: 'return=representation,resolution=ignore-duplicates' }),
+    body: JSON.stringify({ telegram_id, type, amount, description, dedupe_key }),
+  });
+  const inserted = await r.json().catch(() => []);
+  return { alreadyGranted: !Array.isArray(inserted) || inserted.length === 0 };
 }
 
-async function alreadyGranted(telegram_id, type, application_id) {
-  // Look for existing log entry with this app ID in description
-  const encoded = encodeURIComponent(`%${application_id}%`);
-  const rows = await dbGet(
-    `bonus_logs?telegram_id=eq.${telegram_id}&type=eq.${type}&description=like.${encoded}`
-  );
-  return Array.isArray(rows) && rows.length > 0;
+async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
+  // 1) Атомарный лог. Если уже был такой dedupe_key — вернёт alreadyGranted=true
+  if (dedupe_key) {
+    const { alreadyGranted } = await tryInsertBonusLog(telegram_id, type, amount, description, dedupe_key);
+    if (alreadyGranted) return { skipped: true };
+  } else {
+    await dbInsert('bonus_logs', { telegram_id, type, amount, description });
+  }
+
+  // 2) Атомарный апдейт баланса (PostgREST не даёт SET balance = balance + N
+  //    напрямую без RPC, поэтому read+write — у нас уже не двойной начисление,
+  //    но баланс может разойтись если параллельно. В будущем — RPC inc_balance).
+  const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=bonus_balance`);
+  const newBalance = ((user?.bonus_balance) ?? 0) + amount;
+  await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
+
+  return { newBalance };
 }
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data, X-Service-Key');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
-  const { telegram_id, type, amount, description, application_id } = req.body ?? {};
+  // ── Auth: либо проверенная Telegram подпись, либо service key (cron/админка)
+  const serviceKeyHeader = req.headers['x-service-key'];
+  const isServiceCall = SERVICE_KEY && serviceKeyHeader === SERVICE_KEY;
+
+  let verifiedTgId = null;
+  if (!isServiceCall) {
+    try {
+      const verified = requireTelegramUser(req);
+      verifiedTgId = verified.telegramId;
+    } catch (err) {
+      const status = err instanceof AuthError ? (err.status || 401) : 500;
+      res.status(status).json({ error: err.message || 'auth failed' });
+      return;
+    }
+  }
+
+  const body = req.body ?? {};
+  const { type, amount, description, application_id } = body;
+  // Доверяем telegram_id из initData; service-каллу разрешаем переопределить
+  const telegram_id = isServiceCall ? body.telegram_id : verifiedTgId;
   if (!telegram_id || !type || !amount) {
     res.status(400).json({ error: 'telegram_id, type, amount required' });
     return;
   }
 
   try {
-    // ── Deduplication ───────────────────────────────────────────────────────
-    if (application_id) {
-      const dup = await alreadyGranted(telegram_id, type, application_id);
-      if (dup) {
-        res.json({ ok: true, skipped: true });
-        return;
-      }
+    // ── Grant the main bonus (атомарно через unique constraint) ─────────────
+    const dedupeKey = application_id ? `${type}:${application_id}` : null;
+    const result = await grantBonus(telegram_id, type, amount, description, dedupeKey);
+    if (result.skipped) {
+      res.json({ ok: true, skipped: true });
+      return;
     }
-
-    // ── Grant the main bonus ────────────────────────────────────────────────
-    const newBalance = await grantBonus(telegram_id, type, amount, description);
+    const newBalance = result.newBalance;
 
     // ── Referral bonus when a payment is confirmed ──────────────────────────
     // Give 500₽ to whoever referred this user (once per user, first paid visa)
     if (type === 'payment' && application_id) {
       try {
-        // Get user's referred_by
         const [userRow] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=referred_by`);
         const referredBy = userRow?.referred_by;
 
         if (referredBy) {
-          // Check if referrer already got bonus for this user
-          const refDedupDesc = `%ref_for_${telegram_id}%`;
           const [referrerRow] = await dbGet(
             `users?referral_code=eq.${encodeURIComponent(referredBy)}&select=telegram_id,bonus_balance`
           );
-
           if (referrerRow) {
-            const refTgId = referrerRow.telegram_id;
-            const alreadyPaid = await alreadyGranted(refTgId, 'referral', `ref_for_${telegram_id}`);
-
-            if (!alreadyPaid) {
-              await grantBonus(
-                refTgId,
-                'referral',
-                500,
-                `+500₽ за визу друга (ref_for_${telegram_id})`
-              );
-            }
+            await grantBonus(
+              referrerRow.telegram_id,
+              'referral',
+              500,
+              `+500₽ за визу друга (ref_for_${telegram_id})`,
+              `ref_for_${telegram_id}`,
+            );
           }
         }
       } catch (refErr) {

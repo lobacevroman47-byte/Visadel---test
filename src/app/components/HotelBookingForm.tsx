@@ -3,6 +3,7 @@ import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, Fi
 import { uploadFile, getAppSettings, getAdditionalServices, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
+import { apiFetch } from '../lib/apiFetch';
 
 interface HotelBookingFormProps {
   onBack: () => void;
@@ -183,7 +184,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
 
       // 3. Notify admin (best effort)
       try {
-        await fetch('/api/notify-admin', {
+        await apiFetch('/api/notify-admin', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

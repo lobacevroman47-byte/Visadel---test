@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from './supabase';
 import type { TelegramUser } from './telegram';
 import { BONUS_CONFIG, partnerCommission } from './bonus-config';
+import { apiFetch } from './apiFetch';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -419,6 +420,21 @@ export async function getApplication(id: string): Promise<Application | null> {
 
 // ─── File Upload ──────────────────────────────────────────────────────────────
 
+// Получаем telegram_id текущего юзера для prefix-RLS path.
+// Сначала из проверенного initDataUnsafe (быстро), фолбэк на localStorage userData.
+function currentTelegramIdForPath(): number | null {
+  try {
+    const tg = (window as unknown as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id?: number } } } } }).Telegram?.WebApp;
+    const id = tg?.initDataUnsafe?.user?.id;
+    if (typeof id === 'number') return id;
+  } catch { /* noop */ }
+  try {
+    const ud = JSON.parse(localStorage.getItem('userData') || '{}');
+    if (typeof ud?.telegramId === 'number') return ud.telegramId;
+  } catch { /* noop */ }
+  return null;
+}
+
 export async function uploadFile(
   file: File,
   folder: 'payments' | 'photos' | 'visas'
@@ -432,7 +448,13 @@ export async function uploadFile(
     return URL.createObjectURL(file);
   }
   const ext = file.name.split('.').pop();
-  const path = `${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  // Path = <telegram_id>/<folder>/<timestamp>-<rand>.<ext>
+  // Storage RLS политика разрешит чтение/запись только владельцу
+  // (split_part(name, '/', 1)::bigint = current_tg_id()).
+  // shared/ — для случаев когда tg_id неизвестен (анон, до логина).
+  const tgId = currentTelegramIdForPath();
+  const owner = tgId ? String(tgId) : 'shared';
+  const path = `${owner}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage
     .from('visadel-files')
     .upload(path, file, { cacheControl: '3600', upsert: false });
@@ -550,7 +572,7 @@ export async function submitReview(params: {
 
   // Post to Telegram channel @visadel_recall
   try {
-    await fetch('/api/post-review', {
+    await apiFetch('/api/post-review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -565,7 +587,7 @@ export async function submitReview(params: {
   }
 
   // Notify admins about new review on moderation
-  fetch('/api/notify-admin', {
+  apiFetch('/api/notify-admin', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -814,7 +836,7 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
 
   // Idempotent grant via API (dedup key = unique referee id, fires once per referee)
   try {
-    await fetch('/api/grant-bonus', {
+    await apiFetch('/api/grant-bonus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

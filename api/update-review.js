@@ -1,6 +1,23 @@
 // POST /api/update-review  { id, ...fields }
+//
+// Auth: admin-only. Без проверки любой мог бы апрувить/реджектить отзывы
+// или выставлять любой статус.
+
+const { requireAdminUser, AuthError } = require('./_lib/telegram-auth');
+
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
+  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') return res.status(405).end();
+
+  try { requireAdminUser(req); }
+  catch (err) {
+    const status = err instanceof AuthError ? (err.status || 401) : 500;
+    res.status(status).json({ error: err.message || 'auth failed' });
+    return;
+  }
 
   const { id, ...fields } = req.body ?? {};
   if (!id) return res.status(400).json({ error: 'id required' });

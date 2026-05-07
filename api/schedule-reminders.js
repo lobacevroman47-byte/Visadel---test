@@ -1,5 +1,13 @@
 // Vercel Serverless — schedule draft / payment abandonment reminders
-// POST { telegram_id, draft_key, country, visa_type, type: 'draft'|'payment' }
+//
+// Auth: требует Authorization: tma <initData>. telegram_id берётся из подписи,
+// не из тела — иначе любой мог бы спамить чужой Telegram-чат рекламой через
+// напоминания.
+//
+// POST { draft_key, country, visa_type, type: 'draft'|'payment' }
+// (telegram_id больше не принимается из тела — verified из initData)
+
+const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -19,13 +27,23 @@ const INTERVALS = [10, 60, 720, 1440, 2880, 4320]; // 10m, 1h, 12h, 24h, 48h, 72
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
-  const { telegram_id, draft_key, country, visa_type, type } = req.body ?? {};
-  if (!telegram_id || !draft_key) {
-    res.status(400).json({ error: 'telegram_id and draft_key required' });
+  // Verified Telegram user — никаких telegram_id из body
+  let telegram_id;
+  try {
+    telegram_id = requireTelegramUser(req).telegramId;
+  } catch (err) {
+    const status = err instanceof AuthError ? (err.status || 401) : 500;
+    res.status(status).json({ error: err.message || 'auth failed' });
+    return;
+  }
+
+  const { draft_key, country, visa_type, type } = req.body ?? {};
+  if (!draft_key) {
+    res.status(400).json({ error: 'draft_key required' });
     return;
   }
 

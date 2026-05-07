@@ -3,6 +3,7 @@ import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } f
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { saveApplication, uploadFile, updateUser, getAppSettings } from '../../lib/db';
+import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
 
@@ -149,7 +150,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
 
       // 3a. Notify user: application received (pending_confirmation)
       if (telegramId) {
-        fetch('/api/notify-status', {
+        apiFetch('/api/notify-status', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -163,7 +164,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       }
 
       // 3b. Notify all admins about new application
-      fetch('/api/notify-admin', {
+      apiFetch('/api/notify-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -200,7 +201,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       localStorage.removeItem(draftKey);
 
       // 5. Cancel any pending reminders for this draft
-      fetch('/api/cancel-reminders', {
+      apiFetch('/api/cancel-reminders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ draft_key: draftKey }),

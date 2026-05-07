@@ -1,6 +1,14 @@
 // Vercel Serverless Function — notifies user about application status change
 // Env vars: TELEGRAM_BOT_TOKEN, TELEGRAM_APP_URL, NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_KEY
 //
+// Auth:
+//   - Service key (cron / process-reminders) — может уведомить любого
+//   - Admin (ADMIN_TELEGRAM_IDS) — может уведомить любого
+//   - Обычный user — может уведомить ТОЛЬКО себя (telegram_id из подписи).
+// Без auth (анонимно) — отказ. Иначе любой мог бы спамить чужой Telegram.
+
+const { requireTelegramUser, isAdminId, AuthError } = require('./_lib/telegram-auth');
+//
 // Dedup strategy (3 layers — any one prevents duplicates):
 //   1. In-memory Map (same Vercel warm instance, 30s)
 //   2. notification_dedup table INSERT (unique index per minute, atomic across instances)
@@ -95,12 +103,35 @@ async function deleteDedupRow(application_id, status) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data, X-Service-Key');
 
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
-  const { telegram_id, status, country, visa_type, application_id } = req.body ?? {};
+  // Auth flow:
+  //   1) X-Service-Key matches → service call, target_telegram_id = body.telegram_id
+  //   2) verified initData → если админ, target = body.telegram_id;
+  //                          если обычный юзер, target принудительно = его собственный ID
+  const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
+  const isServiceCall = SERVICE_KEY && req.headers['x-service-key'] === SERVICE_KEY;
+  let verifiedTgId = null;
+  let isAdminCaller = false;
+  if (!isServiceCall) {
+    try {
+      const verified = requireTelegramUser(req);
+      verifiedTgId = verified.telegramId;
+      isAdminCaller = isAdminId(verifiedTgId);
+    } catch (err) {
+      const status = err instanceof AuthError ? (err.status || 401) : 500;
+      res.status(status).json({ error: err.message || 'auth failed' });
+      return;
+    }
+  }
+
+  const body = req.body ?? {};
+  const { status, country, visa_type, application_id } = body;
+  // user — только себе; admin / service — кому угодно
+  const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
   console.log('[notify-status] called:', { telegram_id, status, country, application_id });
 

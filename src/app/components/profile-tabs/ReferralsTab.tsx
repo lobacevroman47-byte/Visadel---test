@@ -4,6 +4,7 @@ import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-
 import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
+import { apiFetch } from '../../lib/apiFetch';
 import {
   BONUS_CONFIG,
   REFERRAL_LEVELS,
@@ -54,7 +55,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         for (const level of REFERRAL_LEVELS) {
           if (level.bonus > 0 && s.paidReferrals >= level.minRefs) {
             try {
-              await fetch('/api/grant-bonus', {
+              await apiFetch('/api/grant-bonus', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

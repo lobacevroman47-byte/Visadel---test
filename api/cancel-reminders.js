@@ -1,5 +1,11 @@
 // Vercel Serverless — cancel pending reminders for a draft (when application submitted)
+//
+// Auth: Authorization: tma <initData>. Без этого любой мог бы отменять
+// напоминания других юзеров.
+//
 // POST { draft_key }
+
+const { requireTelegramUser, AuthError } = require('./_lib/telegram-auth');
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -7,9 +13,18 @@ const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
   if (req.method === 'OPTIONS') { res.status(200).end(); return; }
   if (req.method !== 'POST') { res.status(405).end(); return; }
+
+  let telegram_id;
+  try {
+    telegram_id = requireTelegramUser(req).telegramId;
+  } catch (err) {
+    const status = err instanceof AuthError ? (err.status || 401) : 500;
+    res.status(status).json({ error: err.message || 'auth failed' });
+    return;
+  }
 
   const { draft_key } = req.body ?? {};
   if (!draft_key) {
@@ -23,8 +38,9 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Дополнительно фильтруем по telegram_id чтобы юзер не мог отменить чужие
     await fetch(
-      `${SUPABASE_URL}/rest/v1/reminders?draft_key=eq.${encodeURIComponent(draft_key)}&sent=eq.false`,
+      `${SUPABASE_URL}/rest/v1/reminders?draft_key=eq.${encodeURIComponent(draft_key)}&telegram_id=eq.${telegram_id}&sent=eq.false`,
       {
         method: 'PATCH',
         headers: {

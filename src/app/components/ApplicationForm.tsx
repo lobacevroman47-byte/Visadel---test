@@ -4,6 +4,7 @@ import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
 import Step1BasicData from './form-steps/Step1BasicData';
 import { getAdditionalServices } from '../lib/db';
+import { apiFetch } from '../lib/apiFetch';
 import Step2AdditionalDocs from './form-steps/Step2AdditionalDocs';
 import Step4ContactInfo from './form-steps/Step4ContactInfo';
 import Step5PhotoUpload from './form-steps/Step5PhotoUpload';
@@ -182,11 +183,11 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   const scheduleReminders = (type: 'draft' | 'payment') => {
     const telegramId = getTelegramId();
     if (!telegramId || !draftId) return;
-    fetch('/api/schedule-reminders', {
+    apiFetch('/api/schedule-reminders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        telegram_id: telegramId,
+        // telegram_id больше не шлём — сервер берёт из verified initData
         draft_key: draftId,
         country: visa.country,
         visa_type: visa.type,

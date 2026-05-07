@@ -31,6 +31,7 @@ import {
   type HotelBookingRow, type FlightBookingRow,
 } from '../../lib/db';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 import { useTelegram } from '../../App';
 
 interface Draft {
@@ -379,7 +380,7 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
       // Grant +200₽ review bonus via service-key API (with dedup) — partners excluded
       if (telegramId && !appUser?.is_influencer) {
         try {
-          const res = await fetch('/api/grant-bonus', {
+          const res = await apiFetch('/api/grant-bonus', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -775,7 +776,7 @@ function BookingActions({
       // 2) Grant +200₽ review bonus (skipped for partners, deduped server-side)
       if (telegramId && !isPartner) {
         try {
-          const res = await fetch('/api/grant-bonus', {
+          const res = await apiFetch('/api/grant-bonus', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
