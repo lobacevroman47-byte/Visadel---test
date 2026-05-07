@@ -15,13 +15,12 @@ import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
 import { AdditionalServices } from './AdditionalServices';
 
-// ── Top-level tab nav: Анкеты виз / Доп. услуги / Брони
-type TopTab = 'visas' | 'addons' | 'bookings';
+// ── Top-level tab nav: Анкеты виз / Доп. услуги
+type TopTab = 'visas' | 'addons';
 
 const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileEdit }[] = [
-  { id: 'visas',    label: 'Анкеты виз',  Icon: FileEdit },
-  { id: 'addons',   label: 'Доп. услуги', Icon: Package },
-  { id: 'bookings', label: 'Брони',       Icon: Hotel },
+  { id: 'visas',  label: 'Анкеты виз',  Icon: FileEdit },
+  { id: 'addons', label: 'Доп. услуги', Icon: Package },
 ];
 
 export const FormBuilder: React.FC = () => {
@@ -52,9 +51,8 @@ export const FormBuilder: React.FC = () => {
         </div>
       </div>
 
-      {topTab === 'visas'    && <VisaFormSection />}
-      {topTab === 'addons'   && <AdditionalServices />}
-      {topTab === 'bookings' && <BookingsTab />}
+      {topTab === 'visas'  && <VisaFormSection />}
+      {topTab === 'addons' && <AdditionalServices />}
     </div>
   );
 };
