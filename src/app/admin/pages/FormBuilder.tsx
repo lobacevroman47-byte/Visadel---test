@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileEdit, Image as ImageIcon, Plus, Edit2, Trash2, X, Save, Loader2,
   RefreshCw, Database, AlertCircle, Package, Hotel, Plane,
+  Eye, EyeOff, ChevronLeft,
 } from 'lucide-react';
 import {
   getVisaProducts,
@@ -10,6 +11,7 @@ import {
   seedFormFieldsFromCode,
   getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField, type CoreFieldOverrides,
   type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
+  getAdditionalServices, upsertAdditionalService, type AdditionalService,
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
@@ -54,44 +56,7 @@ export const FormBuilder: React.FC = () => {
 
       {topTab === 'visas'    && <VisaFormSection />}
       {topTab === 'addons'   && <AdditionalServices />}
-      {topTab === 'bookings' && <BookingFormsHub />}
-    </div>
-  );
-};
-
-// «Брони» — переключатель между Отелями и Авиабилетами + редактор каждой
-// анкеты (цена, встроенные поля, доп. поля). Все правки сохраняются в
-// app_settings и подтягиваются клиенту в HotelBookingForm/FlightBookingForm
-// на лету — то же поведение, что и у анкет виз.
-const BookingFormsHub: React.FC = () => {
-  const [kind, setKind] = useState<'hotel' | 'flight'>('hotel');
-  return (
-    <div>
-      <div className="bg-white border-b border-gray-100 px-4 md:px-8 pt-4">
-        <div className="flex gap-2 flex-wrap pb-3">
-          <button
-            type="button"
-            onClick={() => setKind('hotel')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition active:scale-95 ${
-              kind === 'hotel' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-gray-50'
-            }`}
-          >
-            <Hotel className="w-4 h-4" />
-            Бронь отеля
-          </button>
-          <button
-            type="button"
-            onClick={() => setKind('flight')}
-            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-sm font-semibold transition active:scale-95 ${
-              kind === 'flight' ? 'vd-grad text-white shadow-md' : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-gray-50'
-            }`}
-          >
-            <Plane className="w-4 h-4" />
-            Бронь авиабилета
-          </button>
-        </div>
-      </div>
-      <BookingFormSection kind={kind} />
+      {topTab === 'bookings' && <BookingsConstructor />}
     </div>
   );
 };
@@ -452,132 +417,397 @@ const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequ
   { key: 'passport',      defaultLabel: 'Загранпаспорт (файл)',               defaultRequired: true },
 ];
 
-const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) => {
+// ─── Booking constructor ──────────────────────────────────────────────────────
+//
+// Единый раздел «Брони» — список карточек в стиле Доп. услуг + общий редактор
+// по клику. Один источник истины:
+//
+//   - Карточка / название / иконка / описание / цена / партнёр % / видимость /
+//     порядок  → таблица additional_services (id = hotel-booking | flight-booking)
+//   - Поля анкеты (override label/required/visible) и доп. поля → app_settings
+//     (hotel_core_overrides / flight_core_overrides / hotel_extra_fields /
+//     flight_extra_fields)
+//
+// Тот же id используется визовым калькулятором и stand-alone формами в
+// мини-аппе → клиент видит изменения сразу.
+
+interface BookingType {
+  serviceId: string;          // additional_services.id
+  kind: 'hotel' | 'flight';   // выбирает coreFields + ключ в app_settings
+  fallbackName: string;
+  fallbackIcon: string;
+  fallbackDescription: string;
+  HeroIcon: typeof Hotel;
+  coreFields: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }>;
+  extraFieldsKey: 'hotel_extra_fields' | 'flight_extra_fields';
+  overridesKey: 'hotel_core_overrides' | 'flight_core_overrides';
+}
+
+const BOOKING_TYPES: BookingType[] = [
+  {
+    serviceId: 'hotel-booking',
+    kind: 'hotel',
+    fallbackName: 'Бронь отеля для визы',
+    fallbackIcon: '🏨',
+    fallbackDescription: 'Подтверждение проживания для визы и границы',
+    HeroIcon: Hotel,
+    coreFields: HOTEL_CORE_FIELDS,
+    extraFieldsKey: 'hotel_extra_fields',
+    overridesKey: 'hotel_core_overrides',
+  },
+  {
+    serviceId: 'flight-booking',
+    kind: 'flight',
+    fallbackName: 'Бронь обратного билета',
+    fallbackIcon: '✈️',
+    fallbackDescription: 'Подтверждение рейса для визы и границы',
+    HeroIcon: Plane,
+    coreFields: FLIGHT_CORE_FIELDS,
+    extraFieldsKey: 'flight_extra_fields',
+    overridesKey: 'flight_core_overrides',
+  },
+];
+
+const BookingsConstructor: React.FC = () => {
+  const [services, setServices] = useState<AdditionalService[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [savedAt, setSavedAt] = useState<Date | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    getAppSettings()
-      .then(s => { if (alive) setSettings(s); })
-      .finally(() => { if (alive) setLoading(false); });
-    return () => { alive = false; };
-  }, []);
-
-  const set = <K extends keyof AppSettings>(k: K, v: AppSettings[K]) => {
-    setSettings(prev => prev ? { ...prev, [k]: v } : prev);
-  };
-
-  const handleSave = async () => {
-    if (!settings || saving) return;
-    setSaving(true);
+  const load = async () => {
+    setLoading(true);
     try {
-      const { id: _id, updated_at: _ts, ...rest } = settings;
-      void _id; void _ts;
-      await saveAppSettings(rest);
-      setSavedAt(new Date());
-    } catch (e) {
-      alert(`Ошибка сохранения: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setSaving(false);
-    }
+      const [s, st] = await Promise.all([getAdditionalServices(), getAppSettings()]);
+      setServices(s);
+      setSettings(st);
+    } finally { setLoading(false); }
+  };
+  useEffect(() => { load(); }, []);
+
+  const handleToggle = async (s: AdditionalService) => {
+    await upsertAdditionalService({ ...s, enabled: !s.enabled });
+    setServices(prev => prev.map(x => x.id === s.id ? { ...x, enabled: !s.enabled } : x));
   };
 
-  if (loading || !settings) {
+  // Возвращаем actual row для хотел/флайт, либо «псевдо»-объект с дефолтами
+  // если в БД ещё нет записи (срабатывает первый запуск).
+  const visible = useMemo(() => {
+    return BOOKING_TYPES.map(bt => {
+      const row = services.find(s => s.id === bt.serviceId);
+      return { bt, row };
+    });
+  }, [services]);
+
+  const editingType = editingId ? BOOKING_TYPES.find(bt => bt.serviceId === editingId) : null;
+  const editingRow = editingId ? services.find(s => s.id === editingId) : null;
+
+  if (editingType && settings) {
     return (
-      <div className="p-8 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-      </div>
+      <BookingProductEditor
+        type={editingType}
+        row={editingRow ?? null}
+        settings={settings}
+        onClose={() => setEditingId(null)}
+        onSaved={async () => {
+          await load();
+          setEditingId(null);
+        }}
+      />
     );
   }
 
-  const priceKey = kind === 'hotel' ? 'hotel_booking_price' : 'flight_booking_price';
-  const fieldsKey = kind === 'hotel' ? 'hotel_extra_fields' : 'flight_extra_fields';
-  const overridesKey = kind === 'hotel' ? 'hotel_core_overrides' : 'flight_core_overrides';
-  const coreFields = kind === 'hotel' ? HOTEL_CORE_FIELDS : FLIGHT_CORE_FIELDS;
-  const title = kind === 'hotel' ? 'Бронь отеля' : 'Бронь авиабилета';
-  const HeroIcon = kind === 'hotel' ? Hotel : Plane;
-  const extras: ExtraFormField[] = settings[fieldsKey] ?? [];
-  const overrides: CoreFieldOverrides = settings[overridesKey] ?? {};
-
-  const updateOverride = (key: string, patch: Partial<{ label: string; required: boolean; visible: boolean }>) => {
-    const next: CoreFieldOverrides = { ...overrides, [key]: { ...(overrides[key] ?? {}), ...patch } };
-    set(overridesKey, next);
-  };
-  const resetOverride = (key: string) => {
-    const next: CoreFieldOverrides = { ...overrides };
-    delete next[key];
-    set(overridesKey, next);
-  };
-
-  const addField = () => {
-    set(fieldsKey, [
-      ...extras,
-      { id: Math.random().toString(36).slice(2, 10), label: '', type: 'text', required: false },
-    ]);
-  };
-
-  const updateField = (idx: number, patch: Partial<ExtraFormField>) => {
-    set(fieldsKey, extras.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
-  };
-
-  const removeField = (idx: number) => {
-    set(fieldsKey, extras.filter((_, i) => i !== idx));
-  };
-
-  const moveField = (idx: number, dir: -1 | 1) => {
-    const next = idx + dir;
-    if (next < 0 || next >= extras.length) return;
-    const arr = [...extras];
-    [arr[idx], arr[next]] = [arr[next], arr[idx]];
-    set(fieldsKey, arr);
-  };
-
   return (
     <div className="p-4 md:p-8">
+      {/* Hero — копия Доп. услуг */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
-            <HeroIcon className="w-5 h-5" />
+            <Hotel className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{title}</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Цена · поля анкеты · видимость и обязательные</p>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Брони</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {visible.length} {visible.length === 1 ? 'услуга' : 'услуг'} ·{' '}
+              {visible.filter(v => v.row?.enabled !== false).length} активных ·
+              автоматически синхронизируются с разделом «Брони» в мини-аппе
+            </p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          {savedAt && !saving && (
-            <span className="text-xs text-emerald-600">✓ сохранено в {savedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
-          )}
-          <button type="button" onClick={handleSave} disabled={saving}
-            className="px-5 py-2.5 vd-grad text-white rounded-xl flex items-center gap-2 font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition disabled:opacity-60">
-            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            {saving ? 'Сохраняем…' : 'Сохранить'}
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button
+            onClick={load}
+            className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95"
+            title="Обновить"
+          >
+            <RefreshCw size={16} className="text-gray-500" />
           </button>
         </div>
       </div>
 
+      {/* Card list — точная копия паттерна Доп. услуг */}
+      <div className="space-y-2.5">
+        {visible.map(({ bt, row }) => {
+          const enabled = row?.enabled !== false;
+          const name = row?.name || bt.fallbackName;
+          const icon = row?.icon || bt.fallbackIcon;
+          const description = row?.description || bt.fallbackDescription;
+          const price = row?.price ?? 0;
+          const partnerPct = row?.partner_commission_pct ?? 0;
+          const extrasCount = (settings?.[bt.extraFieldsKey] ?? []).length;
+          return (
+            <div
+              key={bt.serviceId}
+              className={`bg-white rounded-2xl border border-gray-100 hover:shadow-md transition p-4 flex flex-wrap items-start gap-3 ${!enabled ? 'opacity-55' : ''}`}
+            >
+              <div className="w-12 h-12 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-2xl shrink-0">
+                {icon}
+              </div>
+
+              <div className="flex-1 min-w-[200px]">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-[15px] font-bold text-[#0F2A36]">{name}</p>
+                  {!enabled && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-gray-100 text-gray-500">Скрыта</span>
+                  )}
+                </div>
+                {description && <p className="text-xs text-[#0F2A36]/65 mt-0.5">{description}</p>}
+                <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                  <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{bt.serviceId}</span>
+                  {extrasCount > 0 && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
+                      ➕ доп. полей: {extrasCount}
+                    </span>
+                  )}
+                  {partnerPct > 0 && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                      партнёрам {partnerPct}%
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="text-right whitespace-nowrap shrink-0">
+                <div className="text-[#3B5BFF] text-[15px] font-bold">+{price.toLocaleString('ru-RU')} ₽</div>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                {row && (
+                  <button
+                    onClick={() => handleToggle(row)}
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition active:scale-95 ${
+                      enabled
+                        ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    }`}
+                    title={enabled ? 'Активна — скрыть' : 'Скрыта — показать'}
+                  >
+                    {enabled ? <Eye size={15} /> : <EyeOff size={15} />}
+                  </button>
+                )}
+                <button
+                  onClick={() => setEditingId(bt.serviceId)}
+                  className="w-9 h-9 rounded-lg bg-[#EAF1FF] text-[#3B5BFF] hover:bg-[#DCE7FF] flex items-center justify-center transition active:scale-95"
+                  title="Редактировать"
+                >
+                  <Edit2 size={15} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ─── Booking product editor ───────────────────────────────────────────────────
+// Один редактор для записи брони — атомарный save в additional_services +
+// app_settings (overrides + extras).
+const BookingProductEditor: React.FC<{
+  type: BookingType;
+  row: AdditionalService | null;
+  settings: AppSettings;
+  onClose: () => void;
+  onSaved: () => Promise<void>;
+}> = ({ type, row, settings, onClose, onSaved }) => {
+  // Локальный draft объединяет данные обеих таблиц; save сбрасывает в обе
+  const [draftRow, setDraftRow] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
+    row
+      ? { ...row, countries: Array.isArray(row.countries) ? row.countries : [], partner_commission_pct: row.partner_commission_pct ?? 15 }
+      : {
+          id: type.serviceId,
+          name: type.fallbackName,
+          icon: type.fallbackIcon,
+          description: type.fallbackDescription,
+          price: 0, cost_rub: 0, partner_commission_pct: 15,
+          enabled: true, sort_order: 0, countries: [],
+        }
+  );
+  const [draftExtras, setDraftExtras] = useState<ExtraFormField[]>(settings[type.extraFieldsKey] ?? []);
+  const [draftOverrides, setDraftOverrides] = useState<CoreFieldOverrides>(settings[type.overridesKey] ?? {});
+  const [saving, setSaving] = useState(false);
+
+  const setRow = <K extends keyof typeof draftRow>(k: K, v: typeof draftRow[K]) =>
+    setDraftRow(p => ({ ...p, [k]: v }));
+
+  const updateOverride = (key: string, patch: Partial<{ label: string; required: boolean; visible: boolean }>) => {
+    setDraftOverrides(p => ({ ...p, [key]: { ...(p[key] ?? {}), ...patch } }));
+  };
+  const resetOverride = (key: string) => {
+    setDraftOverrides(p => {
+      const next = { ...p };
+      delete next[key];
+      return next;
+    });
+  };
+
+  const addField = () => {
+    setDraftExtras(prev => [...prev, { id: Math.random().toString(36).slice(2, 10), label: '', type: 'text', required: false }]);
+  };
+  const updateField = (idx: number, patch: Partial<ExtraFormField>) => {
+    setDraftExtras(prev => prev.map((f, i) => (i === idx ? { ...f, ...patch } : f)));
+  };
+  const removeField = (idx: number) => {
+    setDraftExtras(prev => prev.filter((_, i) => i !== idx));
+  };
+  const moveField = (idx: number, dir: -1 | 1) => {
+    const next = idx + dir;
+    if (next < 0 || next >= draftExtras.length) return;
+    const arr = [...draftExtras];
+    [arr[idx], arr[next]] = [arr[next], arr[idx]];
+    setDraftExtras(arr);
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      // 1) additional_services row
+      await upsertAdditionalService(draftRow);
+      // 2) app_settings: extras + overrides
+      const { id: _id, updated_at: _ts, ...rest } = settings;
+      void _id; void _ts;
+      await saveAppSettings({
+        ...rest,
+        [type.extraFieldsKey]: draftExtras,
+        [type.overridesKey]: draftOverrides,
+      });
+      await onSaved();
+    } catch (e) {
+      alert(`Ошибка сохранения: ${e instanceof Error ? e.message : String(e)}`);
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="p-4 md:p-8">
+      {/* Top bar with back + save */}
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
+        <button
+          type="button"
+          onClick={onClose}
+          className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-[#0F2A36] hover:bg-gray-50 active:scale-95 transition flex items-center gap-1.5"
+        >
+          <ChevronLeft className="w-4 h-4" /> К списку броней
+        </button>
+        <button
+          type="button"
+          onClick={handleSave}
+          disabled={saving}
+          className="px-5 py-2.5 vd-grad text-white rounded-xl flex items-center gap-2 font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition disabled:opacity-60"
+        >
+          {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+          {saving ? 'Сохраняем…' : 'Сохранить'}
+        </button>
+      </div>
+
       <div className="space-y-4">
-        {/* Price card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
-          <div className="vd-grad-soft border border-blue-100 rounded-xl px-4 py-3 shrink-0">
-            <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Цена услуги</p>
-            <p className="text-2xl font-extrabold tracking-tight vd-grad-text mt-0.5">{(settings[priceKey] as number).toLocaleString('ru-RU')} ₽</p>
+        {/* About product card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+              <type.HeroIcon className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-extrabold tracking-tight text-[#0F2A36]">Об услуге</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Название, описание, цена — синхронизируются с Каталогом и формами в мини-аппе</p>
+            </div>
+            <span className="text-[10px] font-mono text-gray-400 uppercase tracking-wider shrink-0">{type.serviceId}</span>
           </div>
-          <div className="flex-1">
-            <label className="block text-xs text-gray-700 mb-1 font-semibold">Изменить цену (₽)</label>
-            <input
-              type="number" min={0} step={100}
-              value={settings[priceKey] as number}
-              onChange={e => set(priceKey, parseInt(e.target.value, 10) || 0)}
-              className="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-700 mb-1 font-semibold">Иконка (emoji)</label>
+              <input
+                type="text"
+                value={draftRow.icon ?? ''}
+                onChange={e => setRow('icon', e.target.value)}
+                placeholder={type.fallbackIcon}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-2xl text-center focus:outline-none focus:border-[#5C7BFF]"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs text-gray-700 mb-1 font-semibold">Название</label>
+              <input
+                type="text"
+                value={draftRow.name}
+                onChange={e => setRow('name', e.target.value)}
+                placeholder={type.fallbackName}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
+              />
+            </div>
+          </div>
+
+          <div className="mb-3">
+            <label className="block text-xs text-gray-700 mb-1 font-semibold">Описание</label>
+            <textarea
+              value={draftRow.description ?? ''}
+              onChange={e => setRow('description', e.target.value)}
+              rows={2}
+              placeholder={type.fallbackDescription}
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
             />
-            <p className="text-xs text-gray-500 mt-1.5">
-              Изменения подтягиваются клиентам на лету после нажатия «Сохранить».
-            </p>
           </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            <div>
+              <label className="block text-xs text-gray-700 mb-1 font-semibold">Цена для клиента ₽</label>
+              <input
+                type="number" min={0}
+                value={draftRow.price}
+                onChange={e => setRow('price', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1 font-semibold">Себестоимость ₽</label>
+              <input
+                type="number" min={0}
+                value={draftRow.cost_rub}
+                onChange={e => setRow('cost_rub', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-700 mb-1 font-semibold">Комиссия партнёра %</label>
+              <input
+                type="number" min={0} max={100} step="0.5"
+                value={draftRow.partner_commission_pct ?? 0}
+                onChange={e => setRow('partner_commission_pct', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
+              />
+            </div>
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none bg-gray-50 rounded-xl p-3">
+            <input
+              type="checkbox"
+              checked={draftRow.enabled}
+              onChange={e => setRow('enabled', e.target.checked)}
+              className="w-5 h-5 accent-emerald-500"
+            />
+            <span className="text-sm text-[#0F2A36]">{draftRow.enabled ? 'Активна — показывается клиентам' : 'Скрыта — клиенты не видят'}</span>
+          </label>
         </div>
 
         {/* Core fields card */}
@@ -592,8 +822,8 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
             </div>
           </div>
           <div className="space-y-2">
-            {coreFields.map(f => {
-              const ov = overrides[f.key] ?? {};
+            {type.coreFields.map(f => {
+              const ov = draftOverrides[f.key] ?? {};
               const label = ov.label ?? f.defaultLabel;
               const required = ov.required ?? f.defaultRequired;
               const visible = ov.visible !== false;
@@ -652,83 +882,83 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
               <h3 className="text-sm font-extrabold tracking-tight text-[#0F2A36]">Дополнительные поля</h3>
               <p className="text-xs text-gray-500 mt-0.5">Свои поля поверх анкеты — например, «Класс перелёта» или «Особые пожелания»</p>
             </div>
-            <span className="text-xs text-gray-400 shrink-0">{extras.length} {extras.length === 1 ? 'поле' : 'полей'}</span>
+            <span className="text-xs text-gray-400 shrink-0">{draftExtras.length} {draftExtras.length === 1 ? 'поле' : 'полей'}</span>
           </div>
 
-          {extras.length === 0 ? (
+          {draftExtras.length === 0 ? (
             <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
               <p className="text-xs text-gray-400">Нет дополнительных полей</p>
             </div>
           ) : (
             <div className="space-y-2">
-              {extras.map((f, idx) => {
+              {draftExtras.map((f, idx) => {
                 const needsOptions = f.type === 'select' || f.type === 'radio';
                 return (
-                <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                  <div className="flex items-start gap-2 mb-2">
-                    <div className="flex flex-col gap-0.5 pt-1">
-                      <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
-                        className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▲</button>
-                      <button type="button" onClick={() => moveField(idx, 1)} disabled={idx === extras.length - 1}
-                        className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▼</button>
-                    </div>
-                    <input
-                      type="text" value={f.label}
-                      onChange={e => updateField(idx, { label: e.target.value })}
-                      placeholder="Название поля"
-                      className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#5C7BFF]"
-                    />
-                    <button type="button" onClick={() => removeField(idx)}
-                      className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap pl-6">
-                    <select
-                      value={f.type}
-                      onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
-                      className="px-2 py-1 text-xs border border-gray-200 rounded-md bg-white"
-                    >
-                      <option value="text">Текст</option>
-                      <option value="textarea">Длинный текст</option>
-                      <option value="number">Число</option>
-                      <option value="date">Дата</option>
-                      <option value="select">Выпадающий список</option>
-                      <option value="radio">Радио-кнопки</option>
-                      <option value="checkbox">Чекбокс (да/нет)</option>
-                      <option value="file">Файл</option>
-                    </select>
-                    {f.type !== 'checkbox' && f.type !== 'file' && (
+                  <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                    <div className="flex items-start gap-2 mb-2">
+                      <div className="flex flex-col gap-0.5 pt-1">
+                        <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
+                          className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▲</button>
+                        <button type="button" onClick={() => moveField(idx, 1)} disabled={idx === draftExtras.length - 1}
+                          className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▼</button>
+                      </div>
                       <input
-                        type="text"
-                        value={f.placeholder ?? ''}
-                        onChange={e => updateField(idx, { placeholder: e.target.value })}
-                        placeholder="Подсказка"
-                        className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                        type="text" value={f.label}
+                        onChange={e => updateField(idx, { label: e.target.value })}
+                        placeholder="Название поля"
+                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#5C7BFF]"
                       />
+                      <button type="button" onClick={() => removeField(idx)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap pl-6">
+                      <select
+                        value={f.type}
+                        onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
+                        className="px-2 py-1 text-xs border border-gray-200 rounded-md bg-white"
+                      >
+                        <option value="text">Текст</option>
+                        <option value="textarea">Длинный текст</option>
+                        <option value="number">Число</option>
+                        <option value="date">Дата</option>
+                        <option value="select">Выпадающий список</option>
+                        <option value="radio">Радио-кнопки</option>
+                        <option value="checkbox">Чекбокс (да/нет)</option>
+                        <option value="file">Файл</option>
+                      </select>
+                      {f.type !== 'checkbox' && f.type !== 'file' && (
+                        <input
+                          type="text"
+                          value={f.placeholder ?? ''}
+                          onChange={e => updateField(idx, { placeholder: e.target.value })}
+                          placeholder="Подсказка"
+                          className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
+                        />
+                      )}
+                      <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
+                        <input
+                          type="checkbox" checked={f.required}
+                          onChange={e => updateField(idx, { required: e.target.checked })}
+                          className="accent-[#3B5BFF]"
+                        />
+                        Обязательное
+                      </label>
+                    </div>
+                    {needsOptions && (
+                      <div className="mt-2 pl-6">
+                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Варианты (по одному в строке)</label>
+                        <textarea
+                          value={(f.options ?? []).join('\n')}
+                          onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                          rows={3}
+                          placeholder="Эконом&#10;Бизнес&#10;Первый класс"
+                          className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
+                        />
+                      </div>
                     )}
-                    <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
-                      <input
-                        type="checkbox" checked={f.required}
-                        onChange={e => updateField(idx, { required: e.target.checked })}
-                        className="accent-[#3B5BFF]"
-                      />
-                      Обязательное
-                    </label>
                   </div>
-                  {needsOptions && (
-                    <div className="mt-2 pl-6">
-                      <label className="block text-[11px] font-semibold text-gray-600 mb-1">Варианты (по одному в строке)</label>
-                      <textarea
-                        value={(f.options ?? []).join('\n')}
-                        onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-                        rows={3}
-                        placeholder="Эконом&#10;Бизнес&#10;Первый класс"
-                        className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
-                      />
-                    </div>
-                  )}
-                </div>
                 );
               })}
             </div>
