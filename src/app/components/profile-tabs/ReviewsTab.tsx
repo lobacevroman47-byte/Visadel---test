@@ -129,7 +129,7 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
                 value={country}
                 onChange={e => setCountry(e.target.value)}
                 placeholder="Например: Индия, Вьетнам..."
-                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-400"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-nonefocus:border-yellow-400"
               />
             </div>
 
@@ -141,7 +141,7 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
                 onChange={e => setText(e.target.value)}
                 rows={4}
                 placeholder="Расскажите о своём опыте работы с нами..."
-                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-yellow-300 focus:border-yellow-400 resize-none"
+                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm placeholder-gray-300 focus:outline-nonefocus:border-yellow-400 resize-none"
               />
             </div>
 

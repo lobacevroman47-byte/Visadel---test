@@ -466,7 +466,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Имя</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Иван Иванов"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[#5C7BFF]" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1">Telegram</label>
@@ -482,7 +482,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             </label>
             <input type="tel" value={phone} onChange={e => setPhone(e.target.value)}
               placeholder="+7 (999) 123-45-67"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[#5C7BFF]" />
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
@@ -490,7 +490,7 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             </label>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="example@mail.com"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]" />
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[#5C7BFF]" />
           </div>
           <button onClick={handleSaveProfile} disabled={savingProfile}
             className="w-full py-2.5 rounded-xl bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-95">

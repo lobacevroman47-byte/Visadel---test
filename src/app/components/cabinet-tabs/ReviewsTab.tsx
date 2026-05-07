@@ -132,7 +132,7 @@ export default function ReviewsTab() {
               <select
                 value={selectedCountry}
                 onChange={(e) => setSelectedCountry(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none"
               >
                 <option value="">Выберите страну</option>
                 {canReview.map((country) => (
@@ -153,7 +153,7 @@ export default function ReviewsTab() {
                 onChange={(e) => setReviewText(e.target.value)}
                 placeholder="Расскажите о вашем опыте оформления визы..."
                 rows={5}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none resize-none"
               />
             </div>
 

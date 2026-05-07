@@ -220,7 +220,7 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
               onChange={e => setComment(e.target.value)}
               rows={3}
               placeholder="Расскажите о вашем опыте..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none resize-none"
             />
           </div>
           {/* Bonus hint — hidden for partners */}
