@@ -365,11 +365,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.reminders   TO anon, authenticate
 GRANT SELECT, INSERT             ON public.status_log      TO anon, authenticated;
 GRANT SELECT                     ON public.admin_users     TO anon, authenticated;
 
--- ── Открытые SELECT-политики для публичных каталогов ───────────────────────
+-- ── Открытые политики для публичных каталогов ──────────────────────────────
 -- Supabase по умолчанию включает RLS на новых таблицах (или это уже могло
 -- быть включено руками раньше). Без явной политики anon-ключ получает []
 -- даже при наличии GRANT. Эти политики гарантируют что мини-апп всегда
 -- видит каталог виз, доп. услуг, поля анкет и т.д.
+--
+-- FOR ALL — потому что админка использует тот же anon-ключ, и кнопки
+-- «глаз»/«сохранить» делают UPDATE через PostgREST. После полной миграции
+-- админских операций на /api/* эндпоинты (где идёт Telegram-auth + service
+-- key) это сожмём до FOR SELECT.
 DO $$
 DECLARE t TEXT;
 BEGIN
@@ -379,9 +384,10 @@ BEGIN
   ])
   LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY;', t);
-    EXECUTE format('DROP POLICY IF EXISTS "anon_read" ON public.%I;', t);
+    EXECUTE format('DROP POLICY IF EXISTS "anon_read"  ON public.%I;', t);
+    EXECUTE format('DROP POLICY IF EXISTS "anon_write" ON public.%I;', t);
     EXECUTE format(
-      'CREATE POLICY "anon_read" ON public.%I FOR SELECT TO anon, authenticated USING (true);',
+      'CREATE POLICY "anon_write" ON public.%I FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);',
       t
     );
   END LOOP;
