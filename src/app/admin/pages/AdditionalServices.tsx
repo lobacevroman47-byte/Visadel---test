@@ -1,21 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Package, Plus, Edit2, Trash2, X, Save, Loader2, RefreshCw, Eye, EyeOff,
+  Package, Plus, Edit2, Trash2, X, Save, Loader2, RefreshCw, Eye, EyeOff, Hotel,
 } from 'lucide-react';
 import {
   getAdditionalServices, upsertAdditionalService, deleteAdditionalService,
   type AdditionalService,
 } from '../../lib/db';
 
+const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
+type Mode = 'addons' | 'bookings';
+
 // All services live in one list — visa addons (Подтверждение проживания /
 // Обратный билет / Срочное оформление) plus any custom rows the admin adds.
 // Hotel/flight rows here also feed the standalone HotelBookingForm /
 // FlightBookingForm prices via additional_services.
-export const AdditionalServices: React.FC = () => {
+//
+// `mode='bookings'` filters this list to the predefined hotel+flight entries
+// and locks down add/delete — the Каталог → Брони tab uses this view, while
+// keeping the same source of truth in the additional_services table.
+export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' }) => {
   const [services, setServices] = useState<AdditionalService[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AdditionalService | null>(null);
   const [adding, setAdding] = useState(false);
+
+  const isBookings = mode === 'bookings';
 
   const load = async () => {
     setLoading(true);
@@ -25,10 +34,16 @@ export const AdditionalServices: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
-  const visible = services;
+  const visible = useMemo(
+    () => isBookings ? services.filter(s => (BOOKING_IDS as readonly string[]).includes(s.id)) : services,
+    [services, isBookings],
+  );
   const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
-  const HEADER_TITLE = 'Дополнительные услуги';
-  const HEADER_HINT  = `${visible.length} ${visible.length === 1 ? 'услуга' : 'услуг'} · ${totalEnabled} активных · применяются при оформлении виз`;
+  const HEADER_ICON = isBookings ? <Hotel className="w-5 h-5" /> : <Package className="w-5 h-5" />;
+  const HEADER_TITLE = isBookings ? 'Брони' : 'Дополнительные услуги';
+  const HEADER_HINT = isBookings
+    ? `${visible.length} ${visible.length === 1 ? 'услуга' : 'услуг'} · ${totalEnabled} активных · отдельная страница в мини-аппе`
+    : `${visible.length} ${visible.length === 1 ? 'услуга' : 'услуг'} · ${totalEnabled} активных · применяются при оформлении виз`;
 
   const handleToggle = async (s: AdditionalService) => {
     await upsertAdditionalService({ ...s, enabled: !s.enabled });
@@ -47,7 +62,7 @@ export const AdditionalServices: React.FC = () => {
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md shrink-0">
-            <Package className="w-5 h-5" />
+            {HEADER_ICON}
           </div>
           <div>
             <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{HEADER_TITLE}</h1>
@@ -56,20 +71,22 @@ export const AdditionalServices: React.FC = () => {
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
-          >
-            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
-          </button>
+          {!isBookings && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
+            >
+              <Plus size={16} strokeWidth={2.5} /> Добавить услугу
+            </button>
+          )}
           <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
         </div>
       </div>
 
-      {!loading && visible.length === 0 && (
+      {!loading && visible.length === 0 && !isBookings && (
         <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
           <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
             📦
@@ -83,6 +100,16 @@ export const AdditionalServices: React.FC = () => {
           >
             <Plus size={16} strokeWidth={2.5} /> Добавить услугу
           </button>
+        </div>
+      )}
+
+      {!loading && visible.length === 0 && isBookings && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
+            🏨
+          </div>
+          <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Брони ещё не созданы</h3>
+          <p className="text-sm text-[#0F2A36]/60">Запусти SQL-миграцию или открой <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">Доп. услуги</code> и добавь записи с ID <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">hotel-booking</code> и <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">flight-booking</code>.</p>
         </div>
       )}
 
@@ -115,6 +142,11 @@ export const AdditionalServices: React.FC = () => {
                         🌍 {s.countries.length} {s.countries.length === 1 ? 'страна' : 'стран'}
                       </span>
                     )}
+                    {(s.partner_commission_pct ?? 0) > 0 && (
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                        партнёрам {s.partner_commission_pct}%
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -143,13 +175,15 @@ export const AdditionalServices: React.FC = () => {
                   >
                     <Edit2 size={15} />
                   </button>
-                  <button
-                    onClick={() => handleDelete(s)}
-                    className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
-                    title="Удалить"
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {!isBookings && (
+                    <button
+                      onClick={() => handleDelete(s)}
+                      className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
+                      title="Удалить"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -181,10 +215,16 @@ const ServiceFormModal: React.FC<{
 }> = ({ service, existingIds, onClose, onSaved }) => {
   const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
     service
-      ? { ...service, countries: Array.isArray(service.countries) ? service.countries : [] }
+      ? {
+          ...service,
+          countries: Array.isArray(service.countries) ? service.countries : [],
+          partner_commission_pct: service.partner_commission_pct ?? 15,
+        }
       : {
           id: '', name: '', icon: '⭐', description: '',
-          price: 0, cost_rub: 0, enabled: true, sort_order: 0, countries: [],
+          price: 0, cost_rub: 0,
+          partner_commission_pct: 15,
+          enabled: true, sort_order: 0, countries: [],
         }
   );
 
@@ -293,13 +333,24 @@ const ServiceFormModal: React.FC<{
               <p className="text-xs text-gray-400 mt-1">Сколько мы тратим на эту услугу (для финансов)</p>
             </div>
           </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1">Порядок отображения</label>
-            <input
-              type="number" value={form.sort_order} min={0}
-              onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Комиссия партнёра %</label>
+              <input
+                type="number" value={form.partner_commission_pct ?? 0} step="0.5" min={0} max={100}
+                onChange={e => set('partner_commission_pct', parseFloat(e.target.value) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+              <p className="text-xs text-gray-400 mt-1">% от цены услуги, который получит партнёр-реферрер. 0 = не платим.</p>
+            </div>
+            <div>
+              <label className="block text-sm text-gray-700 mb-1">Порядок отображения</label>
+              <input
+                type="number" value={form.sort_order} min={0}
+                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">

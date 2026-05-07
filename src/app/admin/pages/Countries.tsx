@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Plus, Search, Edit2, Trash2, X, Loader2, RefreshCw, Eye, EyeOff,
-  Database, Save, Globe, FileText, Package,
+  Database, Save, Globe, FileText, Package, Hotel,
 } from 'lucide-react';
 import {
   getVisaProducts,
@@ -14,12 +14,13 @@ import {
 import { countriesVisaData } from '../data/countriesData';
 import { AdditionalServices } from './AdditionalServices';
 
-// ── Top-level tab nav: Визы / Доп. услуги
-type TopTab = 'visas' | 'addons';
+// ── Top-level tab nav: Визы / Доп. услуги / Брони
+type TopTab = 'visas' | 'addons' | 'bookings';
 
 const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileText }[] = [
-  { id: 'visas',  label: 'Визы',        Icon: FileText },
-  { id: 'addons', label: 'Доп. услуги', Icon: Package },
+  { id: 'visas',    label: 'Визы',        Icon: FileText },
+  { id: 'addons',   label: 'Доп. услуги', Icon: Package  },
+  { id: 'bookings', label: 'Брони',       Icon: Hotel    },
 ];
 
 export const Countries: React.FC = () => {
@@ -50,8 +51,9 @@ export const Countries: React.FC = () => {
         </div>
       </div>
 
-      {topTab === 'visas'  && <VisasSection />}
-      {topTab === 'addons' && <AdditionalServices />}
+      {topTab === 'visas'    && <VisasSection />}
+      {topTab === 'addons'   && <AdditionalServices mode="addons" />}
+      {topTab === 'bookings' && <AdditionalServices mode="bookings" />}
     </div>
   );
 };

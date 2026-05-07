@@ -1191,6 +1191,7 @@ export interface AdditionalService {
   description: string | null;
   price: number;          // что платит клиент
   cost_rub: number;       // что платим мы (себестоимость, ₽). Учитывается в финансах
+  partner_commission_pct: number; // % партнёру с цены услуги (как у виз). 0 = не платим.
   enabled: boolean;
   sort_order: number;
   countries: string[];    // Если пусто — услуга доступна во всех странах. Если заполнено — только для перечисленных.
