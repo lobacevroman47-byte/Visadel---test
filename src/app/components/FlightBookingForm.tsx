@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, type ExtraFormField } from '../lib/db';
+import { uploadFile, getAppSettings, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface FlightBookingFormProps {
@@ -42,6 +42,16 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
   const [price, setPrice] = useState(2000);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
   const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
+  const [overrides, setOverrides] = useState<CoreFieldOverrides>({});
+
+  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) => {
+    const o = overrides[key] ?? {};
+    return {
+      label: o.label ?? fallbackLabel,
+      required: o.required ?? fallbackRequired,
+      visible: o.visible !== false,
+    };
+  };
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -51,6 +61,7 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
       setPrice(s.flight_booking_price ?? 2000);
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.flight_extra_fields) ? s.flight_extra_fields : []);
+      setOverrides(s.flight_core_overrides && typeof s.flight_core_overrides === 'object' ? s.flight_core_overrides : {});
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
@@ -225,22 +236,16 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
             Данные вводить <span className="font-bold">латиницей</span>, как в загранпаспорте
           </p>
           <div className="space-y-3">
-            <Field label="Имя" required>
-              <input
-                type="text" value={firstName}
-                onChange={e => setFirstName(e.target.value.toUpperCase())}
-                placeholder="IVAN"
-                className="vd-input"
-              />
-            </Field>
-            <Field label="Фамилия" required>
-              <input
-                type="text" value={lastName}
-                onChange={e => setLastName(e.target.value.toUpperCase())}
-                placeholder="IVANOV"
-                className="vd-input"
-              />
-            </Field>
+            {(() => { const f = ov('firstName', 'Имя', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value.toUpperCase())} placeholder="IVAN" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('lastName', 'Фамилия', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={lastName} onChange={e => setLastName(e.target.value.toUpperCase())} placeholder="IVANOV" className="vd-input" />
+              </Field>
+            ); })()}
           </div>
         </section>
 
@@ -251,30 +256,21 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
             <h3 className="text-sm font-bold text-[#0F2A36]">Маршрут</h3>
           </div>
           <div className="space-y-3">
-            <Field label="Из какого города" required icon={<MapPin className="w-3.5 h-3.5" />}>
-              <input
-                type="text" value={fromCity}
-                onChange={e => setFromCity(e.target.value)}
-                placeholder="Москва"
-                className="vd-input"
-              />
-            </Field>
-            <Field label="В какой город" required icon={<MapPin className="w-3.5 h-3.5" />}>
-              <input
-                type="text" value={toCity}
-                onChange={e => setToCity(e.target.value)}
-                placeholder="Стамбул"
-                className="vd-input"
-              />
-            </Field>
-            <Field label="Дата брони" required icon={<Calendar className="w-3.5 h-3.5" />}>
-              <input
-                type="date"
-                value={bookingDate}
-                onChange={e => setBookingDate(e.target.value)}
-                className="vd-input"
-              />
-            </Field>
+            {(() => { const f = ov('fromCity', 'Из какого города', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<MapPin className="w-3.5 h-3.5" />}>
+                <input type="text" value={fromCity} onChange={e => setFromCity(e.target.value)} placeholder="Москва" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('toCity', 'В какой город', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<MapPin className="w-3.5 h-3.5" />}>
+                <input type="text" value={toCity} onChange={e => setToCity(e.target.value)} placeholder="Стамбул" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('bookingDate', 'Дата брони', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<Calendar className="w-3.5 h-3.5" />}>
+                <input type="date" value={bookingDate} onChange={e => setBookingDate(e.target.value)} className="vd-input" />
+              </Field>
+            ); })()}
           </div>
         </section>
 
@@ -286,15 +282,21 @@ export default function FlightBookingForm({ onBack, onComplete }: FlightBookingF
           </div>
           <p className="text-xs text-[#0F2A36]/60 mb-4">Свяжемся для уточнения деталей и отправки подтверждения</p>
           <div className="space-y-3">
-            <Field label="E-mail" required icon={<Mail className="w-3.5 h-3.5" />}>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="vd-input" />
-            </Field>
-            <Field label="Номер телефона" required icon={<Phone className="w-3.5 h-3.5" />}>
-              <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="vd-input" />
-            </Field>
-            <Field label="Логин в Telegram" required icon={<Send className="w-3.5 h-3.5" />}>
-              <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="vd-input" />
-            </Field>
+            {(() => { const f = ov('email', 'E-mail', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<Mail className="w-3.5 h-3.5" />}>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('phone', 'Номер телефона', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<Phone className="w-3.5 h-3.5" />}>
+                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('telegramLogin', 'Логин в Telegram', true); return f.visible && (
+              <Field label={f.label} required={f.required} icon={<Send className="w-3.5 h-3.5" />}>
+                <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="vd-input" />
+              </Field>
+            ); })()}
           </div>
           <div className="mt-3 vd-grad-soft border border-blue-100 rounded-lg px-3 py-2">
             <p className="text-xs text-[#0F2A36]/75">🔒 Данные в безопасности и не передаются третьим лицам</p>

@@ -1119,6 +1119,16 @@ export interface ExtraFormField {
   placeholder?: string;
 }
 
+// Override for a built-in (core) field of the booking form: rename label,
+// hide it, or change its required flag. If a key is absent — the form's
+// hardcoded default is used.
+export interface CoreFieldOverride {
+  label?: string;
+  required?: boolean;
+  visible?: boolean;
+}
+export type CoreFieldOverrides = Record<string, CoreFieldOverride>;
+
 export interface AppSettings {
   id: number;
   new_user_welcome_bonus: number;
@@ -1136,6 +1146,9 @@ export interface AppSettings {
   // Extra custom fields appended at the bottom of the form
   hotel_extra_fields: ExtraFormField[];
   flight_extra_fields: ExtraFormField[];
+  // Per-key overrides for built-in form fields (rename / hide / required)
+  hotel_core_overrides?: CoreFieldOverrides;
+  flight_core_overrides?: CoreFieldOverrides;
   updated_at?: string;
 }
 

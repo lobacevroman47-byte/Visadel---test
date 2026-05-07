@@ -8,7 +8,7 @@ import {
   getAllFormFields, upsertFormField, deleteFormField,
   getAllPhotoRequirements, upsertPhotoRequirement, deletePhotoRequirement,
   seedFormFieldsFromCode,
-  getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField,
+  getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField, type CoreFieldOverrides,
   type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
@@ -405,6 +405,36 @@ const VisaFormSection: React.FC = () => {
 };
 
 // ─── Booking form config (price + extra fields) ──────────────────────────────
+// Hardcoded core fields of the booking forms — must mirror what's actually
+// rendered in HotelBookingForm/FlightBookingForm. Admin overrides label /
+// required / visibility per key.
+const HOTEL_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+  { key: 'firstName',     defaultLabel: 'Имя (как в загранпаспорте)',       defaultRequired: true },
+  { key: 'lastName',      defaultLabel: 'Фамилия (как в загранпаспорте)',    defaultRequired: true },
+  { key: 'country',       defaultLabel: 'Страна назначения',                  defaultRequired: true },
+  { key: 'city',          defaultLabel: 'Город',                              defaultRequired: true },
+  { key: 'checkIn',       defaultLabel: 'Дата заезда',                        defaultRequired: true },
+  { key: 'checkOut',      defaultLabel: 'Дата выезда',                        defaultRequired: true },
+  { key: 'guests',        defaultLabel: 'Количество гостей',                  defaultRequired: true },
+  { key: 'children',      defaultLabel: 'Есть ли дети?',                      defaultRequired: false },
+  { key: 'email',         defaultLabel: 'E-mail',                             defaultRequired: true },
+  { key: 'phone',         defaultLabel: 'Номер телефона',                     defaultRequired: true },
+  { key: 'telegramLogin', defaultLabel: 'Логин в Telegram',                   defaultRequired: true },
+  { key: 'passport',      defaultLabel: 'Загранпаспорт (файл)',               defaultRequired: true },
+];
+
+const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+  { key: 'firstName',     defaultLabel: 'Имя (латиницей)',                    defaultRequired: true },
+  { key: 'lastName',      defaultLabel: 'Фамилия (латиницей)',                defaultRequired: true },
+  { key: 'fromCity',      defaultLabel: 'Из какого города',                   defaultRequired: true },
+  { key: 'toCity',        defaultLabel: 'В какой город',                      defaultRequired: true },
+  { key: 'bookingDate',   defaultLabel: 'Дата брони',                         defaultRequired: true },
+  { key: 'email',         defaultLabel: 'E-mail',                             defaultRequired: true },
+  { key: 'phone',         defaultLabel: 'Номер телефона',                     defaultRequired: true },
+  { key: 'telegramLogin', defaultLabel: 'Логин в Telegram',                   defaultRequired: true },
+  { key: 'passport',      defaultLabel: 'Загранпаспорт (файл)',               defaultRequired: true },
+];
+
 const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) => {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -448,9 +478,22 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
 
   const priceKey = kind === 'hotel' ? 'hotel_booking_price' : 'flight_booking_price';
   const fieldsKey = kind === 'hotel' ? 'hotel_extra_fields' : 'flight_extra_fields';
+  const overridesKey = kind === 'hotel' ? 'hotel_core_overrides' : 'flight_core_overrides';
+  const coreFields = kind === 'hotel' ? HOTEL_CORE_FIELDS : FLIGHT_CORE_FIELDS;
   const title = kind === 'hotel' ? 'Бронь отеля' : 'Бронь авиабилета';
   const HeroIcon = kind === 'hotel' ? Hotel : Plane;
   const extras: ExtraFormField[] = settings[fieldsKey] ?? [];
+  const overrides: CoreFieldOverrides = settings[overridesKey] ?? {};
+
+  const updateOverride = (key: string, patch: Partial<{ label: string; required: boolean; visible: boolean }>) => {
+    const next: CoreFieldOverrides = { ...overrides, [key]: { ...(overrides[key] ?? {}), ...patch } };
+    set(overridesKey, next);
+  };
+  const resetOverride = (key: string) => {
+    const next: CoreFieldOverrides = { ...overrides };
+    delete next[key];
+    set(overridesKey, next);
+  };
 
   const addField = () => {
     set(fieldsKey, [
@@ -483,8 +526,8 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
             <HeroIcon className="w-5 h-5" />
           </div>
           <div>
-            <h1>{title}</h1>
-            <p className="text-xs text-gray-500 mt-0.5">Настрой цену и дополнительные поля анкеты</p>
+            <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{title}</h1>
+            <p className="text-xs text-gray-500 mt-0.5">Цена · поля анкеты · видимость и обязательные</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -492,35 +535,108 @@ const BookingFormSection: React.FC<{ kind: 'hotel' | 'flight' }> = ({ kind }) =>
             <span className="text-xs text-emerald-600">✓ сохранено в {savedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
           )}
           <button type="button" onClick={handleSave} disabled={saving}
-            className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-lg flex items-center gap-2 select-none">
+            className="px-5 py-2.5 vd-grad text-white rounded-xl flex items-center gap-2 font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition disabled:opacity-60">
             {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
             {saving ? 'Сохраняем…' : 'Сохранить'}
           </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div>
-          <label className="block text-sm text-gray-700 mb-1">Цена услуги (₽)</label>
-          <input
-            type="number" min={0} step={100}
-            value={settings[priceKey] as number}
-            onChange={e => set(priceKey, parseInt(e.target.value, 10) || 0)}
-            className="w-full max-w-xs px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            Сумма, которую видит клиент при оформлении этой брони. Изменения подтягиваются на лету.
-          </p>
+      <div className="space-y-4">
+        {/* Price card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex items-center gap-4">
+          <div className="vd-grad-soft border border-blue-100 rounded-xl px-4 py-3 shrink-0">
+            <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Цена услуги</p>
+            <p className="text-2xl font-extrabold tracking-tight vd-grad-text mt-0.5">{(settings[priceKey] as number).toLocaleString('ru-RU')} ₽</p>
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs text-gray-700 mb-1 font-semibold">Изменить цену (₽)</label>
+            <input
+              type="number" min={0} step={100}
+              value={settings[priceKey] as number}
+              onChange={e => set(priceKey, parseInt(e.target.value, 10) || 0)}
+              className="w-full max-w-xs px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+            />
+            <p className="text-xs text-gray-500 mt-1.5">
+              Изменения подтягиваются клиентам на лету после нажатия «Сохранить».
+            </p>
+          </div>
         </div>
 
-        <div className="pt-4 border-t border-gray-100">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-semibold text-gray-700">Дополнительные поля анкеты</p>
-            <span className="text-xs text-gray-400">{extras.length} {extras.length === 1 ? 'поле' : 'полей'}</span>
+        {/* Core fields card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+              <FileEdit className="w-4 h-4" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-extrabold tracking-tight text-[#0F2A36]">Поля анкеты</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Переименовывай, скрывай или меняй обязательность встроенных полей</p>
+            </div>
           </div>
-          <p className="text-xs text-gray-500 mb-3">
-            Эти поля появятся внизу формы у клиента, перед оплатой. Могут быть текстовыми, числовыми или с датой.
-          </p>
+          <div className="space-y-2">
+            {coreFields.map(f => {
+              const ov = overrides[f.key] ?? {};
+              const label = ov.label ?? f.defaultLabel;
+              const required = ov.required ?? f.defaultRequired;
+              const visible = ov.visible !== false;
+              const isCustom = ov.label !== undefined || ov.required !== undefined || ov.visible !== undefined;
+              return (
+                <div
+                  key={f.key}
+                  className={`bg-gray-50 rounded-xl p-3 border border-gray-100 ${!visible ? 'opacity-50' : ''}`}
+                >
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 shrink-0">{f.key}</span>
+                    <input
+                      type="text"
+                      value={label}
+                      onChange={e => updateOverride(f.key, { label: e.target.value })}
+                      className="flex-1 min-w-[180px] px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
+                    />
+                    {isCustom && (
+                      <button type="button" onClick={() => resetOverride(f.key)}
+                        className="text-[11px] text-[#3B5BFF] hover:underline shrink-0">
+                        Сбросить
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 mt-2 flex-wrap">
+                    <label className="text-xs text-gray-600 flex items-center gap-1.5 select-none">
+                      <input
+                        type="checkbox" checked={visible}
+                        onChange={e => updateOverride(f.key, { visible: e.target.checked })}
+                        className="accent-[#3B5BFF]"
+                      />
+                      Показывать клиенту
+                    </label>
+                    <label className="text-xs text-gray-600 flex items-center gap-1.5 select-none">
+                      <input
+                        type="checkbox" checked={required}
+                        onChange={e => updateOverride(f.key, { required: e.target.checked })}
+                        className="accent-[#3B5BFF]"
+                      />
+                      Обязательное
+                    </label>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Custom fields card */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+              <Plus className="w-4 h-4" strokeWidth={2.5} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-extrabold tracking-tight text-[#0F2A36]">Дополнительные поля</h3>
+              <p className="text-xs text-gray-500 mt-0.5">Свои поля поверх анкеты — например, «Класс перелёта» или «Особые пожелания»</p>
+            </div>
+            <span className="text-xs text-gray-400 shrink-0">{extras.length} {extras.length === 1 ? 'поле' : 'полей'}</span>
+          </div>
 
           {extras.length === 0 ? (
             <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">

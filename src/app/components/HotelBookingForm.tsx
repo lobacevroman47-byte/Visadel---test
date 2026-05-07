@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles } from 'lucide-react';
-import { uploadFile, getAppSettings, type ExtraFormField } from '../lib/db';
+import { uploadFile, getAppSettings, type ExtraFormField, type CoreFieldOverrides } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface HotelBookingFormProps {
@@ -48,6 +48,17 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
   const [price, setPrice] = useState(1000);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
   const [extraFields, setExtraFields] = useState<ExtraFormField[]>([]);
+  const [overrides, setOverrides] = useState<CoreFieldOverrides>({});
+
+  // Helper: read label / required / visibility for a core field key
+  const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) => {
+    const o = overrides[key] ?? {};
+    return {
+      label: o.label ?? fallbackLabel,
+      required: o.required ?? fallbackRequired,
+      visible: o.visible !== false,
+    };
+  };
   const [extraValues, setExtraValues] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -57,6 +68,7 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
       setPrice(s.hotel_booking_price ?? 1000);
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
       setExtraFields(Array.isArray(s.hotel_extra_fields) ? s.hotel_extra_fields : []);
+      setOverrides(s.hotel_core_overrides && typeof s.hotel_core_overrides === 'object' ? s.hotel_core_overrides : {});
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
@@ -93,9 +105,19 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
   const updateChildAge = (id: string, age: string) => setChildren(children.map(c => c.id === id ? { ...c, age } : c));
 
   const validate = (): string | null => {
-    if (!firstName.trim() || !lastName.trim()) return 'Заполните имя и фамилию (как в загранпаспорте)';
-    if (!country.trim() || !city.trim()) return 'Укажите страну и город назначения';
-    if (!checkIn || !checkOut) return 'Укажите даты заезда и выезда';
+    // Required-checks respect admin overrides — if a field was explicitly
+    // marked optional or hidden in app_settings, we skip it here.
+    const reqFirstName = ov('firstName', '', true).required && ov('firstName', '', true).visible;
+    const reqLastName  = ov('lastName',  '', true).required && ov('lastName',  '', true).visible;
+    const reqCountry   = ov('country',   '', true).required && ov('country',   '', true).visible;
+    const reqCity      = ov('city',      '', true).required && ov('city',      '', true).visible;
+    const reqCheckIn   = ov('checkIn',   '', true).required && ov('checkIn',   '', true).visible;
+    const reqCheckOut  = ov('checkOut',  '', true).required && ov('checkOut',  '', true).visible;
+
+    if (reqFirstName && !firstName.trim()) return 'Заполните имя (как в загранпаспорте)';
+    if (reqLastName && !lastName.trim()) return 'Заполните фамилию (как в загранпаспорте)';
+    if ((reqCountry && !country.trim()) || (reqCity && !city.trim())) return 'Укажите страну и город назначения';
+    if ((reqCheckIn && !checkIn) || (reqCheckOut && !checkOut)) return 'Укажите даты заезда и выезда';
     if (new Date(checkOut) <= new Date(checkIn)) return 'Дата выезда должна быть позже даты заезда';
     if (guests < 1) return 'Должен быть хотя бы один гость';
     if (hasChildren === 'yes' && children.some(c => !c.age.trim())) return 'Укажите возраст всех детей';
@@ -243,20 +265,16 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
             <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
           </div>
           <div className="space-y-3">
-            <Field label="Имя (как в загранпаспорте)" required>
-              <input
-                type="text" value={firstName} onChange={e => setFirstName(e.target.value)}
-                placeholder="IVAN"
-                className="vd-input"
-              />
-            </Field>
-            <Field label="Фамилия (как в загранпаспорте)" required>
-              <input
-                type="text" value={lastName} onChange={e => setLastName(e.target.value)}
-                placeholder="IVANOV"
-                className="vd-input"
-              />
-            </Field>
+            {(() => { const f = ov('firstName', 'Имя (как в загранпаспорте)', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="IVAN" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('lastName', 'Фамилия (как в загранпаспорте)', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="IVANOV" className="vd-input" />
+              </Field>
+            ); })()}
           </div>
         </section>
 
@@ -267,21 +285,30 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
             <h3 className="text-sm font-bold text-[#0F2A36]">Данные поездки</h3>
           </div>
           <div className="space-y-3">
-            <Field label="Страна назначения" required>
-              <input type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="Турция" className="vd-input" />
-            </Field>
-            <Field label="Город" required>
-              <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Стамбул" className="vd-input" />
-            </Field>
+            {(() => { const f = ov('country', 'Страна назначения', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={country} onChange={e => setCountry(e.target.value)} placeholder="Турция" className="vd-input" />
+              </Field>
+            ); })()}
+            {(() => { const f = ov('city', 'Город', true); return f.visible && (
+              <Field label={f.label} required={f.required}>
+                <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="Стамбул" className="vd-input" />
+              </Field>
+            ); })()}
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Дата заезда" required>
-                <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="vd-input" />
-              </Field>
-              <Field label="Дата выезда" required>
-                <input type="date" value={checkOut} min={checkIn || undefined} onChange={e => setCheckOut(e.target.value)} className="vd-input" />
-              </Field>
+              {(() => { const f = ov('checkIn', 'Дата заезда', true); return f.visible && (
+                <Field label={f.label} required={f.required}>
+                  <input type="date" value={checkIn} onChange={e => setCheckIn(e.target.value)} className="vd-input" />
+                </Field>
+              ); })()}
+              {(() => { const f = ov('checkOut', 'Дата выезда', true); return f.visible && (
+                <Field label={f.label} required={f.required}>
+                  <input type="date" value={checkOut} min={checkIn || undefined} onChange={e => setCheckOut(e.target.value)} className="vd-input" />
+                </Field>
+              ); })()}
             </div>
-            <Field label="Количество гостей" required>
+            {(() => { const f = ov('guests', 'Количество гостей', true); return f.visible && (
+            <Field label={f.label} required={f.required}>
               <div className="flex items-center gap-2">
                 <button type="button" onClick={() => setGuests(g => Math.max(1, g - 1))}
                   className="w-10 h-10 rounded-xl bg-[#EAF1FF] text-[#3B5BFF] flex items-center justify-center active:scale-95 transition">
@@ -294,16 +321,19 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
                 </button>
               </div>
             </Field>
+            ); })()}
 
             {/* Children radio + dynamic ages */}
-            <Field label="Есть ли дети?">
+            {(() => { const f = ov('children', 'Есть ли дети?', false); return f.visible && (
+            <Field label={f.label} required={f.required}>
               <div className="grid grid-cols-2 gap-2">
                 <RadioCard label="Нет" active={hasChildren === 'no'} onClick={() => { setHasChildren('no'); setChildren([]); }} />
                 <RadioCard label="Да (указать возраст)" active={hasChildren === 'yes'} onClick={() => { setHasChildren('yes'); if (children.length === 0) addChild(); }} />
               </div>
             </Field>
+            ); })()}
 
-            {hasChildren === 'yes' && (
+            {hasChildren === 'yes' && (ov('children', '', false).visible) && (
               <div className="space-y-2 pl-1">
                 {children.map((ch, i) => (
                   <div key={ch.id} className="flex items-center gap-2">
@@ -337,15 +367,21 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
           </div>
           <p className="text-xs text-[#0F2A36]/60 mb-4">Свяжемся для уточнения деталей и отправки подтверждения</p>
           <div className="space-y-3">
-            <Field label="E-mail" required icon={<Mail className="w-3.5 h-3.5" />}>
+            {(() => { const f = ov('email', 'E-mail', true); return f.visible && (
+            <Field label={f.label} required={f.required} icon={<Mail className="w-3.5 h-3.5" />}>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="vd-input" />
             </Field>
-            <Field label="Номер телефона" required icon={<Phone className="w-3.5 h-3.5" />}>
+            ); })()}
+            {(() => { const f = ov('phone', 'Номер телефона', true); return f.visible && (
+            <Field label={f.label} required={f.required} icon={<Phone className="w-3.5 h-3.5" />}>
               <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="vd-input" />
             </Field>
-            <Field label="Логин в Telegram" required icon={<Send className="w-3.5 h-3.5" />}>
+            ); })()}
+            {(() => { const f = ov('telegramLogin', 'Логин в Telegram', true); return f.visible && (
+            <Field label={f.label} required={f.required} icon={<Send className="w-3.5 h-3.5" />}>
               <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="vd-input" />
             </Field>
+            ); })()}
           </div>
           <div className="mt-3 vd-grad-soft border border-blue-100 rounded-lg px-3 py-2">
             <p className="text-xs text-[#0F2A36]/75">🔒 Данные в безопасности и не передаются третьим лицам</p>
