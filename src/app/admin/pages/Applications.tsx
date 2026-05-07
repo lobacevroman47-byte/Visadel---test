@@ -1512,6 +1512,30 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
         </div>
       </div>
 
+      {/* Quick tabs: Все / Срочные — самый частый сценарий, поэтому на верхнем уровне */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => setUrgentOnly(false)}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition active:scale-95 ${
+            !urgentOnly ? 'vd-grad text-white shadow-md vd-shadow-cta' : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-gray-50'
+          }`}
+        >
+          Все ({applications.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setUrgentOnly(true)}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold transition active:scale-95 ${
+            urgentOnly
+              ? 'bg-red-500 text-white shadow-md'
+              : 'bg-white border border-gray-200 text-[#0F2A36]/70 hover:bg-red-50 hover:text-red-700 hover:border-red-200'
+          }`}
+        >
+          <Flame size={14} /> Срочные ({applications.filter(a => a.urgent).length})
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="bg-white p-4 md:p-5 rounded-xl border border-gray-200 mb-5 space-y-3">
         {/* Row 1: search + status + country */}
@@ -1563,10 +1587,6 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
             className="px-2 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]"
             title="По"
           />
-          <label className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg cursor-pointer transition text-sm ${urgentOnly ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100'}`}>
-            <input type="checkbox" checked={urgentOnly} onChange={e => setUrgentOnly(e.target.checked)} className="hidden" />
-            <Flame size={14} /> Только срочные
-          </label>
           {hasActiveFilters && (
             <button
               onClick={resetFilters}
@@ -1634,7 +1654,7 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                     </span>
                     {app.urgent && (
                       <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
-                        <Flame className="w-3 h-3" /> срочно
+                        <Flame className="w-3 h-3" /> Срочно
                       </span>
                     )}
                     <span className="text-[11px] font-bold text-[#3B5BFF]">

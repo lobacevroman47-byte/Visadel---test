@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload,
+  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadFile } from '../../lib/db';
@@ -71,6 +71,43 @@ const STATUS_DROPDOWN = STATUS_OPTIONS.filter(s => s.value !== 'pending_confirma
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 const fmtDateTime = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const statusLabel = (v: string) => STATUS_OPTIONS.find(s => s.value === v)?.label ?? v;
+
+// CSV-экспорт всех броней (отели + авиабилеты, объединённый файл с колонкой "Тип")
+function exportBookingsToCsv(hotels: HotelBooking[], flights: FlightBooking[]) {
+  const head = ['Тип', 'ID', 'Имя', 'Фамилия', 'Telegram', 'Email', 'Телефон', 'Маршрут / Отель', 'Даты', 'Сумма', 'Статус', 'Создано'];
+  const escape = (v: unknown) => {
+    const s = String(v ?? '').replace(/"/g, '""');
+    return /[,";\n]/.test(s) ? `"${s}"` : s;
+  };
+  const lines = [head.join(',')];
+  for (const b of hotels) {
+    lines.push([
+      'Отель', b.id, b.first_name, b.last_name, b.telegram_login, b.email, b.phone,
+      `${b.country}, ${b.city}`,
+      `${fmtDate(b.check_in)} → ${fmtDate(b.check_out)} (${b.guests} гост.)`,
+      b.price ?? '', statusLabel(b.status),
+      new Date(b.created_at).toLocaleDateString('ru-RU'),
+    ].map(escape).join(','));
+  }
+  for (const b of flights) {
+    lines.push([
+      'Авиабилет', b.id, b.first_name, b.last_name, b.telegram_login, b.email, b.phone,
+      `${b.from_city} → ${b.to_city}`,
+      fmtDate(b.booking_date),
+      b.price ?? '', statusLabel(b.status),
+      new Date(b.created_at).toLocaleDateString('ru-RU'),
+    ].map(escape).join(','));
+  }
+  // Excel-friendly: BOM + CRLF
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `bookings_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -84,6 +121,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
   const [flights, setFlights] = useState<FlightBooking[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedHotel, setSelectedHotel] = useState<HotelBooking | null>(null);
   const [selectedFlight, setSelectedFlight] = useState<FlightBooking | null>(null);
 
@@ -104,17 +142,42 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const filteredHotels = hotels.filter(b => {
-    const q = search.toLowerCase().trim();
+  const matchesSearch = (b: HotelBooking | FlightBooking, q: string, type: 'hotel' | 'flight') => {
     if (!q) return true;
-    return [b.first_name, b.last_name, b.country, b.city, b.email, b.phone, b.telegram_login].some(v => v?.toLowerCase().includes(q));
-  });
+    const haystack = [
+      b.id, b.first_name, b.last_name, b.email, b.phone, b.telegram_login, b.username,
+      type === 'hotel' ? 'отель бронь отеля hotel' : 'авиабилет билет рейс flight',
+      type === 'hotel'
+        ? [(b as HotelBooking).country, (b as HotelBooking).city]
+        : [(b as FlightBooking).from_city, (b as FlightBooking).to_city],
+    ].flat().filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(q);
+  };
 
-  const filteredFlights = flights.filter(b => {
+  const filteredHotels = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return true;
-    return [b.first_name, b.last_name, b.from_city, b.to_city, b.email, b.phone, b.telegram_login].some(v => v?.toLowerCase().includes(q));
-  });
+    return hotels.filter(b => {
+      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      return matchesSearch(b, q, 'hotel');
+    });
+  }, [hotels, search, statusFilter]);
+
+  const filteredFlights = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return flights.filter(b => {
+      if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+      return matchesSearch(b, q, 'flight');
+    });
+  }, [flights, search, statusFilter]);
+
+  // Сумма по выручке — только подтверждённые брони (как и в финансах).
+  // Показываем для активной вкладки, чтобы число было относится к видимым строкам.
+  const totalRevenue = useMemo(() => {
+    const list = tab === 'hotels' ? filteredHotels : filteredFlights;
+    return list
+      .filter(b => b.status === 'confirmed')
+      .reduce((s, b) => s + (b.price ?? 0), 0);
+  }, [tab, filteredHotels, filteredFlights]);
 
   const updateStatus = async (table: 'hotel_bookings' | 'flight_bookings', id: string, status: string) => {
     if (!isSupabaseConfigured()) return;
@@ -124,19 +187,37 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     if (selectedFlight?.id === id) setSelectedFlight(s => s ? { ...s, status } : s);
   };
 
+  const handleExportCsv = () => {
+    exportBookingsToCsv(hotels, flights);
+  };
+
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Брони для виз</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Заявки на отели и авиабилеты</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {(tab === 'hotels' ? filteredHotels.length : filteredFlights.length)} из {(tab === 'hotels' ? hotels.length : flights.length)}
+            {' · сумма (подтверждённые): '}
+            {totalRevenue.toLocaleString('ru-RU')} ₽
+          </p>
         </div>
-        <button onClick={() => void refresh()} disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50 transition active:scale-95">
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-          Обновить
-        </button>
+        <div className="flex items-center gap-2">
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+          <button
+            onClick={handleExportCsv}
+            className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition flex items-center gap-1.5 text-sm"
+            title="Экспорт CSV"
+          >
+            <FileDown size={16} /> CSV
+          </button>
+          <button onClick={() => void refresh()} disabled={loading}
+            className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-sm hover:bg-gray-50 disabled:opacity-50 transition active:scale-95">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+            Обновить
+          </button>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -145,14 +226,31 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         <TabPill active={tab === 'flights'} onClick={() => setTab('flights')} icon={<Plane size={16} />} label={`Авиабилеты (${flights.length})`} />
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        <input
-          type="text" value={search} onChange={e => setSearch(e.target.value)}
-          placeholder={tab === 'hotels' ? 'Поиск по имени, городу, email…' : 'Поиск по имени, городам, email…'}
-          className="w-full pl-9 pr-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] focus:ring-2 focus:ring-[#5C7BFF]/20"
-        />
+      {/* Search + status filter */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+        <div className="md:col-span-2 relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="ID заявки, имя, страна, email, телефон, тип брони…"
+            className="w-full pl-9 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] focus:ring-2 focus:ring-[#5C7BFF]/20"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF] focus:ring-2 focus:ring-[#5C7BFF]/20"
+        >
+          <option value="all">Все статусы</option>
+          {STATUS_DROPDOWN.map(opt => (
+            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          ))}
+        </select>
       </div>
 
       {/* List */}
@@ -163,7 +261,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
             <HotelRow key={b.id} b={b} onClick={() => setSelectedHotel(b)} />
           )}
           emptyIcon={<Hotel className="w-12 h-12 text-gray-300" />}
-          emptyText="Заявок на отель пока нет"
+          emptyText={hotels.length === 0 ? 'Заявок на отель пока нет' : 'По выбранным фильтрам ничего не найдено'}
         />
       )}
 
@@ -174,7 +272,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
             <FlightRow key={b.id} b={b} onClick={() => setSelectedFlight(b)} />
           )}
           emptyIcon={<Plane className="w-12 h-12 text-gray-300" />}
-          emptyText="Заявок на авиабилет пока нет"
+          emptyText={flights.length === 0 ? 'Заявок на авиабилет пока нет' : 'По выбранным фильтрам ничего не найдено'}
         />
       )}
 
