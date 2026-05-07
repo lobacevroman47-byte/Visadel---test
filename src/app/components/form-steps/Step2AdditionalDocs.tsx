@@ -25,6 +25,11 @@ const FLIGHT_ADDON_FIELDS = [
   { key: 'bookingDate', defaultLabel: 'Дата бронирования', defaultRequired: true, defaultPlaceholder: '' },
 ];
 
+// Чуть компактнее .form-input (px-4 py-3) — поле с активным focus-ring + клавиатура
+// в Telegram WebView влезали впритык. Та же визуальная анатомия, но 14px текст и
+// 10px вертикальный padding оставляют больше места для контента.
+const ADDON_INPUT = 'w-full px-3.5 py-2.5 text-[15px] border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition';
+
 // Lookup утилита: применяет override (label/required/visible) если есть, иначе дефолт.
 const resolveOverride = (overrides: CoreFieldOverrides, key: string, defaultLabel: string, defaultRequired: boolean) => {
   const o = overrides[key] ?? {};
@@ -138,7 +143,20 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
   };
 
   const handleNext = () => {
-    if (validate()) onNext();
+    if (validate()) {
+      onNext();
+      return;
+    }
+    // Подскролливаем к первому полю с ошибкой и фокусим — иначе ошибки могут
+    // быть выше скролла и кажется, что кнопка «Далее» не работает.
+    requestAnimationFrame(() => {
+      const firstError = document.querySelector('[data-step2-error="true"]');
+      if (firstError instanceof HTMLElement) {
+        firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input = firstError.querySelector('input') as HTMLInputElement | null;
+        input?.focus({ preventScroll: true });
+      }
+    });
   };
 
   const showOptions = country !== 'Вьетнам';
@@ -192,6 +210,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                       const h = formData.hotelDetails ?? {};
 
                       if (f.key === 'children') {
+                        const childrenErr = errors['hotel.childrenCount'];
                         return (
                           <div key={f.key}>
                             <FieldLabel label={ov.label} required={ov.required} />
@@ -215,17 +234,19 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                                   exit={{ opacity: 0, height: 0, marginTop: 0 }}
                                   transition={{ duration: 0.2 }}
                                   className="overflow-hidden"
+                                  data-step2-error={childrenErr ? 'true' : undefined}
                                 >
                                   <FieldLabel label="Количество детей" required />
                                   <input
                                     type="number"
                                     min={1}
+                                    inputMode="numeric"
                                     value={h.childrenCount ?? ''}
                                     onChange={e => updateHotel('childrenCount', parseInt(e.target.value, 10) || 0)}
                                     placeholder="1"
-                                    className="form-input"
+                                    className={ADDON_INPUT}
                                   />
-                                  {errors['hotel.childrenCount'] && <ErrorLine text={errors['hotel.childrenCount']} />}
+                                  {childrenErr && <ErrorLine text={childrenErr} />}
                                 </motion.div>
                               )}
                             </AnimatePresence>
@@ -235,15 +256,16 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
 
                       if (f.key === 'guests') {
                         return (
-                          <div key={f.key}>
+                          <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                             <FieldLabel label={ov.label} required={ov.required} />
                             <input
                               type="number"
                               min={1}
+                              inputMode="numeric"
                               value={h.guests ?? 1}
                               onChange={e => updateHotel('guests', parseInt(e.target.value, 10) || 0)}
                               placeholder={f.defaultPlaceholder}
-                              className="form-input"
+                              className={ADDON_INPUT}
                             />
                             {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                           </div>
@@ -252,14 +274,14 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
 
                       const inputType = f.key === 'checkIn' || f.key === 'checkOut' ? 'date' : 'text';
                       return (
-                        <div key={f.key}>
+                        <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                           <FieldLabel label={ov.label} required={ov.required} />
                           <input
                             type={inputType}
                             value={(h as any)[f.key] ?? ''}
                             onChange={e => updateHotel(f.key as keyof HotelAddonDetails, e.target.value as any)}
                             placeholder={f.defaultPlaceholder}
-                            className="form-input"
+                            className={ADDON_INPUT}
                           />
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
@@ -297,14 +319,14 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
                       const fl = formData.flightDetails ?? {};
                       const inputType = f.key === 'bookingDate' ? 'date' : 'text';
                       return (
-                        <div key={f.key}>
+                        <div key={f.key} data-step2-error={errors[errKey] ? 'true' : undefined}>
                           <FieldLabel label={ov.label} required={ov.required} />
                           <input
                             type={inputType}
                             value={(fl as any)[f.key] ?? ''}
                             onChange={e => updateFlight(f.key as keyof FlightAddonDetails, e.target.value as any)}
                             placeholder={f.defaultPlaceholder}
-                            className="form-input"
+                            className={ADDON_INPUT}
                           />
                           {errors[errKey] && <ErrorLine text={errors[errKey]} />}
                         </div>
@@ -385,7 +407,7 @@ function AddonCard({ emoji, title, description, price, checked, onToggle, childr
           {checked && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
         </div>
       </button>
-      {children && <div className="px-4 pb-4">{children}</div>}
+      {children && <div className="px-3 pb-3">{children}</div>}
     </div>
   );
 }
