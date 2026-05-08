@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
+import { ChevronRight, ChevronDown, Calculator, Check, Loader2, Shield, TrendingUp } from 'lucide-react';
 import BrandHeader from './shared/BrandHeader';
 import type { VisaOption } from '../App';
 import {
@@ -449,25 +449,31 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
             <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
               Заполни анкету за 5 минут — <span className="text-[#0F2A36] font-semibold">мы сделаем остальное</span>
             </p>
-            {/* Trust strip — proof points в одну линию.
-                Порядок: соц.доказательство → claim → value prop. Юзер из
-                Telegram холодный, ★-якорь слева быстрее гасит "не развод
-                ли это", потом уже 99% и удобство. */}
+            {/* Trust strip — premium minimalist триада:
+                Опыт (Shield) → Успех (Check) → Масштаб (TrendingUp).
+                Растущий ритм цифр (5+ → 99% → 1000+) и нарастающий
+                психологический вес: давно работаем → результат стабилен →
+                нас выбрали тысячи. Solid white карточки, тонкая граница,
+                иконки в брендовом цвете — без glass-эффекта и градиентов. */}
             <div className="mt-5 grid grid-cols-3 gap-2 max-w-md mx-auto">
-              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
-                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none flex items-center justify-center gap-0.5">
-                  4.8<span className="text-amber-400">★</span>
+              {[
+                { Icon: Shield,      big: '5+',    small: 'лет опыта'      },
+                { Icon: Check,       big: '99%',   small: 'одобрений'      },
+                { Icon: TrendingUp,  big: '1000+', small: 'виз оформлено'  },
+              ].map(({ Icon, big, small }) => (
+                <div
+                  key={small}
+                  className="bg-white border border-gray-100 rounded-xl px-3 py-3 flex flex-col items-center gap-1.5 active:scale-[0.97] transition"
+                >
+                  <Icon className="w-4 h-4 text-[#3B5BFF]" strokeWidth={2.5} />
+                  <div className="text-[15px] font-extrabold text-[#0F2A36] leading-none tabular-nums">
+                    {big}
+                  </div>
+                  <div className="text-[10px] text-[#0F2A36]/55 leading-tight text-center">
+                    {small}
+                  </div>
                 </div>
-                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">отзывы клиентов</div>
-              </div>
-              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
-                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">99%</div>
-                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">одобрений</div>
-              </div>
-              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
-                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">100%</div>
-                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">онлайн, без посольства</div>
-              </div>
+              ))}
             </div>
           </div>
         )}
