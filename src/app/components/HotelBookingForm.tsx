@@ -253,7 +253,7 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
           <span className="vd-grad-text">для визы</span>
         </h1>
         <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3 leading-relaxed">
-          Подтверждение, принимаемое посольствами и пограничными службами.<br/>Оформление — 5 минут.
+          Подтверждение, принимаемое посольствами и пограничными службами.
         </p>
       </div>
 
