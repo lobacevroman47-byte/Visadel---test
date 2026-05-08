@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2, Check } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
@@ -212,8 +213,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
             console.error('[step7] spend-bonus failed:', res.status, data);
-            // Не блокируем submit, но юзер может увидеть несоответствие
-            alert(`⚠️ Бонусы не списались с сервера:\nHTTP ${res.status}\n${data?.error ?? ''}\n\nСвяжись с поддержкой если баланс не обновился.`);
+            toast.error('Бонусы не списались — свяжитесь с поддержкой если баланс не обновился');
           } else if (typeof data.newBalance === 'number') {
             const updated = { ...userData, bonusBalance: data.newBalance };
             localStorage.setItem('userData', JSON.stringify(updated));
@@ -221,7 +221,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
           }
         } catch (e) {
           console.error('[step7] spend-bonus exception:', e);
-          alert(`⚠️ Бонусы не списались (network):\n${e instanceof Error ? e.message : String(e)}`);
+          toast.error('Бонусы не списались — попробуй ещё раз');
         }
       }
 
@@ -243,8 +243,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
     } catch (err) {
       console.error('Submit error:', err);
       haptic('error');
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(`Ошибка при отправке:\n${msg}\n\nПопробуйте ещё раз или сохраните черновик.`);
+      toast.error('Не удалось отправить заявку. Попробуй ещё раз или сохрани черновик.');
     } finally {
       setSubmitting(false);
     }
@@ -285,7 +284,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       </div>
 
       {/* Реквизиты */}
-      <div className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-gray-100">
+      <div className="bg-white rounded-2xl p-5 mb-3 shadow-sm border border-gray-100">
         <div className="flex items-start gap-3">
           <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
             <CreditCard className="w-5 h-5" />
@@ -295,6 +294,24 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
             <p className="text-[10px] text-[#0F2A36]/60 mt-1.5 uppercase tracking-wider font-semibold">Номер карты</p>
             <p className="text-[#0F2A36] font-mono text-[15px] mt-0.5 tracking-wide">{cardNumber}</p>
             <p className="text-[11px] text-[#0F2A36]/60 mt-2">После оплаты загрузите скриншот перевода</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Trust strip — снижает страх перед вводом реквизитов */}
+      <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm border border-gray-100">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[18px]">🛡️</span>
+            <span className="text-[10px] leading-tight text-[#0F2A36]/70">Защищено<br/>Telegram</span>
+          </div>
+          <div className="flex flex-col items-center gap-1 border-x border-gray-100">
+            <span className="text-[18px]">↩️</span>
+            <span className="text-[10px] leading-tight text-[#0F2A36]/70">Возврат<br/>30 дней</span>
+          </div>
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-[18px]">🤝</span>
+            <span className="text-[10px] leading-tight text-[#0F2A36]/70">Поддержка<br/>24/7</span>
           </div>
         </div>
       </div>

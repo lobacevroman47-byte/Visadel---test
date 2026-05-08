@@ -312,7 +312,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
           {/* Submit Button */}
           <button
             onClick={handleSubmit}
-            className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
+            className="w-full vd-grad text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold flex items-center justify-center gap-2 vd-shadow-cta"
           >
             <Send className="w-5 h-5" />
             Отправить заявку

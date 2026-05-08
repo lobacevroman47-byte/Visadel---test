@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, Component, type ReactNode } from 'react';
+import { toast } from 'sonner';
 import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane, Check, AlertTriangle } from 'lucide-react';
 
 // ── Error Boundary so a single bad row doesn't blank the whole tab ─────────
@@ -435,7 +436,7 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
         }),
       }).then(async (res) => ({ res, data: await res.json().catch(() => ({})) as { ok?: boolean; skipped?: unknown; newBalance?: number; error?: string } }));
     } else if (!telegramId) {
-      alert(`⚠️ Бонус не начислен: нет данных пользователя (telegramId=0). Переоткрой мини-апп через бота.`);
+      toast.error('Переоткрой мини-апп через бота — нет данных пользователя');
     }
 
     // 3. Ждём ответ сервера и подтверждаем/откатываем
@@ -444,18 +445,19 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
         const { res, data } = await bonusPromise;
         if (!res.ok) {
           balance.rollback();
-          alert(`⚠️ Бонус не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error)'}`);
+          toast.error(`Бонус не начислен (${res.status})`);
+          console.error('[review-bonus] HTTP error', res.status, data);
         } else if (data.skipped) {
-          // Уже было начисление — откатываем оптимистичный +200
           balance.rollback();
-          alert(`⚠️ Бонус за этот отзыв уже был начислен ранее.`);
+          toast.info('Бонус за этот отзыв уже был начислен');
         } else if (typeof data.newBalance === 'number') {
-          // Синхронизуем с реальным балансом с сервера
           balance.syncTo(data.newBalance);
+          toast.success('+200 ₽ за отзыв');
         }
       } catch (e) {
         balance.rollback();
-        alert(`⚠️ Бонус упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+        toast.error(`Бонус не начислен — попробуй ещё раз`);
+        console.error('[review-bonus] exception', e);
       }
     }
 
@@ -859,7 +861,7 @@ function BookingActions({
           }),
         }).then(async (res) => ({ res, data: await res.json().catch(() => ({})) as { skipped?: unknown; newBalance?: number; error?: string } }));
       } else if (!telegramId) {
-        alert(`⚠️ Бонус не начислен: нет данных пользователя (telegramId=0). Переоткрой мини-апп через бота.`);
+        toast.error('Переоткрой мини-апп через бота — нет данных пользователя');
       }
 
       // 3. Подтверждаем баланс или откатываем
@@ -868,16 +870,19 @@ function BookingActions({
           const { res, data } = await bonusPromise;
           if (!res.ok) {
             rollback();
-            alert(`⚠️ Бонус за отзыв о брони не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error)'}`);
+            toast.error(`Бонус не начислен (${res.status})`);
+            console.error('[booking-review-bonus] HTTP error', res.status, data);
           } else if (data.skipped) {
             rollback();
-            alert(`⚠️ Бонус за этот отзыв уже был начислен ранее.`);
+            toast.info('Бонус за этот отзыв уже был начислен');
           } else if (typeof data.newBalance === 'number') {
             syncTo(data.newBalance);
+            toast.success('+200 ₽ за отзыв');
           }
         } catch (e) {
           rollback();
-          alert(`⚠️ Бонус упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+          toast.error('Бонус не начислен — попробуй ещё раз');
+          console.error('[booking-review-bonus] exception', e);
         }
       }
 

@@ -450,7 +450,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
       <div className="max-w-2xl mx-auto">
         {/* ─── Hero (визы) — только на главном экране списка стран ─── */}
         {!selectedCountry && (
-          <div className="vd-grad-soft px-5 pt-7 pb-8">
+          <div className="vd-grad-soft px-5 pt-7 pb-6">
             <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36]">
               Простой способ
               <br/>
@@ -459,6 +459,23 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
             <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
               Заполни анкету за 5 минут — <span className="text-[#0F2A36] font-semibold">мы сделаем остальное</span>
             </p>
+            {/* Trust strip — proof points в одну линию */}
+            <div className="mt-5 grid grid-cols-3 gap-2 max-w-md mx-auto">
+              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
+                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">99%</div>
+                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">одобрений</div>
+              </div>
+              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
+                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">1–3 дня</div>
+                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">срок оформления</div>
+              </div>
+              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
+                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none flex items-center justify-center gap-0.5">
+                  4.8<span className="text-amber-400">★</span>
+                </div>
+                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">отзывы клиентов</div>
+              </div>
+            </div>
           </div>
         )}
 

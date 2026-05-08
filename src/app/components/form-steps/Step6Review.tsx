@@ -180,9 +180,9 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
         </button>
         <button
           onClick={onNext}
-          className="flex-1 bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition flex items-center justify-center gap-2"
+          className="flex-1 vd-grad text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold flex items-center justify-center gap-2 vd-shadow-cta"
         >
-          Подтвердить
+          К оплате
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>

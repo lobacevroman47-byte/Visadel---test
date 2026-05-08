@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Gift, Flame, Save, Check, User, Mail, Phone, RefreshCw, History } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getMaxBonusUsage } from '../../lib/bonus-config';
 
 interface ProfileTabProps {
   onBonusChange?: (newBalance: number) => void;
@@ -388,6 +389,13 @@ export default function ProfileTab({ onBonusChange }: ProfileTabProps = {}) {
         <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 mb-4 text-center">
           <p className="text-xs text-gray-500 mb-1">Доступно</p>
           <p className="text-4xl font-bold text-purple-600">{bonusBalance}₽</p>
+          <p className="text-[11px] text-gray-500 mt-1">
+            {(() => {
+              const cap = getMaxBonusUsage(0, isPartner);
+              if (cap == null) return 'Можно оплатить до 100% заказа';
+              return `Можно списать до ${cap}₽ при оплате`;
+            })()}
+          </p>
         </div>
         <div className="space-y-2 text-sm">
           {(isPartner

@@ -160,14 +160,14 @@ export default function Step3HowHeard({ data, onChange, onNext, onPrev }: Step3P
               onClick={() => toggle(option.value)}
               className={`border-2 rounded-xl p-4 cursor-pointer transition-all ${
                 active
-                  ? `${option.color} border-blue-500 shadow-md`
+                  ? `${option.color} border-[#3B5BFF] shadow-md`
                   : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
               }`}
             >
               <div className="flex items-center gap-3">
                 {/* Checkbox */}
                 <div className={`flex-shrink-0 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-all ${
-                  active ? 'border-blue-500 bg-blue-500' : 'border-gray-300'
+                  active ? 'border-[#3B5BFF] bg-[#3B5BFF]' : 'border-gray-300'
                 }`}>
                   {active && (
                     <svg className="w-4 h-4 text-white" fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" viewBox="0 0 24 24" stroke="currentColor">

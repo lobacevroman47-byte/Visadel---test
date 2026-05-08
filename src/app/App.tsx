@@ -1,4 +1,5 @@
 import { useState, useEffect, createContext, useContext, lazy, Suspense } from 'react';
+import { Toaster } from 'sonner';
 import SplashScreen from './components/SplashScreen';
 import Home from './components/Home';
 import BottomNav, { type MainTab } from './components/BottomNav';
@@ -367,6 +368,18 @@ function App() {
           </Suspense>
         )}
       </div>
+      <Toaster
+        position="top-center"
+        richColors
+        closeButton={false}
+        duration={2500}
+        toastOptions={{
+          style: {
+            borderRadius: '12px',
+            fontFamily: 'inherit',
+          },
+        }}
+      />
       </AppCatalogProvider>
     </TelegramCtx.Provider>
   );
