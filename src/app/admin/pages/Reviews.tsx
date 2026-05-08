@@ -26,9 +26,23 @@ interface ReviewForm {
   country: string;
   rating: number;
   text: string;
+  // YYYY-MM-DD — дата которую увидят юзеры. Админ может выставить любую,
+  // чтобы каталог отзывов выглядел "живым" с историей за месяцы/годы.
+  date: string;
+  // Источник отзыва: 'channel' = пришло из @visadel_agency Telegram-канала
+  // (отображается с лейблом "@visadel_agency"), 'miniapp' = оставлено через
+  // мини-апп. На публичной странице отзывов это видно как маленький бейдж.
+  source: 'channel' | 'miniapp';
 }
 
-const EMPTY_FORM: ReviewForm = { authorName: '', avatar: '🧑', country: '', rating: 5, text: '' };
+const todayISO = () => new Date().toISOString().slice(0, 10);
+
+const EMPTY_FORM: ReviewForm = {
+  authorName: '', avatar: '🧑', country: '',
+  rating: 5, text: '',
+  date: todayISO(),
+  source: 'channel',
+};
 const AVATARS = ['👨', '👩', '🧑'];
 
 // ── Star picker ──────────────────────────────────────────────────────────────
@@ -145,6 +159,43 @@ function ReviewModal({ initial, title, onSave, onClose }: {
             <textarea value={form.text} onChange={e => set('text', e.target.value)}
               rows={4} placeholder="Отличный сервис, всё сделали быстро и без проблем!"
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/30 focus:border-[#3B5BFF] resize-none" />
+          </div>
+
+          {/* Date + Source — задают как отзыв будет выглядеть на публичной странице */}
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Дата отзыва</label>
+            <input type="date" value={form.date} onChange={e => set('date', e.target.value)}
+              max={todayISO()}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/30 focus:border-[#3B5BFF]" />
+            <p className="text-[11px] text-gray-400 mt-1">Можно поставить любую дату из прошлого — отзыв будет выглядеть как реально оставленный тогда.</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1.5 uppercase tracking-wide">Откуда отзыв</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={() => set('source', 'channel')}
+                className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all border-2 ${
+                  form.source === 'channel'
+                    ? 'border-[#3B5BFF] bg-blue-50 text-[#3B5BFF]'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                }`}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span>📣</span>
+                  <span>@visadel_agency</span>
+                </div>
+              </button>
+              <button type="button" onClick={() => set('source', 'miniapp')}
+                className={`rounded-xl px-3 py-2.5 text-sm font-medium transition-all border-2 ${
+                  form.source === 'miniapp'
+                    ? 'border-[#3B5BFF] bg-blue-50 text-[#3B5BFF]'
+                    : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                }`}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span>💬</span>
+                  <span>Из приложения</span>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -291,6 +342,10 @@ export const Reviews: React.FC = () => {
     finally { setDeleting(false); setConfirmReview(null); }
   };
 
+  // Полная ISO-таймстемпа из выбранной даты (12:00 UTC чтобы избежать
+  // shift через таймзоны и разные локальные tz).
+  const dateToIso = (d: string) => `${d}T12:00:00.000Z`;
+
   // ── Add ────────────────────────────────────────────────────────────────────
   const handleAdd = async (f: ReviewForm) => {
     try {
@@ -301,7 +356,8 @@ export const Reviews: React.FC = () => {
         author_name: f.authorName.trim() || 'Клиент',
         avatar: f.avatar,
         status: 'approved',
-        source: 'manual',
+        source: f.source, // 'channel' | 'miniapp'
+        created_at: dateToIso(f.date),
       };
       const { data, error } = await supabase.from('reviews').insert(row).select().single();
       if (error) throw error;
@@ -322,6 +378,8 @@ export const Reviews: React.FC = () => {
         text: f.text.trim(),
         author_name: f.authorName.trim() || 'Клиент',
         avatar: f.avatar,
+        source: f.source,
+        created_at: dateToIso(f.date),
       };
       const res = await apiFetch('/api/update-review', {
         method: 'POST',
@@ -372,6 +430,8 @@ export const Reviews: React.FC = () => {
             country: editReview.country ?? '',
             rating: editReview.rating,
             text: editReview.text,
+            date: editReview.created_at ? editReview.created_at.slice(0, 10) : todayISO(),
+            source: editReview.source === 'miniapp' ? 'miniapp' : 'channel',
           }}
           onSave={handleEdit}
           onClose={() => setEditReview(null)}
@@ -481,8 +541,18 @@ export const Reviews: React.FC = () => {
                       <div className="flex items-center gap-2 flex-wrap">
                         <p className="font-semibold text-gray-800 text-sm">{review.author_name ?? 'Клиент'}</p>
                         <StatusBadge status={review.status} />
+                        {review.source === 'channel' && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-blue-50 text-[#3B5BFF] font-medium flex items-center gap-1">
+                            📣 @visadel_agency
+                          </span>
+                        )}
+                        {review.source === 'miniapp' && (
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 font-medium flex items-center gap-1">
+                            💬 Из приложения
+                          </span>
+                        )}
                         {review.source === 'manual' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-violet-50 text-violet-500 font-medium">Вручную</span>
+                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-violet-50 text-violet-500 font-medium">Вручную</span>
                         )}
                         {review.country && <span className="text-xs text-gray-400">{review.country}</span>}
                       </div>

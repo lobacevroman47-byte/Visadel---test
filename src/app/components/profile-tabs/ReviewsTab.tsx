@@ -284,12 +284,25 @@ export default function ReviewsTab() {
                       {review.author_name ?? 'Клиент'}
                     </p>
                     <p className="text-xs text-gray-400 shrink-0">
-                      {new Date(review.created_at).toLocaleDateString('ru-RU')}
+                      {new Date(review.created_at).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                   </div>
-                  {review.country && review.country !== 'Не указана' && (
-                    <p className="text-xs text-gray-400 mb-1">{review.country}</p>
-                  )}
+                  {/* Source-бейдж + страна — на той же строке, мелким шрифтом */}
+                  <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+                    {review.source === 'channel' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-blue-50 text-[#3B5BFF] font-medium flex items-center gap-1">
+                        📣 @visadel_agency
+                      </span>
+                    )}
+                    {review.source === 'miniapp' && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-600 font-medium flex items-center gap-1">
+                        💬 Из приложения
+                      </span>
+                    )}
+                    {review.country && review.country !== 'Не указана' && (
+                      <span className="text-[11px] text-gray-400">{review.country}</span>
+                    )}
+                  </div>
                   <StarRow rating={review.rating} />
                   <p className="text-sm text-gray-700 leading-relaxed mt-2">"{review.text}"</p>
                 </div>
