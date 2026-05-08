@@ -69,12 +69,37 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
     await dbInsert('bonus_logs', { telegram_id, type, amount, description });
   }
 
-  // 2) Атомарный апдейт баланса (PostgREST не даёт SET balance = balance + N
-  //    напрямую без RPC, поэтому read+write — у нас уже не двойной начисление,
-  //    но баланс может разойтись если параллельно. В будущем — RPC inc_balance).
+  // 2) Апдейт баланса. PostgREST не даёт SET balance = balance + N без RPC,
+  //    поэтому read → compute → write. Дедуп логов в (1) защищает от
+  //    двойного начисления; параллельные запросы могут разойтись на величину
+  //    (в будущем — RPC inc_balance).
+  //
+  //    Если строки в users нет (founder заходил через ?admin=true и пропустил
+  //    upsertUser, или RLS заблокировал INSERT с фронта) — PATCH молча
+  //    апдейтит 0 строк, баланс остаётся 0, но bonus_logs уже записан.
+  //    Поэтому fallback'ом делаем UPSERT через on_conflict=telegram_id.
   const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=bonus_balance`);
   const newBalance = ((user?.bonus_balance) ?? 0) + amount;
-  await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
+
+  if (user) {
+    await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
+  } else {
+    // Юзера нет — создаём минимальную строку. on_conflict=telegram_id +
+    // resolution=merge-duplicates делает upsert (на случай race condition,
+    // если параллельный запрос успел вставить). Минимально нужны
+    // telegram_id и referral_code (UNIQUE NOT NULL по схеме).
+    const referral_code = `USR_${telegram_id}`;
+    await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=telegram_id`, {
+      method: 'POST',
+      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+      body: JSON.stringify({
+        telegram_id,
+        bonus_balance: newBalance,
+        referral_code,
+        first_name: 'User',
+      }),
+    });
+  }
 
   return { newBalance };
 }
