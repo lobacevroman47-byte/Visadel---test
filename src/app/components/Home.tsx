@@ -31,6 +31,24 @@ function extractDuration(name: string): string {
   return m ? `${m[1]} ${m[2]}` : '';
 }
 
+// Сроки оформления per страна. Используется в шапке выбора типа визы.
+// Если страны нет в map — fallback "1–3 дня". note показывается мелким
+// текстом под основной строкой (обычно для стран с риском задержек).
+function getCountryTiming(name: string): { days: string; note?: string } {
+  const map: Record<string, { days: string; note?: string }> = {
+    'Индия':       { days: '1–3 дня', note: 'В редких случаях до 10 дней' },
+    'Вьетнам':     { days: 'до 5 рабочих дней' },
+    'Шри-Ланка':   { days: '1–3 дня' },
+    'Южная Корея': { days: '1–3 дня' },
+    'Израиль':     { days: '1–3 дня' },
+    'Филиппины':   { days: '1 день' },
+    'Пакистан':    { days: '1–3 дня' },
+    'Кения':       { days: '1–3 дня' },
+    'Камбоджа':    { days: '3–5 дней' },
+  };
+  return map[name] ?? { days: '1–3 дня' };
+}
+
 // Map DB visa products → grouped country structure with urgent/extension classification
 function productsToCountries(products: VisaProduct[]): Country[] {
   const enabled = products.filter(p => p.enabled);
@@ -548,13 +566,23 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3 mt-4 text-[11px] text-[#0F2A36]/70 uppercase tracking-wider font-semibold">
-                <span>1–3 дня</span>
-                <span className="text-[#5C7BFF]">·</span>
-                <span>99% одобрений</span>
-                <span className="text-[#5C7BFF]">·</span>
-                <span>SSL</span>
-              </div>
+              {(() => {
+                const t = getCountryTiming(selectedCountry.name);
+                return (
+                  <>
+                    <div className="flex items-center gap-3 mt-4 text-[11px] text-[#0F2A36]/70 uppercase tracking-wider font-semibold">
+                      <span>{t.days}</span>
+                      <span className="text-[#5C7BFF]">·</span>
+                      <span>99% одобрений</span>
+                    </div>
+                    {t.note && (
+                      <p className="text-[11px] text-[#0F2A36]/55 mt-1.5 leading-tight">
+                        ⚠️ {t.note}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
             </div>
 
             {/* Extensions for Sri Lanka */}
