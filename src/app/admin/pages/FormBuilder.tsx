@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileEdit, Image as ImageIcon, Plus, Edit2, Trash2, X, Save, Loader2,
   RefreshCw, Database, AlertCircle, Package, Hotel, Plane,
-  Eye, EyeOff, ChevronLeft,
+  Eye, EyeOff, ChevronLeft, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   getVisaProducts,
-  getAllFormFields, upsertFormField, deleteFormField,
-  getAllPhotoRequirements, upsertPhotoRequirement, deletePhotoRequirement,
+  getAllFormFields, upsertFormField, deleteFormField, reorderFormFields,
+  getAllPhotoRequirements, upsertPhotoRequirement, deletePhotoRequirement, reorderPhotoRequirements,
   seedFormFieldsFromCode,
   getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField, type CoreFieldOverrides,
   type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
@@ -175,6 +175,51 @@ const VisaFormSection: React.FC = () => {
     setAllPhotos(prev => prev.filter(x => x.id !== p.id));
   };
 
+  // Перемещение поля вверх/вниз. Меняем порядок в текущем массиве (по
+  // отсортированному списку для выбранной страны), потом пишем
+  // sort_order = 0,1,2,... для всех полей этой страны атомарно.
+  const handleMoveField = async (id: string, direction: 'up' | 'down') => {
+    const sorted = fieldsOfSelected;
+    const idx = sorted.findIndex(f => f.id === id);
+    if (idx === -1) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+
+    // Поменять местами в копии
+    const reordered = [...sorted];
+    [reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]];
+    const orderedIds = reordered.map(f => f.id);
+
+    // Optimistic UI: обновляем sort_order локально, чтобы не мигало
+    setAllFields(prev => prev.map(f => {
+      const newPos = orderedIds.indexOf(f.id);
+      return newPos !== -1 ? { ...f, sort_order: newPos } : f;
+    }));
+
+    try { await reorderFormFields(orderedIds); }
+    catch (e) { console.error('reorderFormFields failed', e); }
+  };
+
+  const handleMovePhoto = async (id: string, direction: 'up' | 'down') => {
+    const sorted = photosOfSelected;
+    const idx = sorted.findIndex(p => p.id === id);
+    if (idx === -1) return;
+    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (newIdx < 0 || newIdx >= sorted.length) return;
+
+    const reordered = [...sorted];
+    [reordered[idx], reordered[newIdx]] = [reordered[newIdx], reordered[idx]];
+    const orderedIds = reordered.map(p => p.id);
+
+    setAllPhotos(prev => prev.map(p => {
+      const newPos = orderedIds.indexOf(p.id);
+      return newPos !== -1 ? { ...p, sort_order: newPos } : p;
+    }));
+
+    try { await reorderPhotoRequirements(orderedIds); }
+    catch (e) { console.error('reorderPhotoRequirements failed', e); }
+  };
+
   const isEmpty = allFields.length === 0 && allPhotos.length === 0;
 
   return (
@@ -295,8 +340,26 @@ const VisaFormSection: React.FC = () => {
                 <div className="p-10 text-center text-sm text-gray-400">Полей пока нет — добавь первое</div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {fieldsOfSelected.map(f => (
+                  {fieldsOfSelected.map((f, idx) => (
                     <div key={f.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          onClick={() => handleMoveField(f.id, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить выше"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleMoveField(f.id, 'down')}
+                          disabled={idx === fieldsOfSelected.length - 1}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить ниже"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
                       <div className="flex-1 min-w-[200px]">
                         <p className="text-gray-800 font-medium">{f.label} {f.required && <span className="text-red-500">*</span>}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
@@ -332,8 +395,26 @@ const VisaFormSection: React.FC = () => {
                 <div className="p-10 text-center text-sm text-gray-400">Фото-требований пока нет</div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {photosOfSelected.map(p => (
+                  {photosOfSelected.map((p, idx) => (
                     <div key={p.id} className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          onClick={() => handleMovePhoto(p.id, 'up')}
+                          disabled={idx === 0}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить выше"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleMovePhoto(p.id, 'down')}
+                          disabled={idx === photosOfSelected.length - 1}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить ниже"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
+                      </div>
                       <div className="flex-1 min-w-[200px]">
                         <p className="text-gray-800 font-medium">{p.label} {p.required && <span className="text-red-500">*</span>}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
@@ -1104,23 +1185,15 @@ const FieldFormModal: React.FC<{
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-              <p className="text-sm font-medium text-gray-700">Обязательное</p>
-              <input
-                type="checkbox" checked={form.required}
-                onChange={e => set('required', e.target.checked)}
-                className="w-5 h-5 accent-emerald-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Порядок</label>
-              <input
-                type="number" value={form.sort_order} min={0}
-                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+          {/* Обязательное — единственный toggle здесь. Поле "Порядок"
+              убрано: порядок меняется кнопками ↑↓ прямо в списке. */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-medium text-gray-700">Обязательное</p>
+            <input
+              type="checkbox" checked={form.required}
+              onChange={e => set('required', e.target.checked)}
+              className="w-5 h-5 accent-emerald-500"
+            />
           </div>
 
           <div className="flex gap-2 pt-2">
@@ -1236,21 +1309,12 @@ const PhotoFormModal: React.FC<{
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
-              <p className="text-sm font-medium text-gray-700">Обязательное</p>
-              <input type="checkbox" checked={form.required}
-                onChange={e => set('required', e.target.checked)}
-                className="w-5 h-5 accent-emerald-500" />
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">Порядок</label>
-              <input
-                type="number" value={form.sort_order} min={0}
-                onChange={e => set('sort_order', parseInt(e.target.value, 10) || 0)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+          {/* Порядок задаётся через ↑↓ в списке, не здесь */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+            <p className="text-sm font-medium text-gray-700">Обязательное</p>
+            <input type="checkbox" checked={form.required}
+              onChange={e => set('required', e.target.checked)}
+              className="w-5 h-5 accent-emerald-500" />
           </div>
 
           <div className="flex gap-2 pt-2">

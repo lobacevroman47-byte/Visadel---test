@@ -951,6 +951,22 @@ export async function deleteFormField(id: string): Promise<void> {
   await supabase.from('visa_form_fields').delete().eq('id', id);
 }
 
+// Перенумеровывает sort_order для нескольких полей одной страны.
+// Используется когда админ переместил поле вверх/вниз в FormBuilder —
+// мы получаем итоговый порядок и пишем sort_order = 0,1,2,3...
+// Так юзер видит поля в той же последовательности что и админ.
+export async function reorderFormFields(orderedIds: string[]): Promise<void> {
+  if (!isSupabaseConfigured() || orderedIds.length === 0) return;
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('visa_form_fields')
+        .update({ sort_order: index, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    )
+  );
+}
+
 // Same merge logic as getFormFields: country-level always included,
 // visa-specific overrides by field_key.
 export async function getPhotoRequirements(country: string, visaId?: string): Promise<VisaPhotoRequirement[]> {
@@ -1002,6 +1018,18 @@ export async function upsertPhotoRequirement(p: Omit<VisaPhotoRequirement, 'crea
 export async function deletePhotoRequirement(id: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
   await supabase.from('visa_photo_requirements').delete().eq('id', id);
+}
+
+export async function reorderPhotoRequirements(orderedIds: string[]): Promise<void> {
+  if (!isSupabaseConfigured() || orderedIds.length === 0) return;
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from('visa_photo_requirements')
+        .update({ sort_order: index, updated_at: new Date().toISOString() })
+        .eq('id', id)
+    )
+  );
 }
 
 // One-shot: import all hardcoded fields and photo requirements from countriesData.
