@@ -358,7 +358,43 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
     load();
   };
 
+  // Helper: optimistic balance update + rollback on failure.
+  // Возвращает [applyDelta, rollback] — applyDelta(amount) сразу прибавляет
+  // к балансу, rollback() возвращает к исходному значению. Когда сервер
+  // подтвердит реальный newBalance — применяем его через syncTo(actual).
+  const optimisticBalance = (delta: number) => {
+    let original = 0;
+    try { original = JSON.parse(localStorage.getItem('userData') ?? '{}').bonusBalance ?? 0; } catch {}
+    const optimistic = original + delta;
+    try {
+      const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+      ud.bonusBalance = optimistic;
+      localStorage.setItem('userData', JSON.stringify(ud));
+    } catch {}
+    onBonusChange?.(optimistic);
+    return {
+      rollback: () => {
+        try {
+          const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+          ud.bonusBalance = original;
+          localStorage.setItem('userData', JSON.stringify(ud));
+        } catch {}
+        onBonusChange?.(original);
+      },
+      syncTo: (actual: number) => {
+        try {
+          const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+          ud.bonusBalance = actual;
+          localStorage.setItem('userData', JSON.stringify(ud));
+        } catch {}
+        onBonusChange?.(actual);
+      },
+    };
+  };
+
   // One-click: submit review + open Telegram + give 200₽ review bonus
+  // Балланс обновляется ОПТИМИСТИЧНО (сразу +200), review и bonus летят
+  // на сервер ПАРАЛЛЕЛЬНО, при ошибке/skipped — rollback.
   const handleQuickReview = async (app: Application) => {
     if (submittingReviewId) return;
     setSubmittingReviewId(app.id!);
@@ -367,61 +403,69 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
       try { return JSON.parse(localStorage.getItem('userData') ?? '{}').username ?? ''; } catch { return ''; }
     })();
 
-    try {
-      await submitReview({
-        telegramId,
-        applicationId: app.id!,
-        country: app.country,
-        rating: 5,
-        text: 'Отзыв оставлен в Telegram-канале',
-        username,
-      });
+    const eligibleForBonus = !!telegramId && !appUser?.is_influencer;
 
-      // Grant +200₽ review bonus via service-key API (with dedup) — partners excluded
-      if (telegramId && !appUser?.is_influencer) {
-        try {
-          const res = await apiFetch('/api/grant-bonus', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: telegramId,
-              type: 'review',
-              amount: 200,
-              description: `+200₽ за отзыв о визе ${app.country} (${app.id})`,
-              application_id: app.id,
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            // ВРЕМЕННО: показываем реальную ошибку в alert чтобы найти баг.
-            // Когда фикс подтвердится, заменим на тихий toast.
-            alert(`⚠️ Бонус за отзыв не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error message)'}`);
-          } else if (data.skipped) {
-            alert(`⚠️ Бонус за отзыв пропущен (skipped: ${data.skipped === true ? 'duplicate' : data.skipped}). Проверь bonus_logs.`);
-          } else if (data.newBalance != null) {
-            try {
-              const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-              ud.bonusBalance = data.newBalance;
-              localStorage.setItem('userData', JSON.stringify(ud));
-            } catch {}
-            onBonusChange?.(data.newBalance);
-          }
-        } catch (e) {
-          alert(`⚠️ Бонус за отзыв упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
-        }
-      } else if (!telegramId) {
-        alert(`⚠️ Бонус за отзыв пропущен: telegramId=0 (нет данных пользователя)`);
-      }
+    // 1. Optimistic UI: показываем +200₽ моментально
+    const balance = eligibleForBonus ? optimisticBalance(200) : null;
 
-      setReviewedIds(prev => new Set([...prev, app.id!]));
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setSubmittingReviewId(null);
+    // Haptic feedback — пользователь чувствует что нажал
+    try { (window as { Telegram?: { WebApp?: { HapticFeedback?: { notificationOccurred?: (t: string) => void } } } }).Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch {}
+
+    // 2. Параллельно: review (best-effort) + bonus (нам важен ответ)
+    const reviewPromise = submitReview({
+      telegramId,
+      applicationId: app.id!,
+      country: app.country,
+      rating: 5,
+      text: 'Отзыв оставлен в Telegram-канале',
+      username,
+    }).catch(e => { console.warn('submitReview error:', e); });
+
+    let bonusPromise: Promise<{ res: Response; data: { ok?: boolean; skipped?: unknown; newBalance?: number; error?: string } }> | null = null;
+    if (eligibleForBonus) {
+      bonusPromise = apiFetch('/api/grant-bonus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: telegramId,
+          type: 'review',
+          amount: 200,
+          description: `+200₽ за отзыв о визе ${app.country} (${app.id})`,
+          application_id: app.id,
+        }),
+      }).then(async (res) => ({ res, data: await res.json().catch(() => ({})) as { ok?: boolean; skipped?: unknown; newBalance?: number; error?: string } }));
+    } else if (!telegramId) {
+      alert(`⚠️ Бонус не начислен: нет данных пользователя (telegramId=0). Переоткрой мини-апп через бота.`);
     }
 
-    // Open Telegram channel
-    const tg = (window as any).Telegram?.WebApp;
+    // 3. Ждём ответ сервера и подтверждаем/откатываем
+    if (bonusPromise && balance) {
+      try {
+        const { res, data } = await bonusPromise;
+        if (!res.ok) {
+          balance.rollback();
+          alert(`⚠️ Бонус не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error)'}`);
+        } else if (data.skipped) {
+          // Уже было начисление — откатываем оптимистичный +200
+          balance.rollback();
+          alert(`⚠️ Бонус за этот отзыв уже был начислен ранее.`);
+        } else if (typeof data.newBalance === 'number') {
+          // Синхронизуем с реальным балансом с сервера
+          balance.syncTo(data.newBalance);
+        }
+      } catch (e) {
+        balance.rollback();
+        alert(`⚠️ Бонус упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    // 4. Дожидаемся review (не блокирует UI)
+    await reviewPromise;
+    setReviewedIds(prev => new Set([...prev, app.id!]));
+    setSubmittingReviewId(null);
+
+    // 5. Открываем Telegram канал
+    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (url: string) => void } } }).Telegram?.WebApp;
     if (tg?.openTelegramLink) {
       tg.openTelegramLink('https://t.me/visadel_recall');
     } else {
@@ -762,58 +806,82 @@ function BookingActions({
     if (submitting || reviewed || !ready) return;
     setSubmitting(true);
 
-    try {
-      // 1) Save review to reviews table — best-effort. The reviews.application_id
-      //    column is uuid for visa applications; passing a 'hotel_<uuid>' / 'flight_<uuid>'
-      //    string would throw, which used to silently abort the whole flow. Wrap it
-      //    locally so the bonus + Telegram redirect still happen even if the row
-      //    doesn't fit the legacy schema.
+    const eligibleForBonus = !!telegramId && !isPartner;
+
+    // 1. Optimistic UI: +200₽ моментально
+    let original = 0;
+    try { original = JSON.parse(localStorage.getItem('userData') ?? '{}').bonusBalance ?? 0; } catch {}
+    const applyDelta = (delta: number) => {
       try {
-        await submitReview({
-          telegramId,
-          applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
-          country: kindLabel,
-          rating: 5,
-          text: 'Отзыв оставлен в Telegram-канале',
-          username,
-        });
-      } catch (e) {
-        console.warn('submitReview for booking failed (likely uuid mismatch — expected):', e);
+        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+        ud.bonusBalance = (ud.bonusBalance ?? 0) + delta;
+        localStorage.setItem('userData', JSON.stringify(ud));
+        onBonusChange?.(ud.bonusBalance);
+      } catch {}
+    };
+    const syncTo = (actual: number) => {
+      try {
+        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+        ud.bonusBalance = actual;
+        localStorage.setItem('userData', JSON.stringify(ud));
+        onBonusChange?.(actual);
+      } catch {}
+    };
+    const rollback = () => syncTo(original);
+
+    if (eligibleForBonus) {
+      applyDelta(+200);
+      try { (window as { Telegram?: { WebApp?: { HapticFeedback?: { notificationOccurred?: (t: string) => void } } } }).Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch {}
+    }
+
+    try {
+      // 2. Параллельно: review (best-effort) + bonus (нам важен ответ)
+      const reviewPromise = submitReview({
+        telegramId,
+        applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
+        country: kindLabel,
+        rating: 5,
+        text: 'Отзыв оставлен в Telegram-канале',
+        username,
+      }).catch(e => { console.warn('submitReview for booking failed:', e); });
+
+      let bonusPromise: Promise<{ res: Response; data: { skipped?: unknown; newBalance?: number; error?: string } }> | null = null;
+      if (eligibleForBonus) {
+        bonusPromise = apiFetch('/api/grant-bonus', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: telegramId,
+            type: 'review',
+            amount: 200,
+            description: `+200₽ за отзыв о брони (${kindLabel}, ${booking.id})`,
+            application_id: `booking_${booking.id}`,
+          }),
+        }).then(async (res) => ({ res, data: await res.json().catch(() => ({})) as { skipped?: unknown; newBalance?: number; error?: string } }));
+      } else if (!telegramId) {
+        alert(`⚠️ Бонус не начислен: нет данных пользователя (telegramId=0). Переоткрой мини-апп через бота.`);
       }
 
-      // 2) Grant +200₽ review bonus (skipped for partners, deduped server-side)
-      if (telegramId && !isPartner) {
+      // 3. Подтверждаем баланс или откатываем
+      if (bonusPromise) {
         try {
-          const res = await apiFetch('/api/grant-bonus', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: telegramId,
-              type: 'review',
-              amount: 200,
-              description: `+200₽ за отзыв о брони (${kindLabel}, ${booking.id})`,
-              application_id: `booking_${booking.id}`,
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
+          const { res, data } = await bonusPromise;
           if (!res.ok) {
-            alert(`⚠️ Бонус за отзыв о брони не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error message)'}`);
+            rollback();
+            alert(`⚠️ Бонус за отзыв о брони не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error)'}`);
           } else if (data.skipped) {
-            alert(`⚠️ Бонус за отзыв о брони пропущен (skipped). Проверь bonus_logs.`);
-          } else if (data.newBalance != null) {
-            try {
-              const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-              ud.bonusBalance = data.newBalance;
-              localStorage.setItem('userData', JSON.stringify(ud));
-            } catch {}
-            onBonusChange?.(data.newBalance);
+            rollback();
+            alert(`⚠️ Бонус за этот отзыв уже был начислен ранее.`);
+          } else if (typeof data.newBalance === 'number') {
+            syncTo(data.newBalance);
           }
         } catch (e) {
-          alert(`⚠️ Бонус за отзыв о брони упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+          rollback();
+          alert(`⚠️ Бонус упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
         }
-      } else if (!telegramId) {
-        alert(`⚠️ Бонус за отзыв о брони пропущен: telegramId=0`);
       }
+
+      await reviewPromise;
 
       // 3) Mark on the booking row so we don't show the button again
       await markBookingReviewBonusGranted(table, booking.id);
