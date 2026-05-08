@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2, Check } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
-import { saveApplication, uploadFile, updateUser, getAppSettings } from '../../lib/db';
+import { saveApplication, uploadFile, getAppSettings } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
@@ -186,14 +186,42 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       // 4. Referral bonus to the referrer is paid by admin when status moves to 'in_progress'
       // (i.e. only after the payment is actually confirmed). See admin/Applications.tsx.
 
-      // 5. Deduct bonuses from Supabase + localStorage
-      if (useBonuses && bonusAmount > 0) {
-        const newBalance = availableBonuses - bonusAmount;
-        const updated = { ...userData, bonusBalance: newBalance };
-        localStorage.setItem('userData', JSON.stringify(updated));
-        localStorage.setItem('vd_user', JSON.stringify(updated));
-        if (telegramId) {
-          await updateUser(telegramId, { bonus_balance: newBalance }).catch(console.error);
+      // 5. Deduct bonuses via /api/grant-bonus с отрицательной суммой.
+      //    Раньше дёргали updateUser(...) напрямую через anon-key, но
+      //    после migration 004 RLS на users запрещает UPDATE для anon —
+      //    запрос тихо проваливался, локально баланс падал, в БД нет.
+      //    При следующем открытии приложения синк возвращал бонусы.
+      //    Через API endpoint со service-key UPDATE проходит, плюс в
+      //    bonus_logs появляется audit-запись с типом 'spent'.
+      if (useBonuses && bonusAmount > 0 && telegramId) {
+        try {
+          const res = await apiFetch('/api/grant-bonus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: telegramId,
+              type: 'spent',
+              amount: -bonusAmount,
+              description: `−${bonusAmount}₽ оплата визы ${visa.country} (${savedApp?.id ?? 'pending'})`,
+              // grant-bonus делает dedupe_key = `${type}:${application_id}` →
+              // 'spent:<uuid>'. Без application_id дедупа нет, можно
+              // продублировать списание при повторном submit.
+              application_id: savedApp?.id,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            console.error('[step7] spend-bonus failed:', res.status, data);
+            // Не блокируем submit, но юзер может увидеть несоответствие
+            alert(`⚠️ Бонусы не списались с сервера:\nHTTP ${res.status}\n${data?.error ?? ''}\n\nСвяжись с поддержкой если баланс не обновился.`);
+          } else if (typeof data.newBalance === 'number') {
+            const updated = { ...userData, bonusBalance: data.newBalance };
+            localStorage.setItem('userData', JSON.stringify(updated));
+            localStorage.setItem('vd_user', JSON.stringify(updated));
+          }
+        } catch (e) {
+          console.error('[step7] spend-bonus exception:', e);
+          alert(`⚠️ Бонусы не списались (network):\n${e instanceof Error ? e.message : String(e)}`);
         }
       }
 
