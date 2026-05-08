@@ -339,23 +339,29 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       {/* Итого */}
       <div className="vd-grad-soft rounded-2xl p-5 mb-4 border border-blue-100/60">
         <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mb-3">Детали оплаты</p>
-        <div className="space-y-2 mb-3">
+        <div className="space-y-2.5 mb-3">
           {breakdown.map((item, idx) => (
-            <div key={idx} className="flex justify-between text-sm">
-              <span className="text-[#0F2A36]/70">{item.label}</span>
-              <span className="text-[#0F2A36] font-semibold">{idx === 0 ? `${item.amount.toLocaleString('ru-RU')} ₽` : `+${item.amount.toLocaleString('ru-RU')} ₽`}</span>
+            <div key={idx} className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">{item.label}</span>
+              <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">
+                {idx === 0 ? `${item.amount.toLocaleString('ru-RU')} ₽` : `+${item.amount.toLocaleString('ru-RU')} ₽`}
+              </span>
             </div>
           ))}
           {useBonuses && bonusAmount > 0 && (
-            <div className="flex justify-between text-sm">
+            <div className="flex items-start justify-between gap-3 text-sm">
               <span className="text-[#10B981]">Бонусы</span>
-              <span className="text-[#10B981] font-semibold">−{bonusAmount.toLocaleString('ru-RU')} ₽</span>
+              <span className="text-[#10B981] font-semibold whitespace-nowrap shrink-0 tabular-nums">
+                −{bonusAmount.toLocaleString('ru-RU')} ₽
+              </span>
             </div>
           )}
         </div>
-        <div className="border-t border-blue-200/60 pt-3 flex justify-between items-center">
+        <div className="border-t border-blue-200/60 pt-3 flex items-baseline justify-between gap-3">
           <span className="text-[#0F2A36] font-bold">Итого</span>
-          <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{finalPrice.toLocaleString('ru-RU')} ₽</span>
+          <span className="text-2xl vd-grad-text font-extrabold tracking-tight whitespace-nowrap shrink-0 tabular-nums">
+            {finalPrice.toLocaleString('ru-RU')} ₽
+          </span>
         </div>
       </div>
 
