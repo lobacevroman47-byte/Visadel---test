@@ -16,7 +16,9 @@ BEGIN
     'additional_services',
     'app_settings',
     'visa_products',
-    'applications'
+    'applications',
+    'flight_bookings',
+    'hotel_bookings'
   ]
   LOOP
     BEGIN

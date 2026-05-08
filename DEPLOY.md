@@ -123,6 +123,8 @@ Sprint 5 добавил подписки на изменения в админк
 - ✅ `app_settings`
 - ✅ `visa_products`
 - ✅ `applications` (для админ Dashboard real-time)
+- ✅ `flight_bookings` (real-time для броней авиа)
+- ✅ `hotel_bookings` (real-time для броней отелей)
 
 Если миграция отработала, проверить можно так:
 
@@ -132,7 +134,7 @@ WHERE pubname = 'supabase_realtime'
 ORDER BY tablename;
 ```
 
-Должны увидеть все 4 таблицы.
+Должны увидеть все 6 таблиц.
 
 ### D. Создать Storage bucket
 
