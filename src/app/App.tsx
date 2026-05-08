@@ -32,6 +32,12 @@ interface TelegramContext {
   appUser: AppUser | null;
   isLoading: boolean;
   refreshUser: () => Promise<void>;
+  // RBAC: роль администратора, если есть.
+  // null = обычный пользователь, кнопка админки не показывается, /admin не доступен.
+  // Проверяется по env VITE_ADMIN_TELEGRAM_IDS (founder) и admin_users таблице.
+  // Backend дополнительно валидирует через initData → telegram_id и admin_users / env.
+  adminRole: AdminRole | null;
+  openAdmin: (() => void) | undefined;
 }
 
 const TelegramCtx = createContext<TelegramContext>({
@@ -39,6 +45,8 @@ const TelegramCtx = createContext<TelegramContext>({
   appUser: null,
   isLoading: true,
   refreshUser: async () => {},
+  adminRole: null,
+  openAdmin: undefined,
 });
 
 export function useTelegram() {
@@ -239,7 +247,14 @@ function App() {
   };
 
   return (
-    <TelegramCtx.Provider value={{ tgUser, appUser, isLoading, refreshUser }}>
+    <TelegramCtx.Provider value={{
+      tgUser,
+      appUser,
+      isLoading,
+      refreshUser,
+      adminRole,
+      openAdmin: adminRole ? () => setCurrentScreen('admin') : undefined,
+    }}>
       <AppCatalogProvider>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
         {currentScreen === 'splash' && <SplashScreen />}
@@ -311,7 +326,6 @@ function App() {
               onContinueDraft={handleContinueDraft}
               onContinueHotelDraft={() => setCurrentScreen('hotel_booking')}
               onContinueFlightDraft={() => setCurrentScreen('flight_booking')}
-              onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
               initialTab={initialProfileTab}
             />
           </Suspense>

@@ -11,7 +11,6 @@ interface UserProfileProps {
   onContinueDraft?: (draft: any) => void;
   onContinueHotelDraft?: () => void;
   onContinueFlightDraft?: () => void;
-  onOpenAdmin?: () => void;
   initialTab?: Tab;
 }
 
@@ -26,7 +25,7 @@ const TABS = [
 
 export default function UserProfile({
   onBack, onOpenPartnerApplication,
-  onContinueDraft, onContinueHotelDraft, onContinueFlightDraft, onOpenAdmin, initialTab,
+  onContinueDraft, onContinueHotelDraft, onContinueFlightDraft, initialTab,
 }: UserProfileProps) {
   const [activeTab, setActiveTab]       = useState<Tab>(initialTab ?? 'profile');
   const [bonusBalance, setBonusBalance] = useState(0);
@@ -133,7 +132,7 @@ export default function UserProfile({
 
         {/* Content */}
         <div className="px-4 py-4">
-          {activeTab === 'profile'      && <ProfileTab onOpenAdmin={onOpenAdmin} onBonusChange={handleBonusChange} />}
+          {activeTab === 'profile'      && <ProfileTab onBonusChange={handleBonusChange} />}
           {activeTab === 'applications' && (
             <ApplicationsTab
               onContinueDraft={onContinueDraft}

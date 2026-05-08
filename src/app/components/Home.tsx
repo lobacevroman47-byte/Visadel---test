@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
+import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2, Shield } from 'lucide-react';
 import type { VisaOption } from '../App';
 import {
   getReferralStats, getVisaProducts, getAdditionalServices,
@@ -426,13 +426,24 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
             </svg>
             <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
           </div>
-          <button
-            onClick={onOpenProfile}
-            className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition"
-            aria-label="Профиль"
-          >
-            <User className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-2">
+            {onOpenAdmin && (
+              <button
+                onClick={onOpenAdmin}
+                className="w-11 h-11 rounded-full vd-grad text-white flex items-center justify-center vd-shadow-cta transition active:scale-95"
+                aria-label="Админ-панель"
+              >
+                <Shield className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              onClick={onOpenProfile}
+              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+              aria-label="Профиль"
+            >
+              <User className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 

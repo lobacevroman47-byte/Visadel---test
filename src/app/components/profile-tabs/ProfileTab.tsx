@@ -1,9 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Gift, Flame, Shield, Save, Check, User, Mail, Phone, RefreshCw, History } from 'lucide-react';
+import { Gift, Flame, Save, Check, User, Mail, Phone, RefreshCw, History } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface ProfileTabProps {
-  onOpenAdmin?: () => void;
   onBonusChange?: (newBalance: number) => void;
 }
 
@@ -77,7 +76,7 @@ function StreakStrip({ streak }: { streak: number }) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabProps = {}) {
+export default function ProfileTab({ onBonusChange }: ProfileTabProps = {}) {
   const [loading, setLoading] = useState(true);
 
   // Core fields (synced with Supabase)
@@ -410,12 +409,8 @@ export default function ProfileTab({ onOpenAdmin, onBonusChange }: ProfileTabPro
             </div>
           ))}
         </div>
-        {onOpenAdmin && (
-          <button onClick={onOpenAdmin}
-            className="w-full mt-4 bg-gradient-to-r from-gray-700 to-gray-900 text-white py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm font-medium hover:shadow-lg transition">
-            <Shield className="w-4 h-4" /> Админ-панель
-          </button>
-        )}
+        {/* Admin-кнопка перенесена в Home header справа от профиля
+            (см. components/Home.tsx). Здесь больше не нужна. */}
       </div>
 
       {/* ── Bonus history ─────────────────────────────────────────────── */}

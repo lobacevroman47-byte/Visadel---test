@@ -158,8 +158,16 @@ export const AdminProvider: React.FC<{ children: ReactNode; onBackToApp?: () => 
     onBackToApp?.();
   }, [onBackToApp]);
 
-  const hasPermission = useCallback((_role: UserRole | UserRole[]): boolean => {
-    return currentUser !== null;
+  // RBAC: реальная проверка роли. Раньше игнорировала аргумент и возвращала
+  // true для любого залогиненного юзера — это означало что 'manager' имел
+  // тот же доступ что 'owner'. Теперь сверяем с currentUser.role.
+  //
+  // Hierarchy: owner > admin > manager. Если требуется конкретный список,
+  // проверяем точное вхождение.
+  const hasPermission = useCallback((requiredRole: UserRole | UserRole[]): boolean => {
+    if (!currentUser) return false;
+    const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    return roles.includes(currentUser.role);
   }, [currentUser]);
 
   return (
