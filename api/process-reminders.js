@@ -56,9 +56,20 @@ async function sendTelegramMessage(telegram_id, text, buttonText) {
 }
 
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+
   // Allow both GET (cron) and POST (manual trigger)
   if (req.method !== 'GET' && req.method !== 'POST') {
     res.status(405).end(); return;
+  }
+
+  // Авторизация: либо Vercel cron, либо явный X-Service-Key.
+  // Без неё любой URL = массовая рассылка напоминаний всем юзерам.
+  const isCron = !!req.headers['x-vercel-cron'];
+  const hasServiceKey = SERVICE_KEY && req.headers['x-service-key'] === SERVICE_KEY;
+  if (!isCron && !hasServiceKey) {
+    res.status(401).json({ error: 'unauthorized — only cron or service key' });
+    return;
   }
 
   if (!SUPABASE_URL || !SERVICE_KEY || !BOT_TOKEN) {
