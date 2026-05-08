@@ -269,7 +269,6 @@ function App() {
                   onOpenReferrals={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
                   onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
                   onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
-                  onOpenAdmin={adminRole ? () => setCurrentScreen('admin') : undefined}
                 />
               </div>
             )}

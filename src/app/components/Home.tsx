@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, ChevronRight, ChevronDown, Calculator, Check, Loader2, Shield } from 'lucide-react';
+import { ChevronRight, ChevronDown, Calculator, Check, Loader2 } from 'lucide-react';
+import BrandHeader from './shared/BrandHeader';
 import type { VisaOption } from '../App';
 import {
   getReferralStats, getVisaProducts, getAdditionalServices,
@@ -13,7 +14,6 @@ interface HomeProps {
   onOpenReferrals?: () => void;
   onOpenExtension: (visa: VisaOption) => void;
   onOpenPartnerApplication?: () => void;
-  onOpenAdmin?: () => void;
 }
 
 interface Country {
@@ -359,7 +359,7 @@ function ReferralBanner({ onOpen }: { onOpen?: () => void }) {
   );
 }
 
-export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onOpenExtension, onOpenPartnerApplication, onOpenAdmin }: HomeProps) {
+export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onOpenExtension, onOpenPartnerApplication }: HomeProps) {
   const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
   const [showUrgentVietnam, setShowUrgentVietnam] = useState(false);
   const [showExtensions, setShowExtensions] = useState(false);
@@ -435,35 +435,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
 
   return (
     <div ref={scrollRef} className="min-h-screen bg-[#F5F7FA] pb-20" style={{ overflowAnchor: 'none' }}>
-      {/* ─── Brand Header (compact, premium) ─── */}
-      <div className="bg-white sticky top-0 z-10 border-b border-gray-100">
-        <div className="px-5 pt-3 pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
-          </div>
-          <div className="flex items-center gap-2">
-            {onOpenAdmin && (
-              <button
-                onClick={onOpenAdmin}
-                className="w-11 h-11 rounded-full vd-grad text-white flex items-center justify-center vd-shadow-cta transition active:scale-95"
-                aria-label="Админ-панель"
-              >
-                <Shield className="w-4 h-4" />
-              </button>
-            )}
-            <button
-              onClick={onOpenProfile}
-              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
-              aria-label="Профиль"
-            >
-              <User className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
+      <BrandHeader onOpenProfile={onOpenProfile} />
 
       <div className="max-w-2xl mx-auto">
         {/* ─── Hero (визы) — только на главном экране списка стран ─── */}

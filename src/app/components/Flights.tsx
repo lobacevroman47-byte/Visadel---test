@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Loader2, Plane, ArrowRightLeft, Search, Plus, Minus, ExternalLink, RefreshCw } from 'lucide-react';
+import { Loader2, Plane, ArrowRightLeft, Search, Plus, Minus, ExternalLink, RefreshCw } from 'lucide-react';
+import BrandHeader from './shared/BrandHeader';
 import {
   tp,
   buildAviasalesUrl,
@@ -46,30 +47,6 @@ function todayPlus(days: number): string {
   const d = new Date();
   d.setDate(d.getDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-// ─── Brand header ─────────────────────────────────────────────────────────────
-
-function BrandHeader({ onOpenProfile }: { onOpenProfile: () => void }) {
-  return (
-    <div className="bg-white sticky top-0 z-10 border-b border-gray-100">
-      <div className="px-5 pt-3 pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-            <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
-        </div>
-        <button
-          onClick={onOpenProfile}
-          className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition"
-          aria-label="Профиль"
-        >
-          <User className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
 }
 
 // ─── City-pick autocomplete input ─────────────────────────────────────────────
