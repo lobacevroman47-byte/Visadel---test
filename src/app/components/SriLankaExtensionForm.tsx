@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, Upload, CheckCircle2, CreditCard } from 'lucide-react';
+import { ChevronLeft, Upload, CheckCircle2, CreditCard, User } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 
@@ -244,7 +244,14 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
 
       <div className="max-w-2xl mx-auto p-4">
         <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
-          <LatinNotice />
+          {/* Единый паттерн со всеми визовыми анкетами и бронями */}
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <User className="w-5 h-5 text-[#3B5BFF]" />
+              <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
+            </div>
+            <LatinNotice />
+          </div>
 
           {/* Home Address */}
           <div>

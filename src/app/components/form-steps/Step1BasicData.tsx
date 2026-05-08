@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronRight, Plus, X, Loader2 } from 'lucide-react';
+import { ChevronRight, Plus, X, Loader2, User } from 'lucide-react';
 import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
 import { getFormFields, type VisaFormField } from '../../lib/db';
 import LatinNotice from '../shared/LatinNotice';
@@ -91,9 +91,14 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-      <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 1</p>
-      <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Основные данные</h2>
-      <LatinNotice className="mt-2 mb-5" />
+      {/* Тот же паттерн что и в HotelBookingForm / FlightBookingForm:
+          👤 иконка + "Личные данные" + LatinNotice. Один визуальный
+          язык для всех анкет (визы + брони). */}
+      <div className="flex items-center gap-2 mb-1.5">
+        <User className="w-5 h-5 text-[#3B5BFF]" />
+        <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
+      </div>
+      <LatinNotice className="mb-5" />
 
       {/* Universal name fields — рендерим только если их нет в БД (иначе будет дубль:
           DynamicForm рендерит свои firstName/lastName из visa_form_fields). */}
