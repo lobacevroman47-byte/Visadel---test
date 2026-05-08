@@ -459,8 +459,17 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
             <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
               Заполни анкету за 5 минут — <span className="text-[#0F2A36] font-semibold">мы сделаем остальное</span>
             </p>
-            {/* Trust strip — proof points в одну линию */}
+            {/* Trust strip — proof points в одну линию.
+                Порядок: соц.доказательство → claim → value prop. Юзер из
+                Telegram холодный, ★-якорь слева быстрее гасит "не развод
+                ли это", потом уже 99% и удобство. */}
             <div className="mt-5 grid grid-cols-3 gap-2 max-w-md mx-auto">
+              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
+                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none flex items-center justify-center gap-0.5">
+                  4.8<span className="text-amber-400">★</span>
+                </div>
+                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">отзывы клиентов</div>
+              </div>
               <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
                 <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">99%</div>
                 <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">одобрений</div>
@@ -468,12 +477,6 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
               <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
                 <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">100%</div>
                 <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">онлайн, без посольства</div>
-              </div>
-              <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
-                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none flex items-center justify-center gap-0.5">
-                  4.8<span className="text-amber-400">★</span>
-                </div>
-                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">отзывы клиентов</div>
               </div>
             </div>
           </div>
