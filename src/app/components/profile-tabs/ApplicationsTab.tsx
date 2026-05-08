@@ -391,18 +391,26 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
               application_id: app.id,
             }),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.skipped && data.newBalance != null) {
-              try {
-                const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-                ud.bonusBalance = data.newBalance;
-                localStorage.setItem('userData', JSON.stringify(ud));
-              } catch {}
-              onBonusChange?.(data.newBalance);
-            }
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            // ВРЕМЕННО: показываем реальную ошибку в alert чтобы найти баг.
+            // Когда фикс подтвердится, заменим на тихий toast.
+            alert(`⚠️ Бонус за отзыв не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error message)'}`);
+          } else if (data.skipped) {
+            alert(`⚠️ Бонус за отзыв пропущен (skipped: ${data.skipped === true ? 'duplicate' : data.skipped}). Проверь bonus_logs.`);
+          } else if (data.newBalance != null) {
+            try {
+              const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+              ud.bonusBalance = data.newBalance;
+              localStorage.setItem('userData', JSON.stringify(ud));
+            } catch {}
+            onBonusChange?.(data.newBalance);
           }
-        } catch (e) { console.error('review bonus error', e); }
+        } catch (e) {
+          alert(`⚠️ Бонус за отзыв упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else if (!telegramId) {
+        alert(`⚠️ Бонус за отзыв пропущен: telegramId=0 (нет данных пользователя)`);
       }
 
       setReviewedIds(prev => new Set([...prev, app.id!]));

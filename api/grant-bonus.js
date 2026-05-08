@@ -179,6 +179,8 @@ export default async function handler(req, res) {
     return;
   }
 
+  console.log('[grant-bonus] called:', { telegram_id, type, amount, application_id, isServiceCall });
+
   try {
     // ── Grant the main bonus (атомарно через unique constraint) ─────────────
     const dedupeKey = application_id ? `${type}:${application_id}` : null;
@@ -215,9 +217,10 @@ export default async function handler(req, res) {
       }
     }
 
+    console.log('[grant-bonus] success:', { telegram_id, type, amount, newBalance });
     res.json({ ok: true, newBalance });
   } catch (err) {
-    console.error('grant-bonus error:', err);
+    console.error('[grant-bonus] error:', err?.message ?? err);
     res.status(500).json({ error: String(err) });
   }
 }
