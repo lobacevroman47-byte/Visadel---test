@@ -144,6 +144,62 @@ function StatusProgress({ status }: { status: string }) {
   );
 }
 
+// ── Booking status progress ──────────────────────────────────────────────────
+// Тот же визуальный паттерн что и StatusProgress для виз, но с лейблами под
+// бронь: Заявка подана → Проверка оплаты → Бронь оформляется → Готово.
+const BOOKING_PROGRESS_STEPS = [
+  { id: 'new',         label: 'Заявка\nподана',     icon: '📋' },
+  { id: 'checking',    label: 'Проверка\nоплаты',   icon: '✅' },
+  { id: 'in_progress', label: 'Бронь\nоформляется', icon: '⚙️' },
+  { id: 'confirmed',   label: 'Готово',              icon: '🎉' },
+];
+
+function getBookingProgressIndex(status: string): number {
+  if (status === 'new') return 0;
+  if (status === 'in_progress') return 2;
+  if (status === 'confirmed') return 3;
+  return -1; // cancelled и прочее не показываем
+}
+
+function BookingProgress({ status }: { status: string }) {
+  const activeIdx = getBookingProgressIndex(status);
+  if (activeIdx < 0) return null;
+
+  return (
+    <div className="mt-3 mb-1 px-1">
+      <div className="flex items-start">
+        {BOOKING_PROGRESS_STEPS.map((step, idx) => {
+          const done = idx < activeIdx;
+          const active = idx === activeIdx;
+          return (
+            <div key={step.id} className="flex items-start flex-1 last:flex-none">
+              <div className="flex flex-col items-center gap-1 min-w-[44px]">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium shadow-sm transition-all ${
+                  done   ? 'bg-[#3B5BFF] text-white' :
+                  active ? 'vd-grad text-white ring-2 ring-[#5C7BFF]/30 ring-offset-1 shadow-md' :
+                           'bg-gray-100 text-gray-400'
+                }`}>
+                  {done ? '✓' : step.icon}
+                </div>
+                <span className={`text-[9px] text-center leading-tight whitespace-pre-line ${
+                  active ? 'text-[#3B5BFF] font-semibold' : done ? 'text-[#5C7BFF]' : 'text-gray-400'
+                }`}>
+                  {step.label}
+                </span>
+              </div>
+              {idx < BOOKING_PROGRESS_STEPS.length - 1 && (
+                <div className={`flex-1 h-0.5 mt-4 mx-0.5 rounded-full transition-colors ${
+                  done ? 'bg-[#3B5BFF]' : 'bg-gray-200'
+                }`} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Review Modal ──────────────────────────────────────────────────────────────
 function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   app: Application;
@@ -305,22 +361,23 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
   }, [telegramId, load]);
 
   // Supabase Realtime — auto-update statuses without column-level filter
-  // (column filters require Supabase Pro; we filter client-side instead)
+  // (column filters require Supabase Pro; we filter client-side instead).
+  // Подписываемся на applications + hotel_bookings + flight_bookings —
+  // когда админ меняет статус, у юзера в Профиле прогресс бар обновляется
+  // мгновенно, без перезагрузки.
   useEffect(() => {
     if (!telegramId || !isSupabaseConfigured()) return;
 
     const channel = supabase
       .channel(`user-apps-${telegramId}`)
+      // Visa applications
       .on(
         'postgres_changes' as any,
         { event: 'UPDATE', schema: 'public', table: 'applications' },
         (payload: any) => {
-          // Client-side filter — only update this user's applications
           if (payload.new.user_telegram_id !== telegramId) return;
           setApplications(prev =>
-            prev.map(app =>
-              app.id === payload.new.id ? { ...app, ...payload.new } : app
-            )
+            prev.map(app => (app.id === payload.new.id ? { ...app, ...payload.new } : app))
           );
         }
       )
@@ -332,6 +389,50 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
           setApplications(prev => {
             if (prev.find(a => a.id === payload.new.id)) return prev;
             return [payload.new as Application, ...prev];
+          });
+        }
+      )
+      // Hotel bookings — статус меняется в админке, прилетает сюда
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'hotel_bookings' },
+        (payload: any) => {
+          if (payload.new.telegram_id !== telegramId) return;
+          setHotelBookings(prev =>
+            prev.map(b => (b.id === payload.new.id ? { ...b, ...payload.new } : b))
+          );
+        }
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'hotel_bookings' },
+        (payload: any) => {
+          if (payload.new.telegram_id !== telegramId) return;
+          setHotelBookings(prev => {
+            if (prev.find(b => b.id === payload.new.id)) return prev;
+            return [payload.new as HotelBookingRow, ...prev];
+          });
+        }
+      )
+      // Flight bookings — то же самое
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'flight_bookings' },
+        (payload: any) => {
+          if (payload.new.telegram_id !== telegramId) return;
+          setFlightBookings(prev =>
+            prev.map(b => (b.id === payload.new.id ? { ...b, ...payload.new } : b))
+          );
+        }
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'flight_bookings' },
+        (payload: any) => {
+          if (payload.new.telegram_id !== telegramId) return;
+          setFlightBookings(prev => {
+            if (prev.find(b => b.id === payload.new.id)) return prev;
+            return [payload.new as FlightBookingRow, ...prev];
           });
         }
       )
@@ -983,6 +1084,7 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
           </div>
         </div>
       </div>
+      <BookingProgress status={b.status} />
       <BookingActions table="hotel_bookings" booking={b} kindLabel="Бронь отеля" {...common} />
     </div>
   );
@@ -1021,6 +1123,7 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
           </div>
         </div>
       </div>
+      <BookingProgress status={b.status} />
       <BookingActions table="flight_bookings" booking={b} kindLabel="Бронь авиабилета" {...common} />
     </div>
   );
