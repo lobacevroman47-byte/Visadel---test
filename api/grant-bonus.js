@@ -32,32 +32,59 @@ async function dbGet(path) {
 }
 
 async function dbPatch(path, body) {
-  return fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  // Используем return=representation чтобы видеть сколько строк апдейтнули.
+  // Раньше был return=minimal — успешный 200 без тела, и нельзя было понять
+  // что WHERE filter не нашёл ни одной строки (silent no-op).
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
     method: 'PATCH',
-    headers: headers({ Prefer: 'return=minimal' }),
+    headers: headers({ Prefer: 'return=representation' }),
     body: JSON.stringify(body),
   });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`dbPatch ${path} failed: ${r.status} ${errText}`);
+  }
+  const rows = await r.json().catch(() => []);
+  return Array.isArray(rows) ? rows : [];
 }
 
 async function dbInsert(table, body) {
-  return fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=minimal' }),
     body: JSON.stringify(body),
   });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`dbInsert ${table} failed: ${r.status} ${errText}`);
+  }
+  return r;
 }
 
 // Атомарный insert через unique constraint (telegram_id, type, dedupe_key).
 // Возвращает {alreadyGranted: bool}: при конфликте Postgres вернёт пустой массив,
 // что мы трактуем как "уже было начисление".
+//
+// Раньше был баг: если PostgREST возвращал 4xx/5xx (например auth fail или
+// нарушение constraint), r.json() парсил error-объект (не массив), и мы
+// ошибочно считали alreadyGranted=true. INSERT фактически не происходил,
+// баланс не обновлялся, в bonus_logs ни строки. Теперь явно проверяем r.ok
+// и кидаем error, чтобы caller увидел.
 async function tryInsertBonusLog(telegram_id, type, amount, description, dedupe_key) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/bonus_logs?on_conflict=telegram_id,type,dedupe_key`, {
     method: 'POST',
     headers: headers({ Prefer: 'return=representation,resolution=ignore-duplicates' }),
     body: JSON.stringify({ telegram_id, type, amount, description, dedupe_key }),
   });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`bonus_logs insert failed: ${r.status} ${errText}`);
+  }
   const inserted = await r.json().catch(() => []);
-  return { alreadyGranted: !Array.isArray(inserted) || inserted.length === 0 };
+  // С resolution=ignore-duplicates: при success inserted=[{...row...}], при
+  // duplicate inserted=[]. Только пустой массив = реальный duplicate.
+  const alreadyGranted = Array.isArray(inserted) && inserted.length === 0;
+  return { alreadyGranted };
 }
 
 async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
@@ -82,7 +109,23 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
   const newBalance = ((user?.bonus_balance) ?? 0) + amount;
 
   if (user) {
-    await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
+    const updated = await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
+    // Защита от silent no-op: если WHERE не нашёл ни одной строки (например
+    // строка удалена прямо во время операции), создаём её.
+    if (updated.length === 0) {
+      console.warn(`[grant-bonus] PATCH matched 0 rows for ${telegram_id} — fallback to upsert`);
+      const referral_code = `USR_${telegram_id}`;
+      await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=telegram_id`, {
+        method: 'POST',
+        headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+        body: JSON.stringify({
+          telegram_id,
+          bonus_balance: newBalance,
+          referral_code,
+          first_name: 'User',
+        }),
+      });
+    }
   } else {
     // Юзера нет — создаём минимальную строку. on_conflict=telegram_id +
     // resolution=merge-duplicates делает upsert (на случай race condition,
