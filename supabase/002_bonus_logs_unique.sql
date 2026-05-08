@@ -20,6 +20,18 @@ WHERE a.id <> b.id
   AND a.dedupe_key IS NOT NULL
   AND a.created_at > b.created_at;
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_bonus_logs_dedupe
-  ON public.bonus_logs (telegram_id, type, dedupe_key)
-  WHERE dedupe_key IS NOT NULL;
+-- ВАЖНО: индекс БЕЗ WHERE clause. Partial unique index не работает с
+-- PostgREST'овским ?on_conflict=...&Prefer:resolution=ignore-duplicates
+-- — Postgres выдаёт 42P10 "no unique or exclusion constraint matching
+-- the ON CONFLICT specification". А полный unique index с nullable
+-- колонкой работает идентично, потому что Postgres по умолчанию считает
+-- NULL'ы различными в unique index (NULLS DISTINCT — поведение по
+-- умолчанию). То есть (123, 'review', NULL) и (123, 'review', NULL) не
+-- конфликтуют, что нам и нужно для legacy-строк без dedupe_key.
+DROP INDEX IF EXISTS idx_bonus_logs_dedupe;
+CREATE UNIQUE INDEX idx_bonus_logs_dedupe
+  ON public.bonus_logs (telegram_id, type, dedupe_key);
+
+-- Сбросить schema cache PostgREST, иначе он не увидит новый индекс
+-- до перезапуска.
+NOTIFY pgrst, 'reload schema';
