@@ -139,7 +139,7 @@ export default async function handler(req, res) {
 
   const reply_markup = appUrl ? {
     inline_keyboard: [[
-      { text: '⚙️ Открыть админку', web_app: { url: `${appUrl}?admin=1` } }
+      { text: '⚙️ Открыть админку', web_app: { url: `${appUrl}?admin=true` } }
     ]],
   } : undefined;
 
