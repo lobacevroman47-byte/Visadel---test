@@ -315,6 +315,7 @@ function App() {
               prefilledAddons={prefilledAddons}
               onBack={handleBackToHome}
               onContinueDraft={handleContinueDraft}
+              onGoToProfile={() => { setInitialProfileTab('applications'); setCurrentScreen('profile'); }}
             />
           </Suspense>
         )}
@@ -350,6 +351,7 @@ function App() {
             <HotelBookingForm
               onBack={() => { setMainTab('bookings'); setCurrentScreen('home'); }}
               onComplete={() => { setMainTab('visas'); setCurrentScreen('home'); }}
+              onGoToProfile={() => { setInitialProfileTab('applications'); setCurrentScreen('profile'); }}
             />
           </Suspense>
         )}
@@ -358,6 +360,7 @@ function App() {
             <FlightBookingForm
               onBack={() => { setMainTab('bookings'); setCurrentScreen('home'); }}
               onComplete={() => { setMainTab('visas'); setCurrentScreen('home'); }}
+              onGoToProfile={() => { setInitialProfileTab('applications'); setCurrentScreen('profile'); }}
             />
           </Suspense>
         )}

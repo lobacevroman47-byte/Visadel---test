@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2, Check } from 'lucide-react';
+import { ChevronLeft, Upload, CheckCircle2, Save, CreditCard, Coins, Loader2 } from 'lucide-react';
+import SuccessScreen from '../shared/SuccessScreen';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { saveApplication, uploadFile, getAppSettings } from '../../lib/db';
@@ -16,15 +17,20 @@ interface Step7Props {
   addonPrices: { urgent: number; hotel: number; ticket: number };
   onPrev: () => void;
   onComplete: () => void;
+  // Куда уйти из success-экранов (черновик / отправка) — обычно профиль.
+  onGoToProfile?: () => void;
 }
 
-export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete }: Step7Props) {
+export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete, onGoToProfile }: Step7Props) {
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [useBonuses, setUseBonuses] = useState(false);
   const [bonusAmount, setBonusAmount] = useState(0);
   const [finalPrice, setFinalPrice] = useState(totalPrice);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // Полноэкранный success после "Сохранить черновик" с двумя кнопками
+  // (продолжить оформление / в личный кабинет) — заменяет native alert.
+  const [draftSavedShown, setDraftSavedShown] = useState(false);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
 
   useEffect(() => {
@@ -82,7 +88,9 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
     else existingDrafts.push(draft);
     localStorage.setItem(draftsKey, JSON.stringify(existingDrafts));
 
-    alert('Черновик сохранён! Вернитесь позже.');
+    haptic('success');
+    // Полноэкранный success вместо native alert
+    setDraftSavedShown(true);
   };
 
   const handlePaymentComplete = async () => {
@@ -255,23 +263,51 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
   if (formData.additionalDocs.returnTicket) breakdown.push({ label: 'Бронирование авиабилета', amount: addonPrices.ticket });
 
   // Полноэкранный success-экран — единый стиль с бронями отеля/билета.
+  // Success после отправки заявки на визу — единый паттерн с бронями
+  // и черновиками (см. shared/SuccessScreen).
   if (submitted) {
     return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-5 py-12">
-        <div className="w-20 h-20 rounded-full vd-grad flex items-center justify-center text-white shadow-lg vd-shadow-cta mb-5">
-          <Check className="w-10 h-10" strokeWidth={3} />
-        </div>
-        <h1 className="text-[24px] font-extrabold tracking-tight text-[#0F2A36] text-center">Заявка отправлена!</h1>
-        <p className="text-center text-sm text-[#0F2A36]/65 mt-3 max-w-xs">
-          Мы получили вашу заявку на визу в {visa.country} и свяжемся в Telegram в течение нескольких часов.
-        </p>
-        <button
-          onClick={onComplete}
-          className="mt-8 px-6 py-3 rounded-xl vd-grad text-white font-semibold shadow-md vd-shadow-cta active:scale-[0.98] transition"
-        >
-          На главную
-        </button>
-      </div>
+      <SuccessScreen
+        title="Заявка отправлена!"
+        description={
+          <>
+            Мы получили вашу заявку на визу в <b>{visa.country}</b> и свяжемся в Telegram
+            в течение нескольких часов.
+          </>
+        }
+        primaryAction={{
+          label: 'На главную',
+          onClick: onComplete,
+        }}
+        secondaryAction={onGoToProfile ? {
+          label: 'Мои заявки',
+          onClick: onGoToProfile,
+        } : undefined}
+      />
+    );
+  }
+
+  // Success после "Сохранить черновик" — две кнопки: продолжить здесь
+  // или уйти в Личный кабинет → Мои заявки (где видны все драфты).
+  if (draftSavedShown) {
+    return (
+      <SuccessScreen
+        title="Черновик сохранён"
+        description={
+          <>
+            Заявка для <b>{visa.country}</b> сохранена в Личном кабинете → «Мои заявки».
+            Вернись к ней в любой момент — данные не потеряются.
+          </>
+        }
+        primaryAction={{
+          label: 'Продолжить оформление',
+          onClick: () => setDraftSavedShown(false),
+        }}
+        secondaryAction={onGoToProfile ? {
+          label: 'В личный кабинет',
+          onClick: () => { setDraftSavedShown(false); onGoToProfile(); },
+        } : undefined}
+      />
     );
   }
 

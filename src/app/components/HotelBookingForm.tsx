@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Check, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles } from 'lucide-react';
+import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
+import SuccessScreen from './shared/SuccessScreen';
 import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
@@ -15,11 +16,12 @@ import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProd
 interface HotelBookingFormProps {
   onBack: () => void;
   onComplete: () => void;
+  onGoToProfile?: () => void;
 }
 
 interface ChildEntry { id: string; age: string; }
 
-export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFormProps) {
+export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: HotelBookingFormProps) {
   // Restore draft from localStorage (if any) on first render
   const draft = (() => {
     try {
@@ -209,21 +211,12 @@ export default function HotelBookingForm({ onBack, onComplete }: HotelBookingFor
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-[#F5F7FA] flex flex-col items-center justify-center px-5">
-        <div className="w-20 h-20 rounded-full vd-grad flex items-center justify-center text-white shadow-lg vd-shadow-cta mb-5">
-          <Check className="w-10 h-10" strokeWidth={3} />
-        </div>
-        <h1 className="text-[24px] font-extrabold tracking-tight text-[#0F2A36]">Заявка отправлена!</h1>
-        <p className="text-center text-sm text-[#0F2A36]/65 mt-3 max-w-xs">
-          Мы получили вашу заявку на бронь отеля и свяжемся в Telegram в течение нескольких часов.
-        </p>
-        <button
-          onClick={onComplete}
-          className="mt-8 px-6 py-3 rounded-xl vd-grad text-white font-semibold shadow-md vd-shadow-cta active:scale-[0.98] transition"
-        >
-          На главную
-        </button>
-      </div>
+      <SuccessScreen
+        title="Заявка отправлена!"
+        description="Мы получили вашу заявку на бронь отеля и свяжемся в Telegram в течение нескольких часов."
+        primaryAction={{ label: 'На главную', onClick: onComplete }}
+        secondaryAction={onGoToProfile ? { label: 'Мои брони', onClick: onGoToProfile } : undefined}
+      />
     );
   }
 

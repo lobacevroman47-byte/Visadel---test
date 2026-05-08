@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
+import SuccessScreen from './shared/SuccessScreen';
 import Step1BasicData from './form-steps/Step1BasicData';
 import { getAdditionalServices } from '../lib/db';
 import { apiFetch } from '../lib/apiFetch';
@@ -22,6 +23,9 @@ interface ApplicationFormProps {
   prefilledAddons?: { urgent: boolean; hotel: boolean; ticket: boolean };
   onBack: () => void;
   onContinueDraft?: (draft: any) => void;
+  // Куда вести юзера после "Сохранить черновик" / "Заявка отправлена" —
+  // обычно в Профиль → вкладку "Мои заявки", чтобы он видел свой драфт.
+  onGoToProfile?: () => void;
 }
 
 // When a user picks the «Бронь отеля для визы» / «Бронь обратного билета»
@@ -83,8 +87,12 @@ const STEPS = [
   'Оплата'
 ];
 
-export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft }: ApplicationFormProps) {
+export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft, onGoToProfile }: ApplicationFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  // Когда юзер сохраняет черновик — показываем полноэкранный success
+  // вместо native alert. 2 кнопки: "Продолжить оформление" (закрыть оверлей)
+  // и "В личный кабинет" (выход + переход в Профиль → Мои заявки).
+  const [draftSavedShown, setDraftSavedShown] = useState(false);
   const [formData, setFormData] = useState<FormData>({
     basicData: {},
     additionalDocs: {
@@ -235,7 +243,8 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     // Schedule draft reminders
     scheduleReminders('draft');
 
-    alert('✅ Черновик сохранен!');
+    // Полноэкранный success вместо native alert (см. SuccessScreen ниже)
+    setDraftSavedShown(true);
   };
 
   // When user reaches payment step — schedule "payment abandoned" reminders (once)
@@ -303,6 +312,32 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     }
     return total;
   };
+
+  // Полноэкранный success после сохранения черновика — заменяет native alert.
+  // Юзер выбирает: остаться в форме и продолжить, или уйти в Профиль → Мои заявки.
+  if (draftSavedShown) {
+    return (
+      <div className="min-h-screen bg-[#F5F7FA]">
+        <SuccessScreen
+          title="Черновик сохранён"
+          description={
+            <>
+              Заявка для <b>{visa.country}</b> сохранена в Личном кабинете → «Мои заявки».
+              Можешь вернуться к ней в любой момент — данные не потеряются.
+            </>
+          }
+          primaryAction={{
+            label: 'Продолжить оформление',
+            onClick: () => setDraftSavedShown(false),
+          }}
+          secondaryAction={onGoToProfile ? {
+            label: 'В личный кабинет',
+            onClick: () => { setDraftSavedShown(false); onGoToProfile(); },
+          } : undefined}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
@@ -428,6 +463,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
               addonPrices={addonPrices}
               onPrev={goToPrevStep}
               onComplete={onBack}
+              onGoToProfile={onGoToProfile}
             />
           )}
         </motion.div>
