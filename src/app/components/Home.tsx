@@ -452,9 +452,9 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
         {!selectedCountry && (
           <div className="vd-grad-soft px-5 pt-7 pb-6">
             <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36]">
-              Простой способ
+              Простой способ оформить
               <br/>
-              <span className="vd-grad-text">оформить визу</span>
+              <span className="vd-grad-text">электронную визу</span>
             </h1>
             <p className="text-center text-[13px] text-[#0F2A36]/65 mt-3 max-w-sm mx-auto leading-snug">
               Заполни анкету за 5 минут — <span className="text-[#0F2A36] font-semibold">мы сделаем остальное</span>
