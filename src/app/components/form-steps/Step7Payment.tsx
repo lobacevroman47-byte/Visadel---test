@@ -300,16 +300,12 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
 
       {/* Trust strip — снижает страх перед вводом реквизитов */}
       <div className="bg-white rounded-2xl px-4 py-3 mb-4 shadow-sm border border-gray-100">
-        <div className="grid grid-cols-3 gap-2 text-center">
+        <div className="grid grid-cols-2 gap-3 text-center">
           <div className="flex flex-col items-center gap-1">
             <span className="text-[18px]">🛡️</span>
             <span className="text-[10px] leading-tight text-[#0F2A36]/70">Защищено<br/>Telegram</span>
           </div>
-          <div className="flex flex-col items-center gap-1 border-x border-gray-100">
-            <span className="text-[18px]">↩️</span>
-            <span className="text-[10px] leading-tight text-[#0F2A36]/70">Возврат<br/>30 дней</span>
-          </div>
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-1 border-l border-gray-100">
             <span className="text-[18px]">🤝</span>
             <span className="text-[10px] leading-tight text-[#0F2A36]/70">Поддержка<br/>24/7</span>
           </div>

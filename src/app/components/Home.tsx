@@ -466,8 +466,8 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                 <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">одобрений</div>
               </div>
               <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
-                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">1–3 дня</div>
-                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">срок оформления</div>
+                <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none">100%</div>
+                <div className="text-[10px] text-[#0F2A36]/55 mt-1 leading-tight">онлайн, без посольства</div>
               </div>
               <div className="bg-white/70 backdrop-blur rounded-xl py-2.5 px-2 text-center">
                 <div className="text-[18px] font-extrabold text-[#0F2A36] leading-none flex items-center justify-center gap-0.5">
