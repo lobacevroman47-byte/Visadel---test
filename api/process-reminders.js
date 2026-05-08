@@ -93,9 +93,51 @@ export default async function handler(req, res) {
 
     let sent = 0;
     let failed = 0;
+    let skipped = 0;
+
+    // Helper: пометить reminder как обработанный без отправки
+    async function markSent(id) {
+      await fetch(
+        `${SUPABASE_URL}/rest/v1/reminders?id=eq.${id}`,
+        {
+          method: 'PATCH',
+          headers: headers({ Prefer: 'return=minimal' }),
+          body: JSON.stringify({ sent: true }),
+        }
+      );
+    }
 
     for (const reminder of reminders) {
       try {
+        // Стале-проверка: если у юзера уже есть заявка по этой стране и типу
+        // визы, которая прошла стадию оплаты — не шлём напоминание про оплату/
+        // черновик. Иначе ловим "Один шаг до визы" про визу которая уже в
+        // работе. Скипаем и помечаем sent=true.
+        if (reminder.telegram_id && reminder.country) {
+          const filters = [
+            `user_telegram_id=eq.${reminder.telegram_id}`,
+            `country=eq.${encodeURIComponent(reminder.country)}`,
+            // Активные пост-оплатные статусы — заявка уже принята/в работе/готова
+            `status=in.(pending_confirmation,in_progress,ready,completed)`,
+            'select=id',
+            'limit=1',
+          ];
+          if (reminder.visa_type) {
+            filters.splice(2, 0, `visa_type=eq.${encodeURIComponent(reminder.visa_type)}`);
+          }
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/applications?${filters.join('&')}`,
+            { headers: headers() }
+          );
+          const apps = await checkRes.json().catch(() => []);
+          if (Array.isArray(apps) && apps.length > 0) {
+            console.log(`[process-reminders] skip stale reminder ${reminder.id} — application already past payment for ${reminder.country}`);
+            await markSent(reminder.id);
+            skipped++;
+            continue;
+          }
+        }
+
         // Pick message variant based on position in sequence (index of this reminder among same draft_key)
         const fetchSeqRes = await fetch(
           `${SUPABASE_URL}/rest/v1/reminders?draft_key=eq.${encodeURIComponent(reminder.draft_key)}&order=scheduled_at.asc&select=id`,
@@ -112,15 +154,7 @@ export default async function handler(req, res) {
 
         await sendTelegramMessage(reminder.telegram_id, text, btnText);
 
-        // Mark as sent
-        await fetch(
-          `${SUPABASE_URL}/rest/v1/reminders?id=eq.${reminder.id}`,
-          {
-            method: 'PATCH',
-            headers: headers({ Prefer: 'return=minimal' }),
-            body: JSON.stringify({ sent: true }),
-          }
-        );
+        await markSent(reminder.id);
         sent++;
       } catch (err) {
         console.error(`Failed to process reminder ${reminder.id}:`, err);
@@ -128,7 +162,7 @@ export default async function handler(req, res) {
       }
     }
 
-    res.status(200).json({ ok: true, processed: reminders.length, sent, failed });
+    res.status(200).json({ ok: true, processed: reminders.length, sent, failed, skipped });
   } catch (err) {
     console.error('process-reminders error:', err);
     res.status(500).json({ error: String(err) });
