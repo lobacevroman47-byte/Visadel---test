@@ -315,7 +315,18 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
         <div className="max-w-2xl mx-auto">
           {/* Top row: back / brand / save */}
           <div className="flex items-center justify-between">
-            <button onClick={onBack} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" aria-label="Назад">
+            <button
+              onClick={() => {
+                // На Step 0 — выход из анкеты (как было). На остальных шагах
+                // эта стрелка должна вести к предыдущему шагу, а не закрывать
+                // всю анкету. Раньше она всегда дёргала onBack — вернуться
+                // в драфте можно было только через Telegram BackButton.
+                if (currentStep === 0) onBack();
+                else goToPrevStep();
+              }}
+              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+              aria-label={currentStep === 0 ? 'Назад к каталогу' : 'Предыдущий шаг'}
+            >
               <ChevronLeft className="w-4 h-4" />
             </button>
             <div className="text-center leading-tight">
