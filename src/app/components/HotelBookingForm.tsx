@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
+import LatinNotice from './shared/LatinNotice';
 import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
@@ -251,25 +252,26 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
           Бронирование отеля <br/>
           <span className="vd-grad-text">для визы</span>
         </h1>
-        <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3">
-          Заполни 5 минут — пришлём подтверждение <br/>для посольства и пограничного контроля
+        <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3 leading-relaxed">
+          Подтверждение, принимаемое посольствами и пограничными службами.<br/>Оформление — 5 минут.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-5 space-y-5">
         {/* ── 👤 Личные данные ──────────────────────────────── */}
         <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2 mb-1.5">
             <User className="w-5 h-5 text-[#3B5BFF]" />
             <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
           </div>
+          <LatinNotice className="mb-4" />
           <div className="space-y-3">
-            {(() => { const f = ov('firstName', 'Имя (как в загранпаспорте)', true); return f.visible && (
+            {(() => { const f = ov('firstName', 'Имя', true); return f.visible && (
               <Field label={f.label} required={f.required}>
                 <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="IVAN" className="form-input" />
               </Field>
             ); })()}
-            {(() => { const f = ov('lastName', 'Фамилия (как в загранпаспорте)', true); return f.visible && (
+            {(() => { const f = ov('lastName', 'Фамилия', true); return f.visible && (
               <Field label={f.label} required={f.required}>
                 <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="IVANOV" className="form-input" />
               </Field>

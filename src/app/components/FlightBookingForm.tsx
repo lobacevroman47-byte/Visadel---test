@@ -5,6 +5,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
+import LatinNotice from './shared/LatinNotice';
 import { apiFetch } from '../lib/apiFetch';
 import {
   showBackButton, hideBackButton,
@@ -216,21 +217,19 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
           Бронь авиабилета <br/>
           <span className="vd-grad-text">для визы</span>
         </h1>
-        <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3">
-          Заполни 3 минуты — пришлём подтверждение <br/>для посольства и пограничного контроля
+        <p className="text-center text-[12px] text-[#0F2A36]/60 mt-3 leading-relaxed">
+          Подтверждение, принимаемое посольствами и пограничными службами.<br/>Оформление — 3 минуты.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-2xl mx-auto px-4 py-5 space-y-5">
         {/* ── 👤 Пассажир ───────────────────────────────────── */}
         <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1.5">
             <User className="w-5 h-5 text-[#3B5BFF]" />
             <h3 className="text-sm font-bold text-[#0F2A36]">Пассажир</h3>
           </div>
-          <p className="text-[11px] text-red-500 mb-4">
-            Данные вводить <span className="font-bold">латиницей</span>, как в загранпаспорте
-          </p>
+          <LatinNotice className="mb-4" />
           <div className="space-y-3">
             {(() => { const f = ov('firstName', 'Имя', true); return f.visible && (
               <Field label={f.label} required={f.required}>

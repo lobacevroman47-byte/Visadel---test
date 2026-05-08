@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronRight, Plus, X, Loader2 } from 'lucide-react';
 import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
 import { getFormFields, type VisaFormField } from '../../lib/db';
+import LatinNotice from '../shared/LatinNotice';
 
 interface Step1Props {
   country: string;
@@ -92,14 +93,14 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 1</p>
       <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Основные данные</h2>
-      <p className="text-sm text-[#0F2A36]/60 mt-1 mb-6">Заполни как в загранпаспорте</p>
+      <LatinNotice className="mt-2 mb-5" />
 
       {/* Universal name fields — рендерим только если их нет в БД (иначе будет дубль:
           DynamicForm рендерит свои firstName/lastName из visa_form_fields). */}
       {!dbFields.some(f => f.field_key === 'firstName' || f.field_key === 'lastName') && (
         <div className="space-y-4 mb-6 pb-6 border-b border-gray-100">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <FormField label="Имя (на английском)" required hint="как в загранпаспорте" error={errors.firstName}>
+            <FormField label="Имя" required error={errors.firstName}>
               <input
                 type="text"
                 value={formData.firstName || ''}
@@ -109,7 +110,7 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
                 autoComplete="given-name"
               />
             </FormField>
-            <FormField label="Фамилия (на английском)" required hint="как в загранпаспорте" error={errors.lastName}>
+            <FormField label="Фамилия" required error={errors.lastName}>
               <input
                 type="text"
                 value={formData.lastName || ''}
