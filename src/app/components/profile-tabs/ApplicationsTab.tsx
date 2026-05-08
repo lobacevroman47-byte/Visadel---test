@@ -795,18 +795,24 @@ function BookingActions({
               application_id: `booking_${booking.id}`,
             }),
           });
-          if (res.ok) {
-            const data = await res.json();
-            if (!data.skipped && data.newBalance != null) {
-              try {
-                const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-                ud.bonusBalance = data.newBalance;
-                localStorage.setItem('userData', JSON.stringify(ud));
-              } catch {}
-              onBonusChange?.(data.newBalance);
-            }
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            alert(`⚠️ Бонус за отзыв о брони не начислен:\nHTTP ${res.status}\n${data?.error ?? '(no error message)'}`);
+          } else if (data.skipped) {
+            alert(`⚠️ Бонус за отзыв о брони пропущен (skipped). Проверь bonus_logs.`);
+          } else if (data.newBalance != null) {
+            try {
+              const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
+              ud.bonusBalance = data.newBalance;
+              localStorage.setItem('userData', JSON.stringify(ud));
+            } catch {}
+            onBonusChange?.(data.newBalance);
           }
-        } catch (e) { console.error('booking review bonus error', e); }
+        } catch (e) {
+          alert(`⚠️ Бонус за отзыв о брони упал в exception:\n${e instanceof Error ? e.message : String(e)}`);
+        }
+      } else if (!telegramId) {
+        alert(`⚠️ Бонус за отзыв о брони пропущен: telegramId=0`);
       }
 
       // 3) Mark on the booking row so we don't show the button again
