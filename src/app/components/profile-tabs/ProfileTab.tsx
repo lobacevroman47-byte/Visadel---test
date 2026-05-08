@@ -307,79 +307,61 @@ export default function ProfileTab({ onBonusChange }: ProfileTabProps = {}) {
           {canCheckIn ? '🎁 Получить +1₽' : '✓ Бонус получен на сегодня'}
         </button>
 
-        <p className="mt-3 text-xs text-white/80 text-center">
-          +1₽ ежедневно · +5₽ каждую неделю · +30₽ за месяц
-        </p>
-      </div>
-
-      {/* ── Milestones — компактная версия: 1 строка на майлстоун ────────
-          Раньше каждая карточка была 2-х рядной (Неделя N · X дней подряд +
-          описание бонуса), занимала много места и дублировала смысл
-          (Неделя 1 = 7 дней). Теперь: иконка + "X дн" + "+N ₽" + статус
-          справа — всё в одну линию. */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-        <h3 className="text-sm font-semibold text-gray-700 mb-3">Серия входов</h3>
-        <div className="space-y-1.5">
+        {/* Награды за серию — мелкие пилл-кнопки прямо в карточке вместо
+            отдельного блока. Каждая = майлстоун (7д/14д/21д/28д/30д).
+            Стили под dark vd-grad фон:
+              - locked    : полупрозрачный, замок, не кликабелен
+              - available : белая капсула + brand-text + glow, click→claim
+              - claimed   : полупрозрачный с галкой, муто
+            +30₽ месячный отличается жёлтым акцентом когда доступен. */}
+        <div className="mt-4 grid grid-cols-5 gap-1.5">
           {WEEK_MILESTONES.map((days, i) => {
-            const unlocked  = streak >= days;
             const claimed   = i < meta.weeklyBonusesClaimed;
-            const available = unlocked && !claimed && i === meta.weeklyBonusesClaimed;
+            const available = streak >= days && !claimed && i === meta.weeklyBonusesClaimed;
             return (
-              <div key={days} className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg ${
-                available ? 'bg-green-50 border border-green-100' : 'bg-gray-50'
-              }`}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">{claimed ? '✅' : available ? '🏆' : '🔒'}</span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${claimed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                    {days} дн
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  <span className={`text-[12px] font-medium tabular-nums ${claimed ? 'text-gray-300' : 'text-emerald-600'}`}>
-                    +5 ₽
-                  </span>
-                </div>
-                {available ? (
-                  <button onClick={handleWeeklyBonus} disabled={claimingWeekly}
-                    className="px-3 py-1 bg-green-500 text-white text-xs font-semibold rounded-md hover:bg-green-600 active:scale-95 transition disabled:opacity-50 shrink-0">
-                    {claimingWeekly ? '...' : 'Забрать'}
-                  </button>
-                ) : (
-                  <span className={`text-[11px] font-semibold whitespace-nowrap shrink-0 ${claimed ? 'text-gray-400' : 'text-gray-400'}`}>
-                    {claimed ? 'получен' : `ещё ${days - streak} дн.`}
-                  </span>
-                )}
-              </div>
+              <button
+                key={days}
+                onClick={available ? handleWeeklyBonus : undefined}
+                disabled={!available || claimingWeekly}
+                className={`rounded-lg py-2 px-1 flex flex-col items-center justify-center gap-0.5 transition ${
+                  available ? 'bg-white text-[#3B5BFF] shadow-md active:scale-95 ring-2 ring-white/40 animate-pulse'
+                  : claimed ? 'bg-white/15 text-white/50'
+                  :           'bg-white/10 text-white/40 cursor-not-allowed'
+                }`}
+                title={available ? `Забрать +5 ₽` : claimed ? 'Получен' : `Ещё ${days - streak} дн.`}
+              >
+                <span className="text-[10px] leading-none">
+                  {claimed ? '✓' : available ? '🏆' : '🔒'}
+                </span>
+                <span className="text-[12px] font-bold tabular-nums leading-none">
+                  {days}д
+                </span>
+                <span className="text-[9px] leading-none opacity-80">+5₽</span>
+              </button>
             );
           })}
-
-          {/* Monthly milestone — same compact layout, желтый акцент */}
+          {/* Месячный — 5-я ячейка справа, желтый акцент */}
           {(() => {
             const claimed = meta.monthlyBonusesClaimed.includes(currentMonth);
             return (
-              <div className={`flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg ${
-                monthlyAvailable ? 'bg-yellow-50 border border-yellow-100' : 'bg-gray-50'
-              }`}>
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-base shrink-0">{claimed ? '✅' : monthlyAvailable ? '🌟' : '🔒'}</span>
-                  <span className={`text-[13px] font-semibold tabular-nums ${claimed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
-                    30 дн
-                  </span>
-                  <span className="text-gray-300">·</span>
-                  <span className={`text-[12px] font-medium tabular-nums ${claimed ? 'text-gray-300' : 'text-yellow-600'}`}>
-                    +30 ₽
-                  </span>
-                </div>
-                {monthlyAvailable ? (
-                  <button onClick={handleMonthlyBonus} disabled={claimingMonthly}
-                    className="px-3 py-1 bg-yellow-500 text-white text-xs font-semibold rounded-md hover:bg-yellow-600 active:scale-95 transition disabled:opacity-50 shrink-0">
-                    {claimingMonthly ? '...' : 'Забрать'}
-                  </button>
-                ) : (
-                  <span className={`text-[11px] font-semibold whitespace-nowrap shrink-0 ${claimed ? 'text-gray-400' : 'text-gray-400'}`}>
-                    {claimed ? 'получен' : `ещё ${30 - streak} дн.`}
-                  </span>
-                )}
-              </div>
+              <button
+                onClick={monthlyAvailable ? handleMonthlyBonus : undefined}
+                disabled={!monthlyAvailable || claimingMonthly}
+                className={`rounded-lg py-2 px-1 flex flex-col items-center justify-center gap-0.5 transition ${
+                  monthlyAvailable ? 'bg-yellow-300 text-yellow-900 shadow-md active:scale-95 ring-2 ring-yellow-200/50 animate-pulse'
+                  : claimed ? 'bg-white/15 text-white/50'
+                  :           'bg-white/10 text-white/40 cursor-not-allowed'
+                }`}
+                title={monthlyAvailable ? `Забрать +30 ₽` : claimed ? 'Получен' : `Ещё ${30 - streak} дн.`}
+              >
+                <span className="text-[10px] leading-none">
+                  {claimed ? '✓' : monthlyAvailable ? '🌟' : '🔒'}
+                </span>
+                <span className="text-[12px] font-bold tabular-nums leading-none">
+                  30д
+                </span>
+                <span className="text-[9px] leading-none opacity-80">+30₽</span>
+              </button>
             );
           })()}
         </div>
