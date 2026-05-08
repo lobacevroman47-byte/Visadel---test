@@ -233,9 +233,20 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
         }
       }
 
-      // 4. Remove draft
+      // 4. Remove draft — и одиночный ключ, и запись из массива visa_drafts
+      // (массив читает ApplicationsTab; раньше чистили только ключ — после оплаты
+      // черновик не уходил из «Моих заявок»).
       const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
       localStorage.removeItem(draftKey);
+      try {
+        const raw = localStorage.getItem('visa_drafts');
+        if (raw) {
+          const filtered = JSON.parse(raw).filter((d: { id?: string }) => d.id !== draftKey);
+          localStorage.setItem('visa_drafts', JSON.stringify(filtered));
+        }
+      } catch (e) {
+        console.warn('[step7] failed to prune visa_drafts:', e);
+      }
 
       // 5. Cancel any pending reminders for this draft
       apiFetch('/api/cancel-reminders', {
