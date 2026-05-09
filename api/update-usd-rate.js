@@ -68,6 +68,13 @@ async function processPartnerHolds() {
 
   for (const p of pending) {
     try {
+      // Канонический dedupe_key: убираем "<bonus_type>:" префикс который
+      // grant-bonus.js добавил при insert pending. Без strip получится
+      // dedupe_key="partner_pending:partner_visa_<id>" на partner_approved
+      // логе — семантически кривовато, хотя unique constraint работает по
+      // (type, dedupe_key) и тип разный.
+      const canonicalKey = (p.dedupe_key ?? '').replace(/^partner_[a-z]+:/, '');
+
       // Insert approved log (idempotent via unique constraint on
       // (telegram_id, type, dedupe_key)).
       const insR = await fetch(
@@ -80,36 +87,48 @@ async function processPartnerHolds() {
             type: 'partner_approved',
             amount: p.amount,
             description: `Approved: ${p.description}`,
-            dedupe_key: p.dedupe_key,
+            dedupe_key: canonicalKey,
           }),
         },
       );
       if (!insR.ok) {
-        errors.push({ dedupe_key: p.dedupe_key, error: `insert ${insR.status}` });
+        errors.push({ dedupe_key: canonicalKey, error: `insert ${insR.status}` });
         continue;
       }
       const inserted = await insR.json().catch(() => []);
       const wasNew = Array.isArray(inserted) && inserted.length > 0;
       if (!wasNew) { skipped++; continue; }
 
-      // Bump partner_balance (read-modify-write — защищено dedupe выше).
-      const userResp = await fetch(
-        `${SUPABASE_URL}/rest/v1/users?telegram_id=eq.${p.telegram_id}&select=partner_balance`,
-        { headers: sbHeaders() },
-      );
-      const userArr = await userResp.json().catch(() => []);
-      const current = (userArr?.[0]?.partner_balance) ?? 0;
+      // Атомарный inc partner_balance через RPC (миграция 020).
+      // Защита от race condition с admin payout.
       const bumpR = await fetch(
-        `${SUPABASE_URL}/rest/v1/users?telegram_id=eq.${p.telegram_id}`,
+        `${SUPABASE_URL}/rest/v1/rpc/inc_partner_balance`,
         {
-          method: 'PATCH',
-          headers: sbHeaders({ Prefer: 'return=minimal' }),
-          body: JSON.stringify({ partner_balance: current + p.amount }),
+          method: 'POST',
+          headers: sbHeaders(),
+          body: JSON.stringify({ p_telegram_id: p.telegram_id, p_delta: p.amount }),
         },
       );
       if (!bumpR.ok) {
-        errors.push({ dedupe_key: p.dedupe_key, error: `bump balance ${bumpR.status}` });
+        errors.push({ dedupe_key: canonicalKey, error: `bump balance ${bumpR.status}` });
         continue;
+      }
+
+      // Апдейтим partner_commission_status у источника (для hotel/flight bookings).
+      // У applications такой колонки нет — пропускаем визы.
+      const sourceMatch = canonicalKey.match(/^partner_(hotel_bookings|flight_bookings)_(.+)$/);
+      if (sourceMatch) {
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/${sourceMatch[1]}?id=eq.${sourceMatch[2]}`,
+          {
+            method: 'PATCH',
+            headers: sbHeaders({ Prefer: 'return=minimal' }),
+            body: JSON.stringify({
+              partner_commission_status: 'approved',
+              partner_commission_approved_at: new Date().toISOString(),
+            }),
+          },
+        ).catch(e => console.warn('[partner-holds] booking status update failed:', e?.message ?? e));
       }
       approved++;
 
