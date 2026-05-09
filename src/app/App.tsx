@@ -133,6 +133,13 @@ function App() {
     if (tabParam === 'applications' || tabParam === 'tasks' || tabParam === 'referrals' || tabParam === 'reviews') {
       setInitialProfileTab(tabParam);
     }
+    // Partner dashboard — отдельный экран. Открывается из push-уведомлений
+    // партнёру (?tab=partner_dashboard в URL кнопки).
+    if (tabParam === 'partner_dashboard') {
+      setCurrentScreen('partner_dashboard');
+      setIsLoading(false);
+      return;
+    }
 
     // Get Telegram user (or mock for local dev)
     const tg = isTelegramWebApp() ? getTelegramUser() : getMockUser();
@@ -146,11 +153,12 @@ function App() {
       const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;
 
       // Deeplink-команды: t.me/<bot>/app?startapp=<param>
-      //   booking_hotel    — открыть форму брони отеля
-      //   booking_flight   — открыть форму брони авиабилета
-      //   applications     — открыть «Мои заявки» в кабинете
-      //   referrals        — открыть реферальный таб
-      //   <реф.код>        — обычный referral-click (как раньше)
+      //   booking_hotel     — открыть форму брони отеля
+      //   booking_flight    — открыть форму брони авиабилета
+      //   applications      — открыть «Мои заявки» в кабинете
+      //   referrals         — открыть реферальный таб
+      //   partner_dashboard — открыть партнёрский кабинет (для is_influencer=true)
+      //   <реф.код>         — обычный referral-click (как раньше)
       let referralCode: string | undefined = startParam;
       if (startParam === 'booking_hotel') {
         setCurrentScreen('hotel_booking'); referralCode = undefined;
@@ -160,6 +168,8 @@ function App() {
         setInitialProfileTab('applications'); setCurrentScreen('profile'); referralCode = undefined;
       } else if (startParam === 'referrals') {
         setInitialProfileTab('referrals'); setCurrentScreen('profile'); referralCode = undefined;
+      } else if (startParam === 'partner_dashboard') {
+        setCurrentScreen('partner_dashboard'); referralCode = undefined;
       }
 
       // Track referral click (если действительно реф.код, а не deeplink-команда)

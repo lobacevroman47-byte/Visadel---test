@@ -15,6 +15,7 @@ import {
   Wallet, Loader2, Search, X, Check, FileDown, Clock, AlertCircle, RefreshCw,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -370,6 +371,19 @@ const PayoutModal: React.FC<{
         description: `−${numericAmount}₽ выплата на карту${cardLast4 ? ` •• ${cardLast4}` : ''}${note ? ` (${note})` : ''}`,
       });
       if (logErr) console.warn('bonus_logs insert failed (non-fatal):', logErr);
+
+      // 4. Push-уведомление партнёру: «X₽ переведено» (best-effort)
+      apiFetch('/api/notify-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: partner.telegram_id,
+          status: 'partner_payout_processed',
+          amount: numericAmount,
+          card_last4: cardLast4.trim() || null,
+          application_id: `partner_notify_payout_${partner.telegram_id}_${Date.now()}`,
+        }),
+      }).catch(e => console.warn('partner notify (payout) error:', e));
 
       onDone();
     } catch (e) {

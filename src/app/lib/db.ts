@@ -865,6 +865,26 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
         application_id: dedupeKey,
       }),
     });
+
+    // Push-уведомление партнёру: «+800₽ начислено, hold 30 дней».
+    // Только для партнёрского flow — обычный реф уже видит в bonus_balance
+    // и без push-а. Best-effort — не падаем при ошибке.
+    if (isPartner) {
+      try {
+        await apiFetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: referrerId,
+            status: 'partner_referral_paid',
+            amount,
+            country: undefined, // visa country добавим если нужно — пока без
+            source: 'visa',
+            application_id: `partner_notify_${dedupeKey}`,
+          }),
+        });
+      } catch (e) { console.warn('partner notify error', e); }
+    }
   } catch (e) { console.warn('payReferralBonus error', e); }
 }
 
