@@ -817,8 +817,14 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   const settings = await getAppSettings();
   let amount = settings.referrer_regular_bonus;
   let description = `+${amount}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`;
+  // Тип записи в bonus_logs:
+  //   'referral'        — обычный реф, мгновенно увеличивает bonus_balance
+  //   'partner_pending' — партнёр, hold-период 30 дней, потом cron approves
+  //                       и инкрементит users.partner_balance (в ₽ к выплате)
+  let bonusType = 'referral';
+  let dedupeKey = `referral_${refereeTelegramId}`;
 
-  // Partner override: percentage of the actual order price
+  // Partner override: percentage of the actual order price + pending status
   if (isPartner && applicationId) {
     const { data: app } = await supabase
       .from('applications')
@@ -835,21 +841,25 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
       const pct = (product as { partner_commission_pct: number } | null)?.partner_commission_pct
         ?? settings.partner_commission_pct_default;
       amount = partnerCommission(a.price, pct);
-      description = `+${amount}₽ партнёру (${pct}% от ${a.price}₽, реферал ${refereeTelegramId})`;
+      description = `+${amount}₽ партнёру (${pct}% от ${a.price}₽ за визу) — в hold-периоде 30д`;
+      bonusType = 'partner_pending';
+      // Уникальный dedupe per visa application — позволяет иметь и
+      // partner_pending, и потом partner_approved для того же applicationId.
+      dedupeKey = `partner_visa_${applicationId}`;
     }
   }
 
-  // Idempotent grant via API (dedup key = unique referee id, fires once per referee)
+  // Idempotent grant via API (dedup key = unique per referee+source, fires once)
   try {
     await apiFetch('/api/grant-bonus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         telegram_id: referrerId,
-        type: 'referral',
+        type: bonusType,
         amount,
         description,
-        application_id: `referral_${refereeTelegramId}`,
+        application_id: dedupeKey,
       }),
     });
   } catch (e) { console.warn('payReferralBonus error', e); }
@@ -1192,6 +1202,9 @@ export interface AppSettings {
   new_user_welcome_bonus: number;
   referrer_regular_bonus: number;
   partner_commission_pct_default: number;
+  // Defaults for booking-tables partner % (per-booking row override)
+  hotel_partner_pct_default?: number;
+  flight_partner_pct_default?: number;
   max_bonus_usage_regular: number;
   max_bonus_usage_partner: number | null;
   bonus_expiration_days: number;
@@ -1215,10 +1228,12 @@ const SETTINGS_DEFAULTS: AppSettings = {
   new_user_welcome_bonus: BONUS_CONFIG.NEW_USER_WELCOME,
   referrer_regular_bonus: BONUS_CONFIG.REFERRER_REGULAR,
   partner_commission_pct_default: BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT,
+  hotel_partner_pct_default: 20,
+  flight_partner_pct_default: 10,
   max_bonus_usage_regular: BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR,
   max_bonus_usage_partner: BONUS_CONFIG.MAX_BONUS_USAGE_PARTNER,
   bonus_expiration_days: 365,
-  payment_card_number: '5536 9140 3834 6908',
+  payment_card_number: '',
   payment_card_holder: '',
   hotel_booking_price: 1000,
   flight_booking_price: 2000,
