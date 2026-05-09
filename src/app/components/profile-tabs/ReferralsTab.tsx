@@ -61,8 +61,9 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
 
   // Direct Link Mini App: opens MiniApp immediately with start_param available.
   const link = `https://t.me/${BOT_USERNAME}/${MINI_APP_SHORT_NAME}?startapp=${referralCode}`;
-  // Сильный shareText: цифра в начале, прямой призыв, без длинной обёртки.
-  const shareText = `Получи ${BONUS_CONFIG.NEW_USER_WELCOME}₽ на первую визу в Visadel — оформление за 5 минут в Telegram: ${link}`;
+  // Текст для шеринга — БЕЗ URL внутри. Ссылка идёт отдельным параметром
+  // в navigator.share / t.me/share/url, иначе получается дубль (превью+текст).
+  const shareText = `Получи ${BONUS_CONFIG.NEW_USER_WELCOME}₽ на первую визу в Visadel — оформление за 5 минут в Telegram`;
 
   const copyLink = async () => {
     try {
