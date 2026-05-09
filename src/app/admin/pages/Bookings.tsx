@@ -200,21 +200,31 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
 
   const updateStatus = async (table: 'hotel_bookings' | 'flight_bookings', id: string, status: string) => {
     if (!isSupabaseConfigured()) return;
+
+    // Validation: status='confirmed' требует прикреплённый confirmation_url.
+    // Иначе админ может «отправить бронь готовой» не загрузив подтверждение,
+    // и юзер получит push «бронь готова» без файла — пойдут жалобы.
+    if (status === 'confirmed') {
+      const current = table === 'hotel_bookings'
+        ? hotels.find(h => h.id === id)
+        : flights.find(f => f.id === id);
+      if (!current?.confirmation_url) {
+        await dialog.warning(
+          'Сначала прикрепи подтверждение',
+          'Нельзя поставить статус «Готово» без файла подтверждения брони. Загрузи скан/PDF в карточке брони и попробуй снова.',
+        );
+        return;
+      }
+    }
+
     const { error } = await supabase.from(table).update({ status }).eq('id', id);
     if (error) {
-      // CHECK violation видим явно вместо тихого молчания — частая причина
-      // когда статус не разрешён в БД (например 'pending_confirmation' для
-      // hotel_bookings, чей CHECK не включает этот статус).
       await dialog.error('Не удалось обновить статус', error.message);
       return;
     }
 
     // При переходе в любой «paid» статус — начислить партнёрскую комиссию
     // (если бронь привязана к партнёру и комиссия ещё не начислялась).
-    // Срабатывает на in_progress и confirmed — админ может пропустить
-    // in_progress и сразу перейти в confirmed. Идемпотентность через
-    // dedupe_key=partner_<table>_<id> защищает от двойных начислений.
-    // Hold 30 дней — статус 'pending', через cron → 'approved' → partner_balance.
     const PAID_BOOKING_STATUSES = ['in_progress', 'confirmed'];
     if (PAID_BOOKING_STATUSES.includes(status)) {
       try {
@@ -224,9 +234,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       }
     }
 
-    // При отмене брони — откатываем партнёрскую комиссию (если уже начислена).
-    // Если был 'pending' — просто пишем log + меняем статус (баланс не трогали).
-    // Если был 'approved' — пишем log с отрицательной amount и dec balance.
+    // При отмене — откатываем партнёрскую комиссию (если уже начислена).
     if (status === 'cancelled') {
       try {
         await maybeReversePartnerCommission(table, id);
@@ -238,6 +246,37 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     void refresh();
     if (selectedHotel?.id === id) setSelectedHotel(s => s ? { ...s, status } : s);
     if (selectedFlight?.id === id) setSelectedFlight(s => s ? { ...s, status } : s);
+
+    // Push клиенту — best-effort. Маппим booking-статус на нотификацию:
+    //   in_progress → booking_in_progress («Бронь в работе»)
+    //   confirmed   → booking_confirmed («Бронь готова!»)
+    //   cancelled   → booking_cancelled («Бронь отменена»)
+    //   new / pending_* — без push (это юзер ещё не был информирован)
+    const NOTIFY_STATUS_MAP: Record<string, string> = {
+      in_progress: 'booking_in_progress',
+      confirmed:   'booking_confirmed',
+      cancelled:   'booking_cancelled',
+    };
+    const notifyStatus = NOTIFY_STATUS_MAP[status];
+    if (notifyStatus) {
+      const booking = table === 'hotel_bookings'
+        ? hotels.find(h => h.id === id)
+        : flights.find(f => f.id === id);
+      if (booking?.telegram_id) {
+        apiFetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: booking.telegram_id,
+            status: notifyStatus,
+            application_id: `booking_${table}_${id}_${status}`,
+          }),
+        }).catch(e => console.warn('[bookings] notify-status failed (non-fatal):', e));
+      }
+    }
+
+    // Брендовый success после всего — единый стиль (не нативный alert).
+    await dialog.success('Статус обновлён', notifyStatus ? 'Уведомление клиенту отправлено.' : undefined);
   };
 
   // Idempotent: dedupe_key (`partner_${table}_${bookingId}`) защищает от
@@ -603,9 +642,9 @@ function ConfirmationUploader({
     <div>
       <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Подтверждение брони (для клиента)</p>
 
-      {!ready && !url && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 text-xs text-amber-900 mb-2">
-          ℹ️ Чтобы прикрепить файл, сначала переведи статус в <span className="font-bold">«Готово»</span> (выше).
+      {!url && !ready && (
+        <div className="bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5 text-xs text-[#0F2A36] mb-2">
+          ℹ️ Сначала загрузи файл подтверждения, потом переведи статус в <span className="font-bold">«Готово»</span> — иначе клиент получит уведомление без прикреплённого подтверждения.
         </div>
       )}
 
@@ -618,22 +657,23 @@ function ConfirmationUploader({
         </div>
       )}
 
-      {/* Dropzone — visible whenever status is "Готово" (replaces or adds) */}
-      {ready && (
-        <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
-          {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
-          <p className="text-xs text-[#0F2A36]">
-            {uploading ? 'Загружаем…' : url ? 'Загрузить другое подтверждение' : 'Загрузить подтверждение'}
-          </p>
-          <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">
-            {url
-              ? 'PDF/JPG/PNG · заменит уже загруженный файл'
-              : 'PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете'}
-          </p>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
-            onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
-        </label>
-      )}
+      {/* Dropzone — доступен ВСЕГДА (раньше только при status=confirmed,
+          что вынуждало админа сначала переводить в Готово, и из-за этого
+          можно было «отправить» бронь без файла). Теперь сначала прикрепи —
+          потом переводи в Готово. */}
+      <label className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+        {uploading ? <Loader2 className="w-5 h-5 animate-spin text-[#3B5BFF] mx-auto" /> : <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />}
+        <p className="text-xs text-[#0F2A36]">
+          {uploading ? 'Загружаем…' : url ? 'Загрузить другое подтверждение' : 'Загрузить подтверждение'}
+        </p>
+        <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">
+          {url
+            ? 'PDF/JPG/PNG · заменит уже загруженный файл'
+            : 'PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете'}
+        </p>
+        <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" disabled={uploading}
+          onChange={e => { const f = e.target.files?.[0]; if (f) void handleFile(f); }} />
+      </label>
     </div>
   );
 }
