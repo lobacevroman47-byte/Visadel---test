@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown,
+  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown, ExternalLink,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadFile, getAppSettings } from '../../lib/db';
@@ -781,14 +781,16 @@ function PaymentBlock({ price, screenshotUrl }: { price: number | null; screensh
 
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-white w-full sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+    <div
+      className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white w-full sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
         {children}
       </div>
-      <button onClick={onClose}
-        className="hidden sm:flex fixed top-4 right-4 w-10 h-10 rounded-full bg-white/90 text-gray-700 items-center justify-center hover:bg-white">
-        <X className="w-5 h-5" />
-      </button>
     </div>
   );
 }
@@ -1028,34 +1030,44 @@ function BookingDetailModal({
 }) {
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
   const tgUsername = b.telegram_login?.replace(/^@/, '') || b.username || '';
-  const kindLabel = kind === 'hotel' ? 'бронь отеля' : 'бронь авиабилета';
   const table = kind === 'hotel' ? 'hotel_bookings' : 'flight_bookings';
+
+  // Заголовок-лейбл идентичный визовой модалке: «{флаг} {тип услуги} · {детали}».
+  // Для отеля: «🏨 Бронь отеля · {страна}, {город}»
+  // Для авиа: «✈️ Бронь авиабилета · {Откуда} → {Куда}»
+  const headerEmoji = kind === 'hotel' ? '🏨' : '✈️';
+  const headerLabel = kind === 'hotel' ? 'Бронь отеля' : 'Бронь авиабилета';
+  const headerDetails = kind === 'hotel'
+    ? [(b as HotelBooking).country, (b as HotelBooking).city].filter(Boolean).join(', ')
+    : `${(b as FlightBooking).from_city ?? ''} → ${(b as FlightBooking).to_city ?? ''}`.trim();
 
   return (
     <ModalShell onClose={onClose}>
-      {/* Header — same as visa modal */}
-      <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">{kindLabel}</p>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95 sm:hidden">
+      {/* Header — идентичен визовой модалке (Applications.tsx) */}
+      <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100 shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold flex items-center gap-1.5">
+            <span>{headerEmoji}</span>
+            <span>{headerLabel}{headerDetails ? ` · ${headerDetails}` : ''}</span>
+          </p>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95">
             <X className="w-4 h-4" />
           </button>
         </div>
         <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{b.first_name} {b.last_name}</h2>
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
-          <p className="text-xs text-[#0F2A36]/60">Подана {fmtDateTime(b.created_at)}</p>
+        <div className="flex items-center gap-3 text-xs text-[#0F2A36]/60 mt-1 flex-wrap">
+          <span>Подана {new Date(b.created_at).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
           {tgUsername && (
             <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
-              className="text-xs text-[#3B5BFF] hover:underline flex items-center gap-1">
-              @{tgUsername}
-              <ChevronRight className="w-3 h-3" />
+              className="text-[#3B5BFF] hover:underline flex items-center gap-1">
+              @{tgUsername} <ExternalLink className="w-3 h-3" />
             </a>
           )}
         </div>
       </div>
 
       {/* Tabs — идентично админке виз */}
-      <div className="flex border-b border-gray-200 shrink-0 sticky top-[110px] bg-white z-10">
+      <div className="flex border-b border-gray-200 shrink-0">
         {(['info', 'form', 'files', 'payment'] as const).map(tab => (
           <button
             key={tab}
