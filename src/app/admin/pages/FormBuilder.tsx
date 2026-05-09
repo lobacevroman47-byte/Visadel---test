@@ -734,6 +734,10 @@ const BookingProductEditor: React.FC<{
   const [draftExtras, setDraftExtras] = useState<ExtraFormField[]>(settings[type.extraFieldsKey] ?? []);
   const [draftOverrides, setDraftOverrides] = useState<CoreFieldOverrides>(settings[type.overridesKey] ?? {});
   const [saving, setSaving] = useState(false);
+  // Какие поля раскрыты для редактирования. Closed-state — компактная строка
+  // как в визовом FormBuilder; click на edit → разворачивает форму.
+  const [expandedCore, setExpandedCore] = useState<string | null>(null);
+  const [expandedExtra, setExpandedExtra] = useState<string | null>(null);
 
   const setRow = <K extends keyof typeof draftRow>(k: K, v: typeof draftRow[K]) =>
     setDraftRow(p => ({ ...p, [k]: v }));
@@ -897,9 +901,11 @@ const BookingProductEditor: React.FC<{
           </label>
         </div>
 
-        {/* Core fields card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-3 mb-4">
+        {/* Core fields card — стиль 1-в-1 с визовым FormBuilder:
+            компактные строки (label + chips + edit-icon), редактирование
+            раскрывает inline-форму ниже строки. */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 p-5 pb-4">
             <div className="w-10 h-10 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
               <FileEdit className="w-4 h-4" />
             </div>
@@ -908,60 +914,83 @@ const BookingProductEditor: React.FC<{
               <p className="text-xs text-gray-500 mt-0.5">Переименовывай, скрывай или меняй обязательность встроенных полей</p>
             </div>
           </div>
-          <div className="space-y-2">
+          <div className="divide-y divide-gray-100 border-t border-gray-100">
             {type.coreFields.map(f => {
               const ov = draftOverrides[f.key] ?? {};
               const label = ov.label ?? f.defaultLabel;
               const required = ov.required ?? f.defaultRequired;
               const visible = ov.visible !== false;
               const isCustom = ov.label !== undefined || ov.required !== undefined || ov.visible !== undefined;
+              const expanded = expandedCore === f.key;
               return (
-                <div
-                  key={f.key}
-                  className={`bg-gray-50 rounded-xl p-3 border border-gray-100 ${!visible ? 'opacity-50' : ''}`}
-                >
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[10px] font-mono uppercase tracking-wider text-gray-400 shrink-0">{f.key}</span>
-                    <input
-                      type="text"
-                      value={label}
-                      onChange={e => updateOverride(f.key, { label: e.target.value })}
-                      className="flex-1 min-w-[180px] px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
-                    />
-                    {isCustom && (
-                      <button type="button" onClick={() => resetOverride(f.key)}
-                        className="text-[11px] text-[#3B5BFF] hover:underline shrink-0">
-                        Сбросить
-                      </button>
-                    )}
+                <div key={f.key} className={!visible ? 'opacity-60' : ''}>
+                  <div className="px-4 py-3 flex flex-wrap items-center gap-3">
+                    <div className="flex-1 min-w-[200px]">
+                      <p className="text-gray-800 font-medium">
+                        {label} {required && <span className="text-red-500">*</span>}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
+                        <span className="font-mono">{f.key}</span>
+                        <span className="px-1.5 py-0.5 bg-gray-100 rounded">Текст</span>
+                        {!visible && <span className="px-1.5 py-0.5 bg-gray-50 text-gray-500 rounded">скрыто</span>}
+                        {isCustom && <span className="px-1.5 py-0.5 bg-[#EAF1FF] text-[#3B5BFF] rounded">изменено</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setExpandedCore(expanded ? null : f.key)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Редактировать"
+                    >
+                      <Edit2 size={16} />
+                    </button>
                   </div>
-                  <div className="flex items-center gap-3 mt-2 flex-wrap">
-                    <label className="text-xs text-gray-600 flex items-center gap-1.5 select-none">
-                      <input
-                        type="checkbox" checked={visible}
-                        onChange={e => updateOverride(f.key, { visible: e.target.checked })}
-                        className="accent-[#3B5BFF]"
-                      />
-                      Показывать клиенту
-                    </label>
-                    <label className="text-xs text-gray-600 flex items-center gap-1.5 select-none">
-                      <input
-                        type="checkbox" checked={required}
-                        onChange={e => updateOverride(f.key, { required: e.target.checked })}
-                        className="accent-[#3B5BFF]"
-                      />
-                      Обязательное
-                    </label>
-                  </div>
+                  {expanded && (
+                    <div className="px-4 pb-4 -mt-1 bg-gray-50 border-t border-gray-100 space-y-3 pt-3">
+                      <div>
+                        <label className="block text-xs text-gray-700 mb-1 font-semibold">Название</label>
+                        <input
+                          type="text"
+                          value={label}
+                          onChange={e => updateOverride(f.key, { label: e.target.value })}
+                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
+                        />
+                      </div>
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <label className="text-sm text-gray-700 flex items-center gap-2 select-none cursor-pointer">
+                          <input
+                            type="checkbox" checked={visible}
+                            onChange={e => updateOverride(f.key, { visible: e.target.checked })}
+                            className="w-4 h-4 accent-[#3B5BFF]"
+                          />
+                          Показывать клиенту
+                        </label>
+                        <label className="text-sm text-gray-700 flex items-center gap-2 select-none cursor-pointer">
+                          <input
+                            type="checkbox" checked={required}
+                            onChange={e => updateOverride(f.key, { required: e.target.checked })}
+                            className="w-4 h-4 accent-[#3B5BFF]"
+                          />
+                          Обязательное
+                        </label>
+                        {isCustom && (
+                          <button type="button" onClick={() => resetOverride(f.key)}
+                            className="ml-auto text-xs text-[#3B5BFF] hover:underline">
+                            Сбросить к умолчанию
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
         </div>
 
-        {/* Custom fields card */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-3 mb-4">
+        {/* Custom fields card — стиль 1-в-1 с визовым FormBuilder. */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="flex items-center gap-3 p-5 pb-4">
             <div className="w-10 h-10 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
               <Plus className="w-4 h-4" strokeWidth={2.5} />
             </div>
@@ -973,76 +1002,135 @@ const BookingProductEditor: React.FC<{
           </div>
 
           {draftExtras.length === 0 ? (
-            <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
-              <p className="text-xs text-gray-400">Нет дополнительных полей</p>
+            <div className="px-5 pb-5">
+              <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg">
+                <p className="text-xs text-gray-400">Нет дополнительных полей</p>
+              </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-100 border-t border-gray-100">
               {draftExtras.map((f, idx) => {
                 const needsOptions = f.type === 'select' || f.type === 'radio';
+                const expanded = expandedExtra === f.id;
+                const typeLabel = ({
+                  text: 'Текст', textarea: 'Длинный текст', number: 'Число', date: 'Дата',
+                  select: 'Выпадающий список', radio: 'Радио', checkbox: 'Да/Нет', file: 'Файл',
+                } as Record<string, string>)[f.type] ?? f.type;
                 return (
-                  <div key={f.id} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
-                    <div className="flex items-start gap-2 mb-2">
-                      <div className="flex flex-col gap-0.5 pt-1">
-                        <button type="button" onClick={() => moveField(idx, -1)} disabled={idx === 0}
-                          className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▲</button>
-                        <button type="button" onClick={() => moveField(idx, 1)} disabled={idx === draftExtras.length - 1}
-                          className="text-gray-400 hover:text-[#3B5BFF] disabled:opacity-30 text-xs">▼</button>
+                  <div key={f.id}>
+                    <div className="px-4 py-3 flex flex-wrap items-center gap-3">
+                      <div className="flex flex-col gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => moveField(idx, -1)}
+                          disabled={idx === 0}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить выше"
+                        >
+                          <ChevronUp size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveField(idx, 1)}
+                          disabled={idx === draftExtras.length - 1}
+                          className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                          title="Переместить ниже"
+                        >
+                          <ChevronDown size={16} />
+                        </button>
                       </div>
-                      <input
-                        type="text" value={f.label}
-                        onChange={e => updateField(idx, { label: e.target.value })}
-                        placeholder="Название поля"
-                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-[#5C7BFF]"
-                      />
-                      <button type="button" onClick={() => removeField(idx)}
-                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition">
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex-1 min-w-[200px]">
+                        <p className="text-gray-800 font-medium">
+                          {f.label || <span className="text-gray-400 italic font-normal">Без названия</span>} {f.required && <span className="text-red-500">*</span>}
+                        </p>
+                        <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500">
+                          <span className="px-1.5 py-0.5 bg-gray-100 rounded">{typeLabel}</span>
+                          {needsOptions && f.options && (
+                            <span className="text-gray-400">опций: {f.options.length}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedExtra(expanded ? null : f.id)}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                          title="Редактировать"
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeField(idx)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-lg"
+                          title="Удалить"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap pl-6">
-                      <select
-                        value={f.type}
-                        onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
-                        className="px-2 py-1 text-xs border border-gray-200 rounded-md bg-white"
-                      >
-                        <option value="text">Текст</option>
-                        <option value="textarea">Длинный текст</option>
-                        <option value="number">Число</option>
-                        <option value="date">Дата</option>
-                        <option value="select">Выпадающий список</option>
-                        <option value="radio">Радио-кнопки</option>
-                        <option value="checkbox">Чекбокс (да/нет)</option>
-                        <option value="file">Файл</option>
-                      </select>
-                      {f.type !== 'checkbox' && f.type !== 'file' && (
-                        <input
-                          type="text"
-                          value={f.placeholder ?? ''}
-                          onChange={e => updateField(idx, { placeholder: e.target.value })}
-                          placeholder="Подсказка"
-                          className="flex-1 min-w-[120px] px-2 py-1 text-xs border border-gray-200 rounded-md"
-                        />
-                      )}
-                      <label className="text-xs text-gray-600 flex items-center gap-1 select-none">
-                        <input
-                          type="checkbox" checked={f.required}
-                          onChange={e => updateField(idx, { required: e.target.checked })}
-                          className="accent-[#3B5BFF]"
-                        />
-                        Обязательное
-                      </label>
-                    </div>
-                    {needsOptions && (
-                      <div className="mt-2 pl-6">
-                        <label className="block text-[11px] font-semibold text-gray-600 mb-1">Варианты (по одному в строке)</label>
-                        <textarea
-                          value={(f.options ?? []).join('\n')}
-                          onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
-                          rows={3}
-                          placeholder="Эконом&#10;Бизнес&#10;Первый класс"
-                          className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
-                        />
+                    {expanded && (
+                      <div className="px-4 pb-4 -mt-1 bg-gray-50 border-t border-gray-100 space-y-3 pt-3">
+                        <div>
+                          <label className="block text-xs text-gray-700 mb-1 font-semibold">Название</label>
+                          <input
+                            type="text" value={f.label}
+                            onChange={e => updateField(idx, { label: e.target.value })}
+                            placeholder="Название поля"
+                            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1 font-semibold">Тип</label>
+                            <select
+                              value={f.type}
+                              onChange={e => updateField(idx, { type: e.target.value as ExtraFormField['type'] })}
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
+                            >
+                              <option value="text">Текст</option>
+                              <option value="textarea">Длинный текст</option>
+                              <option value="number">Число</option>
+                              <option value="date">Дата</option>
+                              <option value="select">Выпадающий список</option>
+                              <option value="radio">Радио-кнопки</option>
+                              <option value="checkbox">Чекбокс (да/нет)</option>
+                              <option value="file">Файл</option>
+                            </select>
+                          </div>
+                          {f.type !== 'checkbox' && f.type !== 'file' && (
+                            <div>
+                              <label className="block text-xs text-gray-700 mb-1 font-semibold">Placeholder</label>
+                              <input
+                                type="text"
+                                value={f.placeholder ?? ''}
+                                onChange={e => updateField(idx, { placeholder: e.target.value })}
+                                placeholder="Подсказка"
+                                className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-[#5C7BFF]"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        <label className="text-sm text-gray-700 flex items-center gap-2 select-none cursor-pointer">
+                          <input
+                            type="checkbox" checked={f.required}
+                            onChange={e => updateField(idx, { required: e.target.checked })}
+                            className="w-4 h-4 accent-[#3B5BFF]"
+                          />
+                          Обязательное
+                        </label>
+                        {needsOptions && (
+                          <div>
+                            <label className="block text-xs text-gray-700 mb-1 font-semibold">Варианты (по одному в строке)</label>
+                            <textarea
+                              value={(f.options ?? []).join('\n')}
+                              onChange={e => updateField(idx, { options: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                              rows={3}
+                              placeholder="Эконом&#10;Бизнес&#10;Первый класс"
+                              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white resize-none focus:outline-none focus:border-[#5C7BFF]"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1051,11 +1139,13 @@ const BookingProductEditor: React.FC<{
             </div>
           )}
 
-          <button type="button" onClick={addField}
-            className="mt-3 w-full py-2 border-2 border-dashed border-gray-200 hover:border-[#5C7BFF] hover:bg-[#EAF1FF] text-sm text-[#3B5BFF] font-semibold rounded-lg transition flex items-center justify-center gap-1">
-            <Plus size={14} strokeWidth={2.5} />
-            Добавить поле
-          </button>
+          <div className="p-5 pt-3">
+            <button type="button" onClick={addField}
+              className="w-full py-2 border-2 border-dashed border-gray-200 hover:border-[#5C7BFF] hover:bg-[#EAF1FF] text-sm text-[#3B5BFF] font-semibold rounded-lg transition flex items-center justify-center gap-1">
+              <Plus size={14} strokeWidth={2.5} />
+              Добавить поле
+            </button>
+          </div>
         </div>
       </div>
     </div>
