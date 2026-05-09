@@ -52,11 +52,15 @@ export interface ReferralLevel {
   perk: string;
 }
 
+// Premium-tone level names — отображаются в Mini App и в bonus_logs.
+// Старые исторические записи (Новичок/Активист/Амбассадор/Легенда) остаются
+// в bonus_logs как есть — переименование не миграция, просто новые описания
+// будут с новыми именами.
 export const REFERRAL_LEVELS: ReferralLevel[] = [
-  { id: 1, name: 'Новичок',    minRefs: 1,  bonus: 0,    icon: '🥉', gradient: 'from-amber-400 to-amber-600',  perk: 'Лимит оплаты бонусами 500₽' },
-  { id: 2, name: 'Активист',   minRefs: 3,  bonus: 500,  icon: '🥈', gradient: 'from-gray-400 to-gray-600',    perk: 'Лимит оплаты бонусами 600₽' },
-  { id: 3, name: 'Амбассадор', minRefs: 10, bonus: 2000, icon: '🥇', gradient: 'from-yellow-400 to-yellow-600', perk: 'Лимит оплаты бонусами 800₽' },
-  { id: 4, name: 'Легенда',    minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-purple-500 to-pink-600',   perk: 'Лимит оплаты бонусами 1000₽' },
+  { id: 1, name: 'Старт',     minRefs: 1,  bonus: 0,    icon: '⭐', gradient: 'from-slate-400 to-slate-600',     perk: 'Лимит оплаты бонусами 500₽' },
+  { id: 2, name: 'Активный',  minRefs: 3,  bonus: 500,  icon: '🏆', gradient: 'from-blue-400 to-blue-600',       perk: 'Лимит оплаты бонусами 600₽' },
+  { id: 3, name: 'Эксперт',   minRefs: 10, bonus: 2000, icon: '✨', gradient: 'from-violet-400 to-violet-600',   perk: 'Лимит оплаты бонусами 800₽' },
+  { id: 4, name: 'VIP',       minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-amber-400 to-amber-600',     perk: 'Лимит оплаты бонусами 1000₽' },
 ];
 
 export function getCurrentLevel(refCount: number): ReferralLevel | null {
