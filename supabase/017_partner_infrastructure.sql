@@ -91,13 +91,13 @@ ALTER TABLE public.partner_payouts ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_select_own_payouts" ON public.partner_payouts;
 CREATE POLICY "anon_select_own_payouts" ON public.partner_payouts
   FOR SELECT TO anon
-  USING (telegram_id = current_tg_id());
+  USING (telegram_id = public.current_tg_id());
 
 -- updated_at trigger
 DROP TRIGGER IF EXISTS partner_payouts_updated_at ON public.partner_payouts;
 CREATE TRIGGER partner_payouts_updated_at
   BEFORE UPDATE ON public.partner_payouts
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 6. partner_settings — реквизиты для выплат (1 строка на партнёра)
@@ -120,23 +120,23 @@ ALTER TABLE public.partner_settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "anon_select_own_settings" ON public.partner_settings;
 CREATE POLICY "anon_select_own_settings" ON public.partner_settings
   FOR SELECT TO anon
-  USING (telegram_id = current_tg_id());
+  USING (telegram_id = public.current_tg_id());
 
 DROP POLICY IF EXISTS "anon_upsert_own_settings" ON public.partner_settings;
 CREATE POLICY "anon_upsert_own_settings" ON public.partner_settings
   FOR INSERT TO anon
-  WITH CHECK (telegram_id = current_tg_id());
+  WITH CHECK (telegram_id = public.current_tg_id());
 
 DROP POLICY IF EXISTS "anon_update_own_settings" ON public.partner_settings;
 CREATE POLICY "anon_update_own_settings" ON public.partner_settings
   FOR UPDATE TO anon
-  USING (telegram_id = current_tg_id())
-  WITH CHECK (telegram_id = current_tg_id());
+  USING (telegram_id = public.current_tg_id())
+  WITH CHECK (telegram_id = public.current_tg_id());
 
 DROP TRIGGER IF EXISTS partner_settings_updated_at ON public.partner_settings;
 CREATE TRIGGER partner_settings_updated_at
   BEFORE UPDATE ON public.partner_settings
-  FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 7. bonus_logs — расширение типов
