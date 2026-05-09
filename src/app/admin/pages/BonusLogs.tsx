@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, Search, Gift, AlertTriangle } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { Button, Input, Card, EmptyState } from '../../components/ui/brand';
 
 interface BonusLog {
   id: string;
@@ -96,11 +97,15 @@ export const BonusLogs: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">История бонусов</h1>
           <p className="text-sm text-gray-400 mt-0.5">Все начисления · проверка на накрутку</p>
         </div>
-        <button onClick={load} disabled={loading}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 transition-all disabled:opacity-50">
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={load}
+          disabled={loading}
+          leftIcon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
+        >
           Обновить
-        </button>
+        </Button>
       </div>
 
       {/* Suspicious users alert */}
@@ -136,14 +141,16 @@ export const BonusLogs: React.FC = () => {
 
       {/* Filters */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-40">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input value={search} onChange={e => setSearch(e.target.value)}
+        <div className="flex-1 min-w-40">
+          <Input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Поиск по имени или ID..."
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            leftIcon={<Search className="w-4 h-4" />}
+          />
         </div>
         <select value={filter} onChange={e => setFilter(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-gray-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-300">
+          className="px-3 py-2.5 rounded-xl border border-[#E1E5EC] text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF]">
           <option value="all">Все типы</option>
           {Object.entries(TYPE_CONFIG).map(([k, v]) => (
             <option key={k} value={k}>{v.icon} {v.label}</option>
@@ -157,10 +164,13 @@ export const BonusLogs: React.FC = () => {
           <RefreshCw className="w-8 h-8 text-gray-300 animate-spin" />
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-gray-100 p-16 text-center">
-          <Gift className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-gray-400">Нет записей</p>
-        </div>
+        <Card variant="flat" padding="none" className="py-12">
+          <EmptyState
+            icon={<Gift className="w-6 h-6 text-[#3B5BFF]" />}
+            title="Нет записей"
+            subtitle="Когда пользователи начнут получать бонусы — они появятся здесь"
+          />
+        </Card>
       ) : (
         <div className="space-y-2">
           {filtered.map(log => {
