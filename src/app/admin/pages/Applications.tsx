@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Search, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, History, Clock, ChevronRight } from 'lucide-react';
+import { Search, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, Clock, ChevronRight, Check } from 'lucide-react';
 import { statusLabels, statusChipClass } from '../data/mockData';
 import {
   useAdminApplications,
@@ -933,6 +933,10 @@ const STATUS_LABELS_RU: Record<string, string> = {
   ready: 'Готово',
 };
 
+// Стиль 1-в-1 с BookingStatusHistory (Bookings.tsx) — единый формат
+// timeline в админке. Иконка Clock (text-[#3B5BFF]), точки timeline-а
+// (синяя для первой записи, emerald для последующих), без рамки на
+// wrapper'е, цвета текста через brand-токены (#0F2A36).
 const StatusHistory: React.FC<{
   createdAt: string;
   log: StatusLogEntry[];
@@ -941,47 +945,52 @@ const StatusHistory: React.FC<{
   const fmt = (iso: string) =>
     new Date(iso).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
 
+  // Объединяем «создание заявки» + status changes в один timeline
+  const entries: Array<{ key: string; date: string; transition: React.ReactNode; admin?: string | null }> = [
+    { key: 'created', date: createdAt, transition: <><span className="text-[#0F2A36]/60">Заявка создана</span> · <span className="font-bold">ожидает подтверждения</span></> },
+    ...log.map(entry => ({
+      key: entry.id,
+      date: entry.created_at,
+      transition: (
+        <>
+          <span className="text-[#0F2A36]/60">{STATUS_LABELS_RU[entry.from_status ?? ''] ?? entry.from_status ?? '?'}</span>
+          {' → '}
+          <span className="font-bold">{STATUS_LABELS_RU[entry.to_status] ?? entry.to_status}</span>
+        </>
+      ),
+      admin: entry.changed_by_name,
+    })),
+  ];
+
   return (
-    <div className="mt-2 bg-gray-50 rounded-xl p-4 border border-gray-100">
+    <div className="bg-gray-50 rounded-xl p-4">
       <div className="flex items-center gap-2 mb-3">
-        <History className="w-4 h-4 text-gray-500" />
-        <h4 className="text-sm font-semibold text-gray-700">История изменений</h4>
+        <Clock className="w-4 h-4 text-[#3B5BFF]" />
+        <p className="text-sm font-semibold text-[#0F2A36]">История изменений</p>
       </div>
       {loading ? (
-        <div className="flex items-center gap-2 text-xs text-gray-400 py-2">
-          <Loader2 className="w-3 h-3 animate-spin" /> Загружаем…
-        </div>
+        <p className="text-xs text-gray-400">Загружаем…</p>
+      ) : entries.length === 0 ? (
+        <p className="text-xs text-gray-400 italic">Статус ещё не менялся</p>
       ) : (
-        <div className="relative pl-5 space-y-3">
-          <div className="absolute left-1.5 top-1.5 bottom-1.5 w-px bg-gray-200" />
-          {/* Creation entry */}
-          <div className="relative">
-            <div className="absolute -left-3.5 top-1 w-2 h-2 rounded-full bg-blue-400 ring-2 ring-white" />
-            <p className="text-xs text-gray-500">{fmt(createdAt)}</p>
-            <p className="text-sm text-gray-700">
-              <span className="font-medium">Заявка создана</span> · ожидает подтверждения
-            </p>
-          </div>
-          {/* Status changes */}
-          {log.map(entry => (
-            <div key={entry.id} className="relative">
-              <div className="absolute -left-3.5 top-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
-              <p className="text-xs text-gray-500">{fmt(entry.created_at)}</p>
-              <p className="text-sm text-gray-700">
-                <span className="text-gray-400">{STATUS_LABELS_RU[entry.from_status ?? ''] ?? entry.from_status ?? '?'}</span>
-                {' → '}
-                <span className="font-medium">{STATUS_LABELS_RU[entry.to_status] ?? entry.to_status}</span>
-              </p>
-              {entry.changed_by_name && (
-                <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                  <Clock className="w-3 h-3" /> {entry.changed_by_name}
-                </p>
-              )}
+        <div className="space-y-3">
+          {entries.map((e, i) => (
+            <div key={e.key} className="flex gap-3">
+              <div className="flex flex-col items-center pt-1">
+                <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                {i < entries.length - 1 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
+              </div>
+              <div className="flex-1 pb-2">
+                <p className="text-xs text-gray-500">{fmt(e.date)}</p>
+                <p className="text-sm text-[#0F2A36] mt-0.5">{e.transition}</p>
+                {e.admin && (
+                  <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" /> Администратор {e.admin}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
-          {log.length === 0 && (
-            <p className="text-xs text-gray-400 italic ml-1">Статус ещё не менялся</p>
-          )}
         </div>
       )}
     </div>
@@ -1000,7 +1009,6 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const usdRate = parseFloat(usdRateStr);
   const taxPct = parseFloat(taxPctStr);
   const [visaFile, setVisaFile] = useState<File | null>(null);
-  const [replaceVisa, setReplaceVisa] = useState(false);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
@@ -1292,59 +1300,46 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 </select>
               </div>
 
-              {/* Visa file — when status = completed */}
+              {/* Visa file — when status = completed.
+                  Стиль 1-в-1 с подтверждением брони (Bookings.tsx) — единый
+                  паттерн загрузки файла-результата в админке. */}
               {status === 'completed' && (
                 <div>
-                  <label className="block text-sm text-gray-700 mb-2 font-medium">Готовая виза</label>
+                  <p className="text-xs font-semibold text-[#0F2A36]/65 mb-2">Готовая виза</p>
 
-                  {/* Already uploaded — show preview + open + replace */}
-                  {application.visaFileUrl && !visaFile && !replaceVisa && (
-                    <div className="space-y-2">
-                      <div className="vd-grad-soft border border-blue-100 rounded-xl p-3 flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-white flex items-center justify-center shrink-0">
-                          <ExternalLink className="w-4 h-4 text-emerald-600" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-[#0F2A36]">Виза отправлена клиенту</p>
-                          <a href={application.visaFileUrl} target="_blank" rel="noreferrer"
-                            className="text-xs text-[#3B5BFF] hover:underline">Открыть файл</a>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => setReplaceVisa(true)}
-                        className="text-xs text-[#3B5BFF] hover:underline">
-                        Загрузить другой файл
-                      </button>
+                  {/* Existing file — small green pill above the dropzone */}
+                  {application.visaFileUrl && !visaFile && (
+                    <div className="vd-grad-soft border border-blue-100 rounded-xl p-2.5 flex items-center gap-2 mb-2">
+                      <Check className="w-4 h-4 text-emerald-600 shrink-0" strokeWidth={3} />
+                      <p className="text-xs font-semibold text-[#0F2A36] flex-1">Виза отправлена клиенту</p>
+                      <a href={application.visaFileUrl} target="_blank" rel="noreferrer"
+                        className="text-xs text-[#3B5BFF] hover:underline shrink-0">Открыть файл</a>
                     </div>
                   )}
 
-                  {/* No file yet, OR replacing — show upload form */}
-                  {(!application.visaFileUrl || replaceVisa || visaFile) && (
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-5 text-center">
-                      <Upload className="mx-auto mb-2 text-gray-400" size={28} />
-                      <p className="text-sm text-gray-500 mb-2">
-                        {replaceVisa ? 'Выбери новый файл — заменит уже отправленный' : 'Перетащите файл или нажмите для выбора'}
-                      </p>
-                      <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={(e) => setVisaFile(e.target.files?.[0] || null)}
-                        className="hidden" id="visa-upload"
-                      />
-                      <label htmlFor="visa-upload"
-                        className="inline-block px-4 py-2 bg-gray-100 text-sm rounded-lg cursor-pointer hover:bg-gray-200 transition">
-                        Выбрать файл
-                      </label>
-                      {visaFile && <p className="text-sm text-green-600 mt-2">✓ {visaFile.name}</p>}
-                      {replaceVisa && (
-                        <button type="button" onClick={() => { setReplaceVisa(false); setVisaFile(null); }}
-                          className="block mx-auto mt-2 text-xs text-gray-500 hover:underline">
-                          Отмена — оставить текущий файл
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* Dropzone — всегда виден (как в Bookings VisaUploadBlock).
+                      Сначала прикрепи файл, потом переводи в Готово. */}
+                  <label htmlFor="visa-upload" className="block border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
+                    <Upload className="w-5 h-5 text-gray-400 mx-auto mb-1" />
+                    <p className="text-xs text-[#0F2A36]">
+                      {visaFile ? visaFile.name : application.visaFileUrl ? 'Загрузить другой файл' : 'Загрузить файл визы'}
+                    </p>
+                    <p className="text-[10px] text-[#0F2A36]/55 mt-0.5">
+                      {application.visaFileUrl
+                        ? 'PDF/JPG/PNG · заменит уже отправленный файл'
+                        : 'PDF/JPG/PNG · после загрузки клиент сможет скачать в кабинете'}
+                    </p>
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                      id="visa-upload"
+                      className="hidden"
+                      onChange={(e) => setVisaFile(e.target.files?.[0] || null)}
+                    />
+                  </label>
                 </div>
               )}
 
-              {/* Resend notification for already-completed apps */}
+              {/* Resend notification for already-completed apps.
+                  Стиль 1-в-1 с Bookings StatusSelector → handleResend. */}
               {application.status === 'completed' && (
                 <button
                   type="button"
@@ -1361,35 +1356,23 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                   }}
                   disabled={notifying}
                   aria-busy={notifying}
-                  className="w-full py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none"
+                  className="w-full px-4 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition"
                 >
-                  {notifying ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Отправка…</span>
-                    </>
-                  ) : (
-                    <span>📨 Отправить уведомление повторно</span>
-                  )}
+                  {notifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>📨</span>}
+                  {notifying ? 'Отправляем…' : 'Отправить уведомление повторно'}
                 </button>
               )}
 
-              {/* Save */}
+              {/* Save — стиль 1-в-1 с Bookings (синяя с Check-иконкой). */}
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={saving}
                 aria-busy={saving}
-                className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:pointer-events-none select-none transition-colors"
+                className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"
               >
-                {saving ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Сохранение…</span>
-                  </>
-                ) : (
-                  <span>Сохранить изменения</span>
-                )}
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {saving ? 'Сохраняем…' : 'Сохранить изменения'}
               </button>
 
               {/* Status history */}

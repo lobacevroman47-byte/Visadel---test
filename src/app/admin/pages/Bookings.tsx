@@ -81,11 +81,12 @@ const STATUS_OPTIONS = [
   { value: 'cancelled',            label: 'Отменена',               color: 'bg-red-100 text-red-700' },
 ];
 
-// Что показывать в селекте — только 4 целевых статуса.
-// Legacy 'pending_payment' и 'pending_confirmation' видны в badge'ах если
-// есть в БД, но менять на них из админки нельзя.
+// Что показывать в селекте — только 3 целевых статуса (без «Отменена»,
+// чтобы случайно не отменить бронь — отмену делаем через отдельный flow).
+// Legacy 'pending_payment' / 'pending_confirmation' / 'cancelled' видны
+// в badge'ах если уже есть в БД, но из dropdown'а админ их выбрать не может.
 const STATUS_DROPDOWN = STATUS_OPTIONS.filter(s =>
-  ['new', 'in_progress', 'confirmed', 'cancelled'].includes(s.value)
+  ['new', 'in_progress', 'confirmed'].includes(s.value)
 );
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
