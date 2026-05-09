@@ -298,7 +298,7 @@ export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDa
               <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Прозрачная статистика по каждому рефу
             </li>
             <li className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Выплаты 2 раза в месяц · без минимума
+              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Выплаты 2 раза в месяц · без минимальной суммы для вывода
             </li>
             <li className="flex items-center gap-2">
               <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Личный менеджер в Telegram
