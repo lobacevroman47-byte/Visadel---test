@@ -1,20 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  Users, Award, Loader2, Copy, Share2, Check, Crown, Star,
-  Sparkles, ChevronRight, QrCode, Download, UserPlus, Wallet,
+  Users, Loader2, Copy, Share2, Check, Crown,
+  ChevronRight, QrCode, Download, UserPlus,
   CheckCircle2,
 } from 'lucide-react';
 import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
-import { apiFetch } from '../../lib/apiFetch';
-import {
-  BONUS_CONFIG,
-  REFERRAL_LEVELS,
-  getCurrentLevel,
-  getNextLevel,
-} from '../../lib/bonus-config';
+import { BONUS_CONFIG } from '../../lib/bonus-config';
+// (apiFetch удалён вместе с auto-grant level bonuses)
 
 interface ReferralTabProps {
   onOpenPartnerApplication?: () => void;
@@ -22,15 +17,6 @@ interface ReferralTabProps {
 
 const BOT_USERNAME = 'Visadel_test_bot';
 const MINI_APP_SHORT_NAME = 'app';
-
-// Levels отображаются монохромными lucide-иконками, а не emoji в config.
-// Premium feel — единая icon system.
-const LEVEL_ICON: Record<number, React.ComponentType<{ className?: string }>> = {
-  1: Star,
-  2: Award,
-  3: Sparkles,
-  4: Crown,
-};
 
 export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabProps) {
   const { appUser } = useTelegram();
@@ -57,31 +43,14 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         if (cancelled) return;
         setStats(s);
 
-        // Cache paid referrals count for Step7Payment (bonus usage limit)
+        // Cache paid referrals count for Step7Payment (bonus usage limit).
+        // Хотя getMaxBonusUsage больше не зависит от уровня, кэш оставляем —
+        // другие места могут читать это значение из userData.
         try {
           const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
           ud.paidReferralsCount = s.paidReferrals;
           localStorage.setItem('userData', JSON.stringify(ud));
         } catch { /* ignore */ }
-
-        // Auto-grant level bonuses (idempotent — dedupe via application_id)
-        for (const level of REFERRAL_LEVELS) {
-          if (level.bonus > 0 && s.paidReferrals >= level.minRefs) {
-            try {
-              await apiFetch('/api/grant-bonus', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  telegram_id: myTelegramId,
-                  type: 'level',
-                  amount: level.bonus,
-                  description: `+${level.bonus}₽ за достижение уровня «${level.name}»`,
-                  application_id: `level_${level.id}_${myTelegramId}`,
-                }),
-              });
-            } catch (e) { console.warn('level bonus grant failed', e); }
-          }
-        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -168,18 +137,6 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     }, 'image/png');
   };
 
-  // Levels — derived from PAID referrals only (officially counted).
-  const refCount = stats.paidReferrals;
-  const currentLevel = getCurrentLevel(refCount);
-  const nextLevel = getNextLevel(refCount);
-  const progressPct = useMemo(() => {
-    if (!nextLevel) return 100;
-    const prevMin = currentLevel?.minRefs ?? 0;
-    const span = nextLevel.minRefs - prevMin;
-    const done = refCount - prevMin;
-    return Math.min(100, Math.max(0, Math.round((done / span) * 100)));
-  }, [refCount, currentLevel, nextLevel]);
-
   const scrollToShare = () => {
     shareSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
@@ -216,18 +173,12 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         </button>
       </div>
 
-      {/* ── 2. Earnings stats — 3 compact cards ────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* ── 2. Earnings stats — 2 compact cards (funnel: top vs bottom) ─ */}
+      <div className="grid grid-cols-2 gap-2">
         <SummaryCard
           icon={<Users className="w-3.5 h-3.5 text-gray-400" />}
-          label="Перешли"
+          label="Перешли по ссылке"
           value={stats.clicks}
-          loading={loading}
-        />
-        <SummaryCard
-          icon={<UserPlus className="w-3.5 h-3.5 text-gray-400" />}
-          label="Зарегистр."
-          value={stats.registered}
           loading={loading}
         />
         <SummaryCard
@@ -308,66 +259,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         )}
       </div>
 
-      {/* ── 5. Levels — compact pills ──────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Уровень</p>
-          <p className="text-sm font-semibold text-[#0F2A36]">
-            {currentLevel ? currentLevel.name : 'Старт'}
-          </p>
-        </div>
-        {nextLevel ? (
-          <div className="mb-4">
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div
-                className="h-full vd-grad transition-all duration-500"
-                style={{ width: `${progressPct}%` }}
-              />
-            </div>
-            <p className="text-xs text-gray-500 mt-2 tabular-nums">
-              {refCount} / {nextLevel.minRefs} приглашений до уровня «{nextLevel.name}»
-            </p>
-          </div>
-        ) : (
-          <p className="text-xs text-emerald-600 font-medium mb-4 flex items-center gap-1">
-            <Check className="w-3.5 h-3.5" /> Достигнут максимальный уровень
-          </p>
-        )}
-        <div className="grid grid-cols-4 gap-1.5">
-          {REFERRAL_LEVELS.map(level => {
-            const Icon = LEVEL_ICON[level.id] ?? Star;
-            const reached = refCount >= level.minRefs;
-            const isCurrent = currentLevel?.id === level.id;
-            return (
-              <div
-                key={level.id}
-                className={`rounded-xl py-2.5 px-1 flex flex-col items-center gap-1 transition ${
-                  isCurrent
-                    ? 'bg-[#EAF1FF] ring-1 ring-[#3B5BFF]/30'
-                    : reached
-                      ? 'bg-gray-50'
-                      : 'bg-gray-50 opacity-50'
-                }`}
-                title={`${level.name} · ${level.minRefs}+ приглашений${level.bonus > 0 ? ` · +${level.bonus}₽` : ''}`}
-              >
-                <Icon className={`w-4 h-4 ${isCurrent ? 'text-[#3B5BFF]' : 'text-gray-400'}`} />
-                <p className={`text-[11px] font-medium leading-tight ${isCurrent ? 'text-[#3B5BFF]' : 'text-gray-600'}`}>
-                  {level.name}
-                </p>
-                <p className="text-[10px] text-gray-400 tabular-nums">
-                  {level.minRefs}+
-                </p>
-              </div>
-            );
-          })}
-        </div>
-        <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
-          Уровни доступны всем участникам. Премиум-партнёры дополнительно
-          получают % с каждой брони — см. ниже.
-        </p>
-      </div>
-
-      {/* ── 6. Premium-Partner banner — only for non-partners ──────────── */}
+      {/* ── 5. Premium-Partner banner — only for non-partners ──────────── */}
       {!isPartner && (
         <div className="bg-gradient-to-br from-[#0F2A36] to-[#1F3A48] rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-2">
@@ -412,7 +304,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         </div>
       )}
 
-      {/* ── 7. Partner status card — shown if user is already a partner ── */}
+      {/* ── 6. Partner status card — shown if user is already a partner ── */}
       {isPartner && (
         <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-1.5">
@@ -431,7 +323,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         </div>
       )}
 
-      {/* ── 8. Referrals list — activity-style rows ─────────────────────── */}
+      {/* ── 7. Referrals list — activity-style rows ─────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-8 text-sm text-gray-400">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем…
