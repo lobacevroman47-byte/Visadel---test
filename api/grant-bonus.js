@@ -87,6 +87,23 @@ async function tryInsertBonusLog(telegram_id, type, amount, description, dedupe_
   return { alreadyGranted };
 }
 
+// Partner-specific types работают с users.partner_balance, не bonus_balance:
+//   partner_pending   — log only, не трогает баланс (в hold-периоде 30 дней)
+//   partner_approved  — log + increment partner_balance (после hold-а)
+//   partner_paid      — log + decrement partner_balance (амт обычно отрицательная)
+//   partner_cancelled — log only (откат комиссии при refund клиента)
+function isPartnerType(type) {
+  return typeof type === 'string' && type.startsWith('partner_');
+}
+function affectsPartnerBalance(type) {
+  return type === 'partner_approved' || type === 'partner_paid';
+}
+function affectsBonusBalance(type) {
+  // Все НЕ partner_* типы трогают bonus_balance.
+  // partner_pending / partner_cancelled — log only, балансы не трогают.
+  return !isPartnerType(type);
+}
+
 async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
   // 1) Атомарный лог. Если уже был такой dedupe_key — вернёт alreadyGranted=true
   if (dedupe_key) {
@@ -96,7 +113,19 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
     await dbInsert('bonus_logs', { telegram_id, type, amount, description });
   }
 
-  // 2) Апдейт баланса. PostgREST не даёт SET balance = balance + N без RPC,
+  // 2) Партнёрский баланс — отдельная ветка. partner_pending/cancelled —
+  //    только лог, не трогают балансы вообще.
+  if (isPartnerType(type)) {
+    if (!affectsPartnerBalance(type)) return { skipped: false };
+    const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=partner_balance`);
+    const newPartnerBalance = ((user?.partner_balance) ?? 0) + amount;
+    if (user) {
+      await dbPatch(`users?telegram_id=eq.${telegram_id}`, { partner_balance: newPartnerBalance });
+    }
+    return { newPartnerBalance };
+  }
+
+  // 3) Обычный (bonus) баланс. PostgREST не даёт SET balance = balance + N без RPC,
   //    поэтому read → compute → write. Дедуп логов в (1) защищает от
   //    двойного начисления; параллельные запросы могут разойтись на величину
   //    (в будущем — RPC inc_balance).
@@ -105,6 +134,7 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
   //    upsertUser, или RLS заблокировал INSERT с фронта) — PATCH молча
   //    апдейтит 0 строк, баланс остаётся 0, но bonus_logs уже записан.
   //    Поэтому fallback'ом делаем UPSERT через on_conflict=telegram_id.
+  if (!affectsBonusBalance(type)) return { skipped: false };
   const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=bonus_balance`);
   const newBalance = ((user?.bonus_balance) ?? 0) + amount;
 

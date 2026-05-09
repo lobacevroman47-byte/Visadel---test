@@ -90,12 +90,28 @@ export const Settings: React.FC = () => {
               onChange={v => set('referrer_regular_bonus', v)}
             />
             <NumberRow
-              label="Партнёрская комиссия по умолчанию (%)"
+              label="Партнёрская комиссия с виз по умолчанию (%)"
               hint="Используется если у конкретной визы не задан свой процент. Партнёры (is_influencer=true) получают этот процент от цены визы вместо фиксированной суммы."
               value={settings.partner_commission_pct_default}
               step={0.5}
               suffix="%"
               onChange={v => set('partner_commission_pct_default', v)}
+            />
+            <NumberRow
+              label="Партнёрская комиссия с броней отелей (%)"
+              hint="Применяется к hotel_bookings когда админ переводит бронь в «Готово». Используется если у конкретной брони не задан свой процент."
+              value={settings.hotel_partner_pct_default ?? 20}
+              step={0.5}
+              suffix="%"
+              onChange={v => set('hotel_partner_pct_default', v)}
+            />
+            <NumberRow
+              label="Партнёрская комиссия с броней авиабилетов (%)"
+              hint="Применяется к flight_bookings когда админ переводит бронь в «Готово»."
+              value={settings.flight_partner_pct_default ?? 10}
+              step={0.5}
+              suffix="%"
+              onChange={v => set('flight_partner_pct_default', v)}
             />
           </div>
         </div>

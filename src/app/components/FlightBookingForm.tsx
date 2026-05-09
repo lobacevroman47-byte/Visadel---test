@@ -126,6 +126,20 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
       })();
 
+      // Захват referrer_code чтобы партнёр получил % с этой брони после
+      // hold-периода (мигр. 017). Best-effort — fail silently.
+      let referrerCode: string | null = null;
+      if (isSupabaseConfigured() && userData.telegramId) {
+        try {
+          const { data: u } = await supabase
+            .from('users')
+            .select('referred_by')
+            .eq('telegram_id', userData.telegramId)
+            .single();
+          referrerCode = (u as { referred_by?: string | null } | null)?.referred_by ?? null;
+        } catch { /* ignore */ }
+      }
+
       const row = {
         telegram_id: userData.telegramId ?? null,
         username: userData.username ?? null,
@@ -141,6 +155,7 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         price,
         payment_screenshot_url: paymentUrl,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
+        referrer_code: referrerCode,
         status: 'pending_confirmation',
       };
 

@@ -3,7 +3,9 @@ import {
   Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
-import { uploadFile } from '../../lib/db';
+import { uploadFile, getAppSettings } from '../../lib/db';
+import { apiFetch } from '../../lib/apiFetch';
+import { partnerCommission } from '../../lib/bonus-config';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -184,10 +186,78 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
   const updateStatus = async (table: 'hotel_bookings' | 'flight_bookings', id: string, status: string) => {
     if (!isSupabaseConfigured()) return;
     await supabase.from(table).update({ status }).eq('id', id);
+
+    // При confirm — начислить партнёрскую комиссию (если бронь привязана к
+    // партнёру и комиссия ещё не начислялась). Hold 30 дней — статус 'pending',
+    // через cron станет 'approved' и попадёт в users.partner_balance.
+    if (status === 'confirmed') {
+      try {
+        await maybeAccruePartnerCommission(table, id);
+      } catch (e) {
+        console.warn('[bookings] partner commission accrual failed (non-fatal):', e);
+      }
+    }
+
     void refresh();
     if (selectedHotel?.id === id) setSelectedHotel(s => s ? { ...s, status } : s);
     if (selectedFlight?.id === id) setSelectedFlight(s => s ? { ...s, status } : s);
   };
+
+  // Idempotent: dedupe_key (`partner_${table}_${bookingId}`) защищает от
+  // повторного начисления при повторном клике "Готово". Не падает если у
+  // брони нет referrer или referrer не партнёр — просто no-op.
+  async function maybeAccruePartnerCommission(table: 'hotel_bookings' | 'flight_bookings', bookingId: string) {
+    const { data: booking } = await supabase
+      .from(table)
+      .select('id, price, referrer_code, partner_commission_pct, partner_commission_status')
+      .eq('id', bookingId)
+      .single();
+    const b = booking as {
+      price: number | null;
+      referrer_code: string | null;
+      partner_commission_pct: number | null;
+      partner_commission_status: string | null;
+    } | null;
+    if (!b || !b.referrer_code || !b.price) return;
+    if (b.partner_commission_status) return; // уже начислялось
+
+    // Reservation → referrer
+    const { data: refRow } = await supabase
+      .from('users')
+      .select('telegram_id, is_influencer')
+      .eq('referral_code', b.referrer_code)
+      .single();
+    const r = refRow as { telegram_id: number; is_influencer: boolean } | null;
+    if (!r || !r.is_influencer) return; // не партнёр — комиссии нет
+
+    const settings = await getAppSettings();
+    const defaultPct = table === 'hotel_bookings'
+      ? (settings.hotel_partner_pct_default ?? 20)
+      : (settings.flight_partner_pct_default ?? 10);
+    const pct = b.partner_commission_pct ?? defaultPct;
+    const amount = partnerCommission(b.price, pct);
+    if (amount <= 0) return;
+
+    const kind = table === 'hotel_bookings' ? 'отеля' : 'авиабилета';
+    await apiFetch('/api/grant-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: r.telegram_id,
+        type: 'partner_pending',
+        amount,
+        description: `+${amount}₽ партнёру (${pct}% от ${b.price}₽ за бронь ${kind}) — в hold-периоде 30д`,
+        application_id: `partner_${table}_${bookingId}`,
+      }),
+    });
+
+    // Update booking row with commission tracking fields
+    await supabase.from(table).update({
+      partner_commission_pct: pct,
+      partner_commission_amount_rub: amount,
+      partner_commission_status: 'pending',
+    }).eq('id', bookingId);
+  }
 
   const handleExportCsv = () => {
     exportBookingsToCsv(hotels, flights);

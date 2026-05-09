@@ -153,6 +153,21 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
         try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
       })();
 
+      // Захват referrer_code чтобы партнёр получил % с этой брони после
+      // hold-периода (мигр. 017). Берём referred_by из users по текущему
+      // telegram_id; если юзер не в users или без реферера — оставим NULL.
+      let referrerCode: string | null = null;
+      if (isSupabaseConfigured() && userData.telegramId) {
+        try {
+          const { data: u } = await supabase
+            .from('users')
+            .select('referred_by')
+            .eq('telegram_id', userData.telegramId)
+            .single();
+          referrerCode = (u as { referred_by?: string | null } | null)?.referred_by ?? null;
+        } catch { /* ignore — best-effort attribution */ }
+      }
+
       const row = {
         telegram_id: userData.telegramId ?? null,
         username: userData.username ?? null,
@@ -171,6 +186,8 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
         price,
         payment_screenshot_url: paymentUrl,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
+        // Атрибуция партнёра: NULL если юзер пришёл органически
+        referrer_code: referrerCode,
         // Юзер прикрепил скриншот оплаты при сабмите → сразу
         // pending_confirmation. Админ видит в инбоксе как «ожидает
         // подтверждения», не как «новая без оплаты».
