@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Upload, X, CheckCircle2 } from 'lucide-react';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Step5Props {
   country: string;
@@ -18,6 +19,7 @@ interface Step5Props {
 }
 
 export default function Step5PhotoUpload({ country, data, additionalDocs, onChange, onNext, onPrev }: Step5Props) {
+  const dialog = useDialog();
   const [formData, setFormData] = useState(data);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -25,9 +27,9 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
     onChange(formData);
   }, [formData]);
 
-  const handleFileChange = (field: string, file: File | null, isAdditional: boolean = false) => {
+  const handleFileChange = async (field: string, file: File | null, isAdditional: boolean = false) => {
     if (file && file.size > 5 * 1024 * 1024) {
-      alert('Размер файла не должен превышать 5MB');
+      await dialog.warning('Размер файла не должен превышать 5MB');
       return;
     }
 
@@ -55,7 +57,7 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
     }
   };
 
-  const validateAndNext = () => {
+  const validateAndNext = async () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.facePhoto) {
@@ -80,7 +82,7 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      alert('Пожалуйста, загрузите все обязательные файлы');
+      await dialog.warning('Загрузите все обязательные файлы');
       return;
     }
 

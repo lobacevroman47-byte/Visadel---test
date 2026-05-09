@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, X, RefreshCw, Loader2, ShieldCheck, Shield, User } from 'lucide-react';
 import { getAdminUsers, addAdminUser, removeAdminUser, updateAdminRole, type AdminUserRow, type AdminRole } from '../../lib/db';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   founder: 'Основатель',
@@ -35,6 +36,7 @@ const AddAdminModal: React.FC<{
   onClose: () => void;
   onAdd: (row: Omit<AdminUserRow, 'id' | 'created_at'>) => Promise<void>;
 }> = ({ onClose, onAdd }) => {
+  const dialog = useDialog();
   const [telegramId, setTelegramId] = useState('');
   const [username, setUsername] = useState('');
   const [name, setName] = useState('');
@@ -44,7 +46,7 @@ const AddAdminModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const id = parseInt(telegramId.trim(), 10);
-    if (isNaN(id)) { alert('Telegram ID должен быть числом'); return; }
+    if (isNaN(id)) { await dialog.warning('Telegram ID должен быть числом'); return; }
     setSaving(true);
     await onAdd({ telegram_id: id, telegram_username: username.replace('@', '') || undefined, name, role });
     setSaving(false);
@@ -105,6 +107,7 @@ const AddAdminModal: React.FC<{
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export const Administrators: React.FC = () => {
+  const dialog = useDialog();
   const [admins, setAdmins] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -125,17 +128,18 @@ export const Administrators: React.FC = () => {
 
   const handleDelete = async (row: AdminUserRow) => {
     if (FOUNDER_IDS.includes(String(row.telegram_id))) {
-      alert('Нельзя удалить основателя');
+      await dialog.warning('Нельзя удалить основателя');
       return;
     }
-    if (!confirm(`Удалить ${row.name}?`)) return;
+    const ok = await dialog.confirm(`Удалить ${row.name}?`, 'Доступ к админ-панели будет отозван.', { confirmLabel: 'Удалить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     await removeAdminUser(row.telegram_id);
     setAdmins(prev => prev.filter(a => a.telegram_id !== row.telegram_id));
   };
 
   const handleRoleChange = async (row: AdminUserRow, role: AdminRole) => {
     if (FOUNDER_IDS.includes(String(row.telegram_id))) {
-      alert('Нельзя изменить роль основателя');
+      await dialog.warning('Нельзя изменить роль основателя');
       return;
     }
     await updateAdminRole(row.telegram_id, role);

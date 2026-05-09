@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Plus, Minus, Loader2, RefreshCw, X, ExternalLink, ShieldCheck, Shield, User as UserIcon } from 'lucide-react';
 import { useAdminUsers, updateUserBonuses, updateUserStatus, type AdminUser } from '../hooks/useAdminData';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 interface UsersProps {
   filter?: { filter?: 'all' | 'partners' | 'regular' };
@@ -25,6 +26,7 @@ function getRoleBadge(user: AdminUser) {
 
 // ── User Modal ────────────────────────────────────────────────────────────────
 const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () => void }> = ({ user, onClose, onSaved }) => {
+  const dialog = useDialog();
   const [bonusBalance, setBonusBalance] = useState(user.bonusBalance);
   const [bonusInput, setBonusInput] = useState('');
   const [status, setStatus] = useState(user.status);
@@ -33,15 +35,15 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
   const amount = parseInt(bonusInput, 10) || 0;
 
   const handleBonus = async (add: boolean) => {
-    if (amount <= 0) { alert('Введите сумму'); return; }
-    if (!add && bonusBalance < amount) { alert('Недостаточно бонусов'); return; }
+    if (amount <= 0) { await dialog.warning('Введите сумму'); return; }
+    if (!add && bonusBalance < amount) { await dialog.warning('Недостаточно бонусов'); return; }
     setSaving(true);
     try {
       await updateUserBonuses(user.telegramId, amount, add);
       setBonusBalance(prev => add ? prev + amount : prev - amount);
       setBonusInput('');
     } catch {
-      alert('Ошибка при изменении бонусов');
+      await dialog.error('Ошибка при изменении бонусов');
     } finally {
       setSaving(false);
     }
@@ -54,7 +56,7 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
       onSaved();
       onClose();
     } catch {
-      alert('Ошибка при сохранении');
+      await dialog.error('Ошибка при сохранении');
     } finally {
       setSaving(false);
     }

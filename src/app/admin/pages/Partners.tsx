@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 const BOT_USERNAME = 'Visadel_test_bot'; // в /app?startapp=<code>
 
@@ -88,6 +89,7 @@ const PAYOUT_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function Partners() {
+  const dialog = useDialog();
   const [partners, setPartners] = useState<PartnerFullRow[]>([]);
   const [history, setHistory] = useState<PayoutHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -223,7 +225,7 @@ export function Partners() {
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      alert('Скопируйте: ' + text);
+      await dialog.info('Скопируйте вручную', text);
     }
   };
 
@@ -813,6 +815,7 @@ const PartnerDetailModal: React.FC<{
   onPayout: () => void;
   onDone: () => void;
 }> = ({ partner, onClose, onPayout, onDone }) => {
+  const dialog = useDialog();
   const [recentLogs, setRecentLogs] = useState<BonusLogEntry[] | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [earlyConfirm, setEarlyConfirm] = useState<{ amount: number; daysLeft: number; pendingIds: { id: string; amount: number; dedupe_key: string | null; created_at: string }[] } | null>(null);
@@ -859,7 +862,7 @@ const PartnerDetailModal: React.FC<{
         return canonical && !approvedKeys.has(canonical);
       });
       if (toApprove.length === 0) {
-        alert('Нет pending записей без approval. Возможно cron уже всё обработал — используй обычную «Выплатить».');
+        await dialog.info('Нет pending записей без approval', 'Возможно cron уже всё обработал — используй обычную «Выплатить».');
         return;
       }
       const totalAmount = toApprove.reduce((s, l) => s + l.amount, 0);
@@ -955,7 +958,7 @@ const PartnerDetailModal: React.FC<{
       setEarlyConfirm(null);
       onDone();
     } catch (e) {
-      alert(`Ошибка досрочной выплаты: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Ошибка досрочной выплаты', e instanceof Error ? e.message : String(e));
     } finally {
       setEarlyProcessing(false);
     }
@@ -975,7 +978,7 @@ const PartnerDetailModal: React.FC<{
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
       setTimeout(() => setCopiedKey(null), 1500);
-    } catch { alert('Скопируйте: ' + text); }
+    } catch { await dialog.info('Скопируйте вручную', text); }
   };
 
   const allRequisitesText = useMemo(() => {

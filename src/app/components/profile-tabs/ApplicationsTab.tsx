@@ -34,6 +34,7 @@ import {
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
 import { useTelegram } from '../../App';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Draft {
   id: string;
@@ -219,6 +220,7 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   onSubmitted: () => void;
   isPartner: boolean;
 }) {
+  const dialog = useDialog();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -230,8 +232,8 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   const username: string = userData.username ?? '';
 
   const handleSubmit = async () => {
-    if (rating === 0) { alert('Поставьте оценку'); return; }
-    if (comment.trim().length < 5) { alert('Напишите хотя бы несколько слов'); return; }
+    if (rating === 0) { await dialog.warning('Поставьте оценку'); return; }
+    if (comment.trim().length < 5) { await dialog.warning('Напишите хотя бы несколько слов'); return; }
     setSubmitting(true);
     try {
       await submitReview({
@@ -252,7 +254,7 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
       }
       onSubmitted();
     } catch {
-      alert('Ошибка при отправке отзыва');
+      await dialog.error('Ошибка при отправке отзыва');
     } finally {
       setSubmitting(false);
     }

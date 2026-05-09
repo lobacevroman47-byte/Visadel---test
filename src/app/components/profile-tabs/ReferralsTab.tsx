@@ -9,6 +9,7 @@ import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
 import { BONUS_CONFIG } from '../../lib/bonus-config';
+import { useDialog } from '../shared/BrandDialog';
 // (apiFetch удалён вместе с auto-grant level bonuses)
 
 interface ReferralTabProps {
@@ -21,6 +22,7 @@ const MINI_APP_SHORT_NAME = 'app';
 
 export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDashboard }: ReferralTabProps) {
   const { appUser } = useTelegram();
+  const dialog = useDialog();
   // Партнёр может задать vanity-код в кабинете — используем его если есть.
   // Для обычных юзеров vanity не предлагается, остаётся system referral_code.
   const referralCode = (appUser?.vanity_code || appUser?.referral_code) ?? '';
@@ -74,7 +76,7 @@ export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDa
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      alert('Не удалось скопировать. Скопируйте вручную:\n' + link);
+      await dialog.info('Скопируйте вручную', link);
     }
   };
 

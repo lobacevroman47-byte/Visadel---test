@@ -7,6 +7,7 @@ import {
   type AdditionalService,
 } from '../../lib/db';
 import { auditLog } from '../lib/audit';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
 type Mode = 'addons' | 'bookings';
@@ -20,6 +21,7 @@ type Mode = 'addons' | 'bookings';
 // and locks down add/delete — the Каталог → Брони tab uses this view, while
 // keeping the same source of truth in the additional_services table.
 export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' }) => {
+  const dialog = useDialog();
   const [services, setServices] = useState<AdditionalService[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AdditionalService | null>(null);
@@ -56,7 +58,8 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
   };
 
   const handleDelete = async (s: AdditionalService) => {
-    if (!confirm(`Удалить «${s.name}»? Это нельзя отменить.`)) return;
+    const ok = await dialog.confirm(`Удалить «${s.name}»?`, 'Это действие нельзя отменить.', { confirmLabel: 'Удалить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     await deleteAdditionalService(s.id);
     setServices(prev => prev.filter(x => x.id !== s.id));
     void auditLog('service.delete', {
@@ -228,6 +231,7 @@ const ServiceFormModal: React.FC<{
   onClose: () => void;
   onSaved: (s: Omit<AdditionalService, 'created_at' | 'updated_at'>) => Promise<void>;
 }> = ({ service, mode, existingIds, onClose, onSaved }) => {
+  const dialog = useDialog();
   // Брони в нижнем меню оформляются без визы — поэтому ограничение по странам
   // не имеет смысла. Поле видно только в режиме доп. услуг.
   const showCountries = mode === 'addons';
@@ -267,11 +271,11 @@ const ServiceFormModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.id || !form.name || form.price < 0) {
-      alert('Заполни ID, название и корректную цену');
+      await dialog.warning('Заполни ID, название и корректную цену');
       return;
     }
     if (!service && existingIds.includes(form.id)) {
-      alert('Услуга с таким ID уже есть');
+      await dialog.warning('Услуга с таким ID уже есть');
       return;
     }
     setSaving(true);

@@ -3,6 +3,7 @@ import { ChevronRight, Plus, X, Loader2, User } from 'lucide-react';
 import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../../lib/countries';
 import { getFormFields, type VisaFormField } from '../../lib/db';
 import LatinNotice from '../shared/LatinNotice';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Step1Props {
   country: string;
@@ -13,6 +14,7 @@ interface Step1Props {
 }
 
 export default function Step1BasicData({ country, visaId, data, onChange, onNext }: Step1Props) {
+  const dialog = useDialog();
   const [formData, setFormData] = useState(data);
   const [errors, setErrors] = useState<Record<string, string>>({});
   // DB-driven fields. While loading or empty, fall back to hardcoded per-country forms.
@@ -46,7 +48,7 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
     }
   };
 
-  const validateAndNext = () => {
+  const validateAndNext = async () => {
     // If DB is the source of truth, derive required fields from there
     const requiredFields = dbFields.length > 0
       ? ['firstName', 'lastName', ...dbFields.filter(f => f.required).map(f => f.field_key)]
@@ -82,7 +84,7 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      alert('Пожалуйста, заполните все обязательные поля');
+      await dialog.warning('Заполните все обязательные поля');
       return;
     }
 

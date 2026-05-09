@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Mail, Phone, MessageCircle } from 'lucide-react';
 import { useTelegram } from '../../App';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Step4Props {
   data: {
@@ -15,6 +16,7 @@ interface Step4Props {
 
 export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Step4Props) {
   const { appUser } = useTelegram();
+  const dialog = useDialog();
   const [formData, setFormData] = useState(data);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -48,7 +50,7 @@ export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Ste
     }
   };
 
-  const validateAndNext = () => {
+  const validateAndNext = async () => {
     const newErrors: Record<string, string> = {};
 
     if (!formData.email || !formData.email.includes('@')) {
@@ -63,7 +65,7 @@ export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Ste
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
-      alert('Пожалуйста, заполните все поля корректно');
+      await dialog.warning('Заполните все поля корректно');
       return;
     }
 

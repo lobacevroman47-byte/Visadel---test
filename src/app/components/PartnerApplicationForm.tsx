@@ -24,6 +24,7 @@ import { useTelegram } from '../App';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { apiFetch } from '../lib/apiFetch';
 import { HeaderActions } from './HeaderActions';
+import { useDialog } from './shared/BrandDialog';
 
 interface PartnerApplicationFormProps {
   onBack: () => void;
@@ -48,6 +49,7 @@ interface Application {
 
 export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerApplicationFormProps) {
   const { appUser } = useTelegram();
+  const dialog = useDialog();
   const telegramId = appUser?.telegram_id ?? 0;
 
   const [existingApp, setExistingApp] = useState<Application | null>(null);
@@ -99,7 +101,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
   const handleSubmit = async () => {
     if (!validateForm()) return;
     if (!isSupabaseConfigured()) {
-      alert('Supabase не настроен — невозможно отправить заявку.');
+      await dialog.error('Supabase не настроен', 'Невозможно отправить заявку.');
       return;
     }
 
@@ -145,7 +147,7 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
       setExistingApp(data as Application);
     } catch (e) {
       console.error('partner_applications insert:', e);
-      alert(`Не удалось отправить заявку: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Не удалось отправить заявку', e instanceof Error ? e.message : String(e));
     } finally {
       setSubmitting(false);
     }
