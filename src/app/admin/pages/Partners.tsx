@@ -11,10 +11,21 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Crown, Loader2, Search, FileDown, RefreshCw, Copy, Check, AlertCircle,
-  X, Wallet,
+  X, Wallet, Send, Link as LinkIcon, Sparkles, ExternalLink, Clock,
+  CreditCard, Phone, Building2, Hash, FileText, History,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
+
+const BOT_USERNAME = 'Visadel_test_bot'; // в /app?startapp=<code>
+
+interface BonusLogEntry {
+  id: string;
+  type: string;
+  amount: number;
+  description: string | null;
+  created_at: string;
+}
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -85,6 +96,7 @@ export function Partners() {
   const [tab, setTab] = useState<'list' | 'history'>('list');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [payoutTarget, setPayoutTarget] = useState<PartnerFullRow | null>(null);
+  const [selectedPartner, setSelectedPartner] = useState<PartnerFullRow | null>(null);
 
   const refresh = useCallback(async () => {
     if (!isSupabaseConfigured()) { setLoading(false); return; }
@@ -405,7 +417,11 @@ export function Partners() {
                     }
 
                     return (
-                      <tr key={p.telegram_id} className="hover:bg-blue-50/30 transition">
+                      <tr
+                        key={p.telegram_id}
+                        onClick={() => setSelectedPartner(p)}
+                        className="hover:bg-blue-50/30 transition cursor-pointer"
+                      >
                         <td className="px-3 py-3 align-top">
                           <p className="font-semibold text-[#0F2A36]">{fioOrOrg || tgName}</p>
                           <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
@@ -440,7 +456,7 @@ export function Partners() {
                                 </div>
                               </div>
                               <button
-                                onClick={() => copyToClipboard(payTo!.value, `pay-${p.telegram_id}`)}
+                                onClick={(e) => { e.stopPropagation(); copyToClipboard(payTo!.value, `pay-${p.telegram_id}`); }}
                                 className="text-gray-400 hover:text-[#3B5BFF] active:scale-90 transition shrink-0 mt-1"
                                 title="Скопировать"
                               >
@@ -475,7 +491,7 @@ export function Partners() {
                         <td className="px-3 py-3 align-top text-right">
                           {canPayOut ? (
                             <button
-                              onClick={() => setPayoutTarget(p)}
+                              onClick={(e) => { e.stopPropagation(); setPayoutTarget(p); }}
                               className="px-3 py-1.5 vd-grad text-white text-xs font-semibold rounded-lg flex items-center gap-1 active:scale-95 transition ml-auto"
                             >
                               <Wallet className="w-3.5 h-3.5" /> Выплатить
@@ -525,6 +541,15 @@ export function Partners() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Partner detail modal — клик по строке таблицы */}
+      {selectedPartner && (
+        <PartnerDetailModal
+          partner={selectedPartner}
+          onClose={() => setSelectedPartner(null)}
+          onPayout={() => { setPayoutTarget(selectedPartner); setSelectedPartner(null); }}
+        />
       )}
 
       {/* Payout modal */}
@@ -773,3 +798,364 @@ const PayoutModal: React.FC<{
     </div>
   );
 };
+
+// ── Partner detail modal — расширенный профиль партнёра ─────────────────────
+
+const PartnerDetailModal: React.FC<{
+  partner: PartnerFullRow;
+  onClose: () => void;
+  onPayout: () => void;
+}> = ({ partner, onClose, onPayout }) => {
+  const [recentLogs, setRecentLogs] = useState<BonusLogEntry[] | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+
+  // Подгружаем последние 10 partner_* событий для контекста «за что начисляли/выплачивали»
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('bonus_logs')
+        .select('id, type, amount, description, created_at')
+        .eq('telegram_id', partner.telegram_id)
+        .like('type', 'partner_%')
+        .order('created_at', { ascending: false })
+        .limit(10);
+      if (!cancelled) setRecentLogs((data ?? []) as BonusLogEntry[]);
+    })();
+    return () => { cancelled = true; };
+  }, [partner.telegram_id]);
+
+  const partnerName = (partner.entity_type === 'legal' ? partner.organization_name : partner.full_name)
+    || [partner.first_name, partner.last_name].filter(Boolean).join(' ').trim()
+    || `@${partner.username ?? partner.telegram_id}`;
+
+  const referralCode = partner.referral_code ?? '';
+  const vanityCode = partner.vanity_code ?? '';
+  const referralLink = referralCode ? `https://t.me/${BOT_USERNAME}/app?startapp=${referralCode}` : '';
+  const vanityLink   = vanityCode   ? `https://t.me/${BOT_USERNAME}/app?startapp=${vanityCode.toUpperCase()}` : '';
+
+  const copy = async (text: string, key: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(null), 1500);
+    } catch { alert('Скопируйте: ' + text); }
+  };
+
+  const allRequisitesText = useMemo(() => {
+    const lines: string[] = [];
+    lines.push(`Партнёр: ${partnerName}`);
+    lines.push(`TG ID: ${partner.telegram_id}${partner.username ? ` (@${partner.username})` : ''}`);
+    if (partner.entity_type) {
+      lines.push(`Статус: ${STATUS_LABELS[partner.entity_type] ?? partner.entity_type}`);
+    }
+    if (partner.inn) lines.push(`ИНН: ${partner.inn}`);
+    if (partner.kpp) lines.push(`КПП: ${partner.kpp}`);
+    if (partner.card_number) lines.push(`Карта: ${partner.card_number}`);
+    if (partner.phone_for_sbp) lines.push(`СБП: ${partner.phone_for_sbp}`);
+    if (partner.bank_account) lines.push(`Расчётный счёт: ${partner.bank_account}`);
+    if (partner.bank_bic) lines.push(`БИК: ${partner.bank_bic}`);
+    if (partner.card_bank) lines.push(`Банк: ${partner.card_bank}`);
+    lines.push('');
+    lines.push(`К выплате: ${partner.partner_balance.toLocaleString('ru-RU')}₽`);
+    return lines.join('\n');
+  }, [partner, partnerName]);
+
+  const ready = partner.partner_balance > 0;
+  const hasStatus = !!partner.entity_type;
+  const canPayOut = ready && hasStatus;
+  const blocked = ready && !hasStatus;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 sticky top-0 bg-white z-10">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className="text-base font-bold text-[#0F2A36] truncate">{partnerName}</p>
+              {partner.entity_type ? (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[partner.entity_type] ?? 'bg-gray-100'}`}>
+                  {STATUS_LABELS[partner.entity_type] ?? partner.entity_type}
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-700">
+                  Не указан
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
+              ID {partner.telegram_id}
+              {partner.username && (
+                <> · <a href={`https://t.me/${partner.username}`} target="_blank" rel="noopener noreferrer" className="text-[#3B5BFF] hover:underline">@{partner.username}</a></>
+              )}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition shrink-0" aria-label="Закрыть">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-4 bg-gray-50 border-b border-gray-100">
+          <StatCard label="К выплате" value={`${partner.partner_balance.toLocaleString('ru-RU')}₽`} cls="text-emerald-600" />
+          <StatCard label="В hold" value={`${partner.pending_hold.toLocaleString('ru-RU')}₽`} cls="text-amber-600" />
+          <StatCard label="Выплачено" value={`${partner.total_paid.toLocaleString('ru-RU')}₽`} cls="text-[#3B5BFF]" />
+          <StatCard label="Заработано всего" value={`${partner.total_approved_lifetime.toLocaleString('ru-RU')}₽`} cls="text-[#0F2A36]" />
+        </div>
+
+        {/* Контакты и ссылки */}
+        <Section title="Контакты и ссылки">
+          {partner.username && (
+            <DetailLine
+              label="Telegram"
+              icon={<Send className="w-3.5 h-3.5" />}
+              value={
+                <a
+                  href={`https://t.me/${partner.username}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#3B5BFF] hover:underline flex items-center gap-1"
+                >
+                  @{partner.username} <ExternalLink className="w-3 h-3" />
+                </a>
+              }
+            />
+          )}
+          <DetailLine
+            label="Telegram ID"
+            icon={<Hash className="w-3.5 h-3.5" />}
+            value={<span className="font-mono">{partner.telegram_id}</span>}
+            copyValue={String(partner.telegram_id)}
+            copyKey="tgid"
+            copiedKey={copiedKey}
+            onCopy={copy}
+          />
+          {referralLink && (
+            <DetailLine
+              label="Реф-ссылка"
+              icon={<LinkIcon className="w-3.5 h-3.5" />}
+              value={
+                <span className="font-mono text-xs break-all">
+                  {referralLink.replace('https://', '')}
+                </span>
+              }
+              copyValue={referralLink}
+              copyKey="ref"
+              copiedKey={copiedKey}
+              onCopy={copy}
+            />
+          )}
+          {vanityLink && (
+            <DetailLine
+              label="Vanity-ссылка"
+              icon={<Sparkles className="w-3.5 h-3.5" />}
+              value={
+                <span className="font-mono text-xs break-all text-[#3B5BFF]">
+                  {vanityLink.replace('https://', '')}
+                </span>
+              }
+              copyValue={vanityLink}
+              copyKey="vanity"
+              copiedKey={copiedKey}
+              onCopy={copy}
+            />
+          )}
+        </Section>
+
+        {/* Реквизиты */}
+        <Section title="Реквизиты для выплат">
+          {!partner.entity_type && (
+            <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs text-rose-700 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>Партнёр не указал налоговый статус. Выплата невозможна — попроси заполнить реквизиты в Партнёрском кабинете.</span>
+            </div>
+          )}
+          {partner.entity_type === 'legal' && partner.organization_name && (
+            <DetailLine label="Организация" icon={<Building2 className="w-3.5 h-3.5" />} value={partner.organization_name} />
+          )}
+          {partner.entity_type !== 'legal' && partner.full_name && (
+            <DetailLine label="ФИО" icon={<FileText className="w-3.5 h-3.5" />} value={partner.full_name}
+              copyValue={partner.full_name} copyKey="fio" copiedKey={copiedKey} onCopy={copy} />
+          )}
+          {partner.inn && (
+            <DetailLine label="ИНН" icon={<Hash className="w-3.5 h-3.5" />}
+              value={<span className="font-mono">{partner.inn}</span>}
+              copyValue={partner.inn} copyKey="inn" copiedKey={copiedKey} onCopy={copy} />
+          )}
+          {partner.kpp && (
+            <DetailLine label="КПП" icon={<Hash className="w-3.5 h-3.5" />}
+              value={<span className="font-mono">{partner.kpp}</span>}
+              copyValue={partner.kpp} copyKey="kpp" copiedKey={copiedKey} onCopy={copy} />
+          )}
+          {partner.entity_type === 'self_employed' && (
+            <>
+              {partner.card_number && (
+                <DetailLine label="Карта" icon={<CreditCard className="w-3.5 h-3.5" />}
+                  value={<span className="font-mono">{partner.card_number.replace(/(\d{4})(?=\d)/g, '$1 ')}</span>}
+                  copyValue={partner.card_number} copyKey="card" copiedKey={copiedKey} onCopy={copy} />
+              )}
+              {!partner.card_number && partner.card_number_last4 && (
+                <DetailLine label="Карта (last4)" icon={<CreditCard className="w-3.5 h-3.5" />}
+                  value={<span className="font-mono">•• {partner.card_number_last4}</span>} />
+              )}
+              {partner.phone_for_sbp && (
+                <DetailLine label="СБП" icon={<Phone className="w-3.5 h-3.5" />}
+                  value={<span className="font-mono">{partner.phone_for_sbp}</span>}
+                  copyValue={partner.phone_for_sbp} copyKey="sbp" copiedKey={copiedKey} onCopy={copy} />
+              )}
+            </>
+          )}
+          {(partner.entity_type === 'ip' || partner.entity_type === 'legal') && (
+            <>
+              {partner.bank_account && (
+                <DetailLine label="Расчётный счёт" icon={<Hash className="w-3.5 h-3.5" />}
+                  value={<span className="font-mono">{partner.bank_account}</span>}
+                  copyValue={partner.bank_account} copyKey="acc" copiedKey={copiedKey} onCopy={copy} />
+              )}
+              {partner.bank_bic && (
+                <DetailLine label="БИК" icon={<Hash className="w-3.5 h-3.5" />}
+                  value={<span className="font-mono">{partner.bank_bic}</span>}
+                  copyValue={partner.bank_bic} copyKey="bic" copiedKey={copiedKey} onCopy={copy} />
+              )}
+            </>
+          )}
+          {partner.card_bank && (
+            <DetailLine label="Банк" value={partner.card_bank} />
+          )}
+
+          {/* Кнопка copy всех реквизитов одной строкой */}
+          <button
+            onClick={() => copy(allRequisitesText, 'all')}
+            className="w-full mt-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition"
+          >
+            {copiedKey === 'all' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            Скопировать все реквизиты для бухгалтера
+          </button>
+        </Section>
+
+        {/* Последние начисления */}
+        <Section title="Последние начисления">
+          {recentLogs === null ? (
+            <p className="text-xs text-gray-400 py-2">Загружаем…</p>
+          ) : recentLogs.length === 0 ? (
+            <p className="text-xs text-gray-400 py-2">Начислений пока нет</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {recentLogs.map(l => {
+                const cls = l.type === 'partner_pending'   ? 'text-amber-600'
+                          : l.type === 'partner_approved'  ? 'text-emerald-600'
+                          : l.type === 'partner_paid'      ? 'text-[#3B5BFF]'
+                          : l.type === 'partner_cancelled' ? 'text-rose-600'
+                          : 'text-gray-600';
+                const Icon = l.type === 'partner_paid' ? Wallet
+                           : l.type === 'partner_pending' ? Clock
+                           : l.type === 'partner_cancelled' ? X
+                           : Check;
+                return (
+                  <div key={l.id} className="flex items-start gap-2 py-2 first:pt-0 last:pb-0">
+                    <Icon className={`w-3.5 h-3.5 mt-0.5 shrink-0 ${cls}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs text-gray-700 truncate">{l.description}</p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">
+                        {new Date(l.created_at).toLocaleString('ru-RU')}
+                      </p>
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums shrink-0 ${cls}`}>
+                      {l.amount > 0 ? '+' : ''}{l.amount.toLocaleString('ru-RU')}₽
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Section>
+
+        {/* Footer with actions */}
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            Закрыть
+          </button>
+          {canPayOut ? (
+            <button
+              onClick={onPayout}
+              className="px-4 py-2.5 vd-grad text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition"
+            >
+              <Wallet className="w-4 h-4" /> Выплатить {partner.partner_balance.toLocaleString('ru-RU')}₽
+            </button>
+          ) : blocked ? (
+            <button
+              disabled
+              className="px-4 py-2.5 bg-gray-200 text-gray-500 rounded-lg text-sm font-semibold flex items-center gap-1.5 cursor-not-allowed"
+              title="Партнёр не указал налоговый статус"
+            >
+              ⛔ Выплата заблокирована
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Subcomponents для PartnerDetailModal ────────────────────────────────────
+
+function StatCard({ label, value, cls }: { label: string; value: string; cls: string }) {
+  return (
+    <div className="bg-white rounded-xl p-3 border border-gray-100">
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
+      <p className={`text-base font-bold tabular-nums mt-0.5 ${cls}`}>{value}</p>
+    </div>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="px-5 py-4 border-b border-gray-100 last:border-b-0">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <History className="w-3 h-3" /> {title}
+      </p>
+      <div className="space-y-1.5">{children}</div>
+    </div>
+  );
+}
+
+function DetailLine({
+  label, icon, value, copyValue, copyKey, copiedKey, onCopy,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  value: React.ReactNode;
+  copyValue?: string;
+  copyKey?: string;
+  copiedKey?: string | null;
+  onCopy?: (text: string, key: string) => void;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-3 py-1">
+      <div className="flex items-center gap-1.5 min-w-[100px] text-xs text-gray-500 shrink-0">
+        {icon} {label}
+      </div>
+      <div className="flex items-start gap-1.5 min-w-0 flex-1 justify-end">
+        <div className="text-sm text-[#0F2A36] text-right break-all">{value}</div>
+        {copyValue && copyKey && onCopy && (
+          <button
+            onClick={() => onCopy(copyValue, copyKey)}
+            className="text-gray-400 hover:text-[#3B5BFF] active:scale-90 transition shrink-0"
+            title="Скопировать"
+          >
+            {copiedKey === copyKey
+              ? <Check className="w-3.5 h-3.5 text-emerald-600" />
+              : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
