@@ -93,50 +93,54 @@ export default function UserProfile({
       </div>
 
       <div className="max-w-2xl mx-auto">
-        {/* Hero — bonus balance, brand soft gradient like Home */}
-        <div className="vd-grad-soft px-5 pt-7 pb-6">
-          <p className="text-center text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">
-            Личный кабинет
-          </p>
-          <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36] mt-1">
-            Бонусный счёт
-          </h1>
-          <p className="text-center mt-3">
-            <span className="vd-grad-text text-[36px] font-extrabold tracking-tight">
-              {bonusBalance.toLocaleString('ru-RU')} ₽
-            </span>
-          </p>
-          <p className="text-center text-[12px] text-[#0F2A36]/55 mt-1">
-            1 ₽ бонуса = 1 ₽ скидки
-          </p>
+        {/* Hero — bonus balance. Показываем ТОЛЬКО на табе «Профиль».
+            На остальных табах (Мои заявки / Партнёрство / Отзывы) бонусный
+            счёт смыслово не нужен и только отвлекает. */}
+        {activeTab === 'profile' && (
+          <div className="vd-grad-soft px-5 pt-7 pb-6">
+            <p className="text-center text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">
+              Личный кабинет
+            </p>
+            <h1 className="text-center text-[28px] leading-[1.05] tracking-tight font-extrabold text-[#0F2A36] mt-1">
+              Бонусный счёт
+            </h1>
+            <p className="text-center mt-3">
+              <span className="vd-grad-text text-[36px] font-extrabold tracking-tight">
+                {bonusBalance.toLocaleString('ru-RU')} ₽
+              </span>
+            </p>
+            <p className="text-center text-[12px] text-[#0F2A36]/55 mt-1">
+              1 ₽ бонуса = 1 ₽ скидки
+            </p>
 
-          {/* Subtle disclaimer — small "где можно потратить бонусы" с раскрывашкой */}
-          <div className="mt-2 flex justify-center">
-            <button
-              type="button"
-              onClick={() => setShowBonusInfo(v => !v)}
-              className="inline-flex items-center gap-1 text-[11px] text-[#0F2A36]/45 hover:text-[#3B5BFF] transition"
-            >
-              <Info className="w-3 h-3" />
-              На что можно потратить
-            </button>
-          </div>
-          {showBonusInfo && (
-            <div className="mt-2 mx-auto max-w-md bg-white/60 border border-blue-100/50 rounded-xl px-3 py-2.5">
-              <p className="text-[11px] text-[#0F2A36]/75 leading-snug">
-                Бонусы можно использовать как скидку при оформлении{' '}
-                <span className="font-semibold">визы</span>,{' '}
-                <span className="font-semibold">брони отеля</span> и{' '}
-                <span className="font-semibold">брони авиабилета</span>.
-              </p>
-              <p className="text-[10px] text-[#0F2A36]/50 mt-1.5 leading-snug">
-                Не действуют на готовые авиабилеты, отели из каталога,
-                экскурсии, страховки, eSIM и прочие услуги.
-                Лимит списания — 500₽ на одну заявку.
-              </p>
+            {/* Subtle disclaimer — small "где можно потратить бонусы" с раскрывашкой */}
+            <div className="mt-2 flex justify-center">
+              <button
+                type="button"
+                onClick={() => setShowBonusInfo(v => !v)}
+                className="inline-flex items-center gap-1 text-[11px] text-[#0F2A36]/45 hover:text-[#3B5BFF] transition"
+              >
+                <Info className="w-3 h-3" />
+                На что можно потратить
+              </button>
             </div>
-          )}
-        </div>
+            {showBonusInfo && (
+              <div className="mt-2 mx-auto max-w-md bg-white/60 border border-blue-100/50 rounded-xl px-3 py-2.5">
+                <p className="text-[11px] text-[#0F2A36]/75 leading-snug">
+                  Бонусы можно использовать как скидку при оформлении{' '}
+                  <span className="font-semibold">визы</span>,{' '}
+                  <span className="font-semibold">брони отеля</span> и{' '}
+                  <span className="font-semibold">брони авиабилета</span>.
+                </p>
+                <p className="text-[10px] text-[#0F2A36]/50 mt-1.5 leading-snug">
+                  Не действуют на готовые авиабилеты, отели из каталога,
+                  экскурсии, страховки, eSIM и прочие услуги.
+                  Лимит списания — 500₽ на одну заявку.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Content */}
         <div className="px-4 py-4">
