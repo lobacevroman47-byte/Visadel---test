@@ -86,21 +86,24 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         className={cn(
-          'bg-white rounded-2xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-xl',
+          'relative bg-white rounded-2xl w-full max-h-[92vh] overflow-hidden flex flex-col shadow-xl',
           sizeClass[size],
           className,
         )}
       >
+        {/* Universal close button — always rendered, positioned over content.
+            Z-30 stays above sticky internal headers (z-10) и vd-grad-soft. */}
+        <button
+          onClick={onClose}
+          aria-label="Закрыть"
+          className="absolute top-3 right-3 z-30 w-8 h-8 rounded-full bg-white/85 hover:bg-white shadow-sm flex items-center justify-center transition-colors"
+        >
+          <X className="w-4 h-4 text-[#0F2A36]" />
+        </button>
+
         {/* Header (vd-grad-soft) */}
         {(label || title || subtitle || icon) && (
           <div className="vd-grad-soft px-5 pt-4 pb-4 relative shrink-0">
-            <button
-              onClick={onClose}
-              aria-label="Закрыть"
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-white/70 hover:bg-white flex items-center justify-center transition-colors"
-            >
-              <X className="w-4 h-4 text-[#0F2A36]" />
-            </button>
             {(icon || label) && (
               <div className="flex items-center gap-2 mb-1">
                 {icon && <span className="text-base leading-none">{icon}</span>}
