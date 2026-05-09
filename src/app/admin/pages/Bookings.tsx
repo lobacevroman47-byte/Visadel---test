@@ -187,10 +187,14 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     if (!isSupabaseConfigured()) return;
     await supabase.from(table).update({ status }).eq('id', id);
 
-    // При confirm — начислить партнёрскую комиссию (если бронь привязана к
-    // партнёру и комиссия ещё не начислялась). Hold 30 дней — статус 'pending',
-    // через cron станет 'approved' и попадёт в users.partner_balance.
-    if (status === 'confirmed') {
+    // При переходе в любой «paid» статус — начислить партнёрскую комиссию
+    // (если бронь привязана к партнёру и комиссия ещё не начислялась).
+    // Срабатывает на in_progress и confirmed — админ может пропустить
+    // in_progress и сразу перейти в confirmed. Идемпотентность через
+    // dedupe_key=partner_<table>_<id> защищает от двойных начислений.
+    // Hold 30 дней — статус 'pending', через cron → 'approved' → partner_balance.
+    const PAID_BOOKING_STATUSES = ['in_progress', 'confirmed'];
+    if (PAID_BOOKING_STATUSES.includes(status)) {
       try {
         await maybeAccruePartnerCommission(table, id);
       } catch (e) {
