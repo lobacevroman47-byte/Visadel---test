@@ -14,6 +14,7 @@ import {
   Gift,
   Calendar,
   Wallet,
+  Crown,
   X
 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
@@ -182,6 +183,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="История бонусов"
           active={activeSection === 'bonus-logs'}
           onClick={() => onSectionChange('bonus-logs')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<Crown size={20} />}
+          label="Партнёры"
+          active={activeSection === 'partners'}
+          onClick={() => onSectionChange('partners')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
