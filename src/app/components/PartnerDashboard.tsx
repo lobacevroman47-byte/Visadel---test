@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useTelegram } from '../App';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { HeaderActions } from './HeaderActions';
 
 interface PartnerDashboardProps {
   onBack: () => void;
@@ -581,17 +582,21 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-10">
-      {/* Header */}
+      {/* Header: ←  ✓ VISADEL  [Profile][Admin] (без Partner — мы на нём) */}
       <div className="bg-white sticky top-0 z-20 border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between">
-          <button onClick={onBack} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95" aria-label="Назад">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-1.5">
-            <Crown className="w-4 h-4 text-amber-500" />
-            <span className="text-[#0F2A36] font-bold text-[15px]">Партнёрский кабинет</span>
+        <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <button onClick={onBack} className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95 shrink-0" aria-label="Назад">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-1 min-w-0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+                <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[#0F2A36] font-extrabold text-[16px] tracking-tight truncate">VISADEL</span>
+            </div>
           </div>
-          <span className="w-9" />
+          <HeaderActions />
         </div>
       </div>
 

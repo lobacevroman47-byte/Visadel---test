@@ -4,6 +4,7 @@ import ProfileTab from './profile-tabs/ProfileTab';
 import ApplicationsTab from './profile-tabs/ApplicationsTab';
 import ReferralsTab from './profile-tabs/ReferralsTab';
 import ReviewsTab from './profile-tabs/ReviewsTab';
+import { HeaderActions } from './HeaderActions';
 
 interface UserProfileProps {
   onBack: () => void;
@@ -46,22 +47,24 @@ export default function UserProfile({
           с расчётом offset как было раньше при двух отдельных sticky). */}
       <div className="bg-white sticky top-0 z-20 border-b border-gray-100">
         <div className="max-w-2xl mx-auto">
-          {/* Brand row */}
-          <div className="px-5 pt-3 pb-3 flex items-center justify-between">
-            <button
-              onClick={onBack}
-              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
-              aria-label="Назад"
-            >
-              <ChevronLeft className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-1.5">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
+          {/* Brand row: ←  ✓ VISADEL  [Profile][Partner][Admin] */}
+          <div className="px-5 pt-3 pb-3 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <button
+                onClick={onBack}
+                className="w-9 h-9 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95 shrink-0"
+                aria-label="Назад"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <div className="flex items-center gap-1 min-w-0">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden className="shrink-0">
+                  <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <span className="text-[#0F2A36] font-extrabold text-[16px] tracking-tight truncate">VISADEL</span>
+              </div>
             </div>
-            <span className="w-9" />
+            <HeaderActions />
           </div>
           {/* Tab bar — pill tabs, в той же sticky-области */}
           <div className="px-3 pb-2 overflow-x-auto border-t border-gray-100">
