@@ -27,9 +27,16 @@ interface PartnerRow {
   partner_balance: number;
   // From partner_settings (LEFT JOIN)
   full_name: string | null;
+  card_number: string | null;
   card_number_last4: string | null;
   card_bank: string | null;
+  phone_for_sbp: string | null;
+  bank_account: string | null;
+  bank_bic: string | null;
+  organization_name: string | null;
+  kpp: string | null;
   inn: string | null;
+  entity_type: string | null;  // 'self_employed' | 'ip' | 'legal' | null
   // Aggregated counters
   pending_hold: number;       // sum of partner_pending bonus_logs (in 30d hold)
   total_paid: number;         // sum of |partner_paid| amounts
@@ -82,8 +89,22 @@ export function Payouts() {
       const { data: settingsData } = tgIds.length > 0
         ? await supabase.from('partner_settings').select('*').in('telegram_id', tgIds)
         : { data: [] };
-      const settingsMap = new Map<number, { full_name: string | null; card_number_last4: string | null; card_bank: string | null; inn: string | null }>();
-      for (const s of (settingsData ?? []) as Array<{ telegram_id: number; full_name: string | null; card_number_last4: string | null; card_bank: string | null; inn: string | null }>) {
+      type SettingsRow = {
+        telegram_id: number;
+        full_name: string | null;
+        card_number: string | null;
+        card_number_last4: string | null;
+        card_bank: string | null;
+        phone_for_sbp: string | null;
+        bank_account: string | null;
+        bank_bic: string | null;
+        organization_name: string | null;
+        kpp: string | null;
+        inn: string | null;
+        entity_type: string | null;
+      };
+      const settingsMap = new Map<number, SettingsRow>();
+      for (const s of (settingsData ?? []) as SettingsRow[]) {
         settingsMap.set(s.telegram_id, s);
       }
 
@@ -106,9 +127,16 @@ export function Payouts() {
         return {
           ...u,
           full_name: s?.full_name ?? null,
+          card_number: s?.card_number ?? null,
           card_number_last4: s?.card_number_last4 ?? null,
           card_bank: s?.card_bank ?? null,
+          phone_for_sbp: s?.phone_for_sbp ?? null,
+          bank_account: s?.bank_account ?? null,
+          bank_bic: s?.bank_bic ?? null,
+          organization_name: s?.organization_name ?? null,
+          kpp: s?.kpp ?? null,
           inn: s?.inn ?? null,
+          entity_type: s?.entity_type ?? null,
           pending_hold: a.pending,
           // partner_paid amounts are negative — берём абсолютное значение для отображения
           total_paid: Math.abs(a.paid),
@@ -238,10 +266,22 @@ export function Payouts() {
             {filtered.map(p => {
               const name = [p.first_name, p.last_name].filter(Boolean).join(' ').trim() || `@${p.username ?? p.telegram_id}`;
               const ready = p.partner_balance > 0;
+              const hasValidStatus = p.entity_type === 'self_employed' || p.entity_type === 'ip' || p.entity_type === 'legal';
+              const blocked = ready && !hasValidStatus; // деньги есть, но статус не указан
               return (
                 <button
                   key={p.telegram_id}
-                  onClick={() => setSelected(p)}
+                  onClick={() => {
+                    if (blocked) {
+                      alert(
+                        `Партнёр ${name} не указал налоговый статус (самозанятый / ИП / юрлицо).\n\n` +
+                        `Без статуса выплата невозможна — самозанятый-founder не может быть налоговым агентом физлица.\n\n` +
+                        `Попроси партнёра заполнить «Реквизиты для выплат» в Партнёрском кабинете.`
+                      );
+                      return;
+                    }
+                    setSelected(p);
+                  }}
                   className={`w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/30 active:bg-blue-50/60 transition text-left ${ready ? '' : 'opacity-60'}`}
                 >
                   <div className="min-w-0 flex-1">
@@ -256,9 +296,15 @@ export function Payouts() {
                         В hold-периоде: {p.pending_hold.toLocaleString('ru-RU')}₽
                       </p>
                     )}
+                    {blocked && (
+                      <p className="text-[11px] text-rose-600 mt-1 flex items-center gap-1">
+                        <AlertCircle className="w-3 h-3" />
+                        Не указан налоговый статус — выплата заблокирована
+                      </p>
+                    )}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className={`text-lg font-bold tabular-nums ${ready ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    <p className={`text-lg font-bold tabular-nums ${blocked ? 'text-rose-500' : ready ? 'text-emerald-600' : 'text-gray-400'}`}>
                       {p.partner_balance.toLocaleString('ru-RU')}₽
                     </p>
                     <p className="text-[10px] text-gray-400 mt-0.5 uppercase tracking-wider">К выплате</p>
@@ -445,19 +491,55 @@ const PayoutModal: React.FC<{
           </div>
         </div>
 
-        {/* Partner settings (info only) */}
-        {(partner.full_name || partner.card_number_last4 || partner.inn) && (
-          <div className="px-5 py-3 border-b border-gray-100 bg-blue-50/30">
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Реквизиты партнёра</p>
-            {partner.full_name && <p className="text-sm text-gray-700">ФИО: {partner.full_name}</p>}
-            {partner.card_number_last4 && (
-              <p className="text-sm text-gray-700">
-                Карта: •• {partner.card_number_last4}{partner.card_bank ? ` · ${partner.card_bank}` : ''}
-              </p>
+        {/* Partner settings — отображаем поля по entity_type */}
+        <div className="px-5 py-3 border-b border-gray-100 bg-blue-50/30 space-y-1">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Реквизиты партнёра</p>
+            {partner.entity_type && (
+              <span className="text-[10px] font-medium text-[#3B5BFF] uppercase tracking-wider">
+                {partner.entity_type === 'self_employed' ? 'Самозанятый'
+                  : partner.entity_type === 'ip' ? 'ИП'
+                  : partner.entity_type === 'legal' ? 'Юрлицо'
+                  : '—'}
+              </span>
             )}
-            {partner.inn && <p className="text-sm text-gray-700">ИНН: {partner.inn}</p>}
           </div>
-        )}
+          {partner.entity_type === 'legal' && partner.organization_name && (
+            <p className="text-sm text-gray-700">Организация: {partner.organization_name}</p>
+          )}
+          {partner.entity_type !== 'legal' && partner.full_name && (
+            <p className="text-sm text-gray-700">ФИО: {partner.full_name}</p>
+          )}
+          {partner.inn && <p className="text-sm text-gray-700">ИНН: {partner.inn}</p>}
+          {partner.entity_type === 'legal' && partner.kpp && (
+            <p className="text-sm text-gray-700">КПП: {partner.kpp}</p>
+          )}
+          {partner.entity_type === 'self_employed' && (
+            <>
+              {partner.card_number && (
+                <p className="text-sm text-gray-700 font-mono">
+                  Карта: {partner.card_number.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                  {partner.card_bank ? ` · ${partner.card_bank}` : ''}
+                </p>
+              )}
+              {!partner.card_number && partner.card_number_last4 && (
+                <p className="text-sm text-gray-700">
+                  Карта: •• {partner.card_number_last4}{partner.card_bank ? ` · ${partner.card_bank}` : ''}
+                </p>
+              )}
+              {partner.phone_for_sbp && (
+                <p className="text-sm text-gray-700">СБП: {partner.phone_for_sbp}</p>
+              )}
+            </>
+          )}
+          {(partner.entity_type === 'ip' || partner.entity_type === 'legal') && (
+            <>
+              {partner.bank_account && <p className="text-sm text-gray-700 font-mono">Р/с: {partner.bank_account}</p>}
+              {partner.bank_bic && <p className="text-sm text-gray-700 font-mono">БИК: {partner.bank_bic}</p>}
+              {partner.card_bank && <p className="text-sm text-gray-700">Банк: {partner.card_bank}</p>}
+            </>
+          )}
+        </div>
 
         {/* Form */}
         <div className="px-5 py-4 space-y-4">
@@ -513,8 +595,14 @@ const PayoutModal: React.FC<{
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
             <strong>⚠️ Это просто учёт в системе.</strong>{' '}
-            Перевод денег партнёру делаешь сам — с своей карты на его карту •• {cardLast4 || partner.card_number_last4 || '????'}.
-            После нажатия «Подтвердить» баланс партнёра уменьшится на {numericAmount.toLocaleString('ru-RU')}₽.
+            Перевод денег партнёру делаешь сам —{' '}
+            {partner.entity_type === 'self_employed' && (
+              <>на карту {partner.card_number_last4 ? `•• ${partner.card_number_last4}` : ''}{partner.phone_for_sbp ? ` или СБП на ${partner.phone_for_sbp}` : ''}</>
+            )}
+            {(partner.entity_type === 'ip' || partner.entity_type === 'legal') && (
+              <>на расчётный счёт {partner.bank_account ?? '????'} (БИК {partner.bank_bic ?? '???'})</>
+            )}
+            . После нажатия «Подтвердить» баланс партнёра уменьшится на {numericAmount.toLocaleString('ru-RU')}₽.
           </div>
         </div>
 
