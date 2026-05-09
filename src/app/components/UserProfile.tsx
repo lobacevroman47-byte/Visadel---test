@@ -19,7 +19,7 @@ type Tab = 'profile' | 'applications' | 'referrals' | 'reviews';
 const TABS = [
   { id: 'profile' as Tab,      label: 'Профиль',    icon: User },
   { id: 'applications' as Tab, label: 'Мои заявки', icon: FileText },
-  { id: 'referrals' as Tab,    label: 'Рефералы',   icon: Users },
+  { id: 'referrals' as Tab,    label: 'Партнёрство', icon: Users },
   { id: 'reviews' as Tab,      label: 'Отзывы',     icon: Star },
 ];
 

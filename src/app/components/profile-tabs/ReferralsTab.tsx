@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Users, Award, Loader2, Copy, Share2, Check, Crown, Star,
   Sparkles, ChevronRight, QrCode, Download, UserPlus, Wallet,
-  Activity, Clock,
+  CheckCircle2,
 } from 'lucide-react';
 import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -91,7 +91,8 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
 
   // Direct Link Mini App: opens MiniApp immediately with start_param available.
   const link = `https://t.me/${BOT_USERNAME}/${MINI_APP_SHORT_NAME}?startapp=${referralCode}`;
-  const shareText = `Оформляйте визу с Visadel Agency. По моей ссылке вы получите 200₽ на первую визу.`;
+  // Сильный shareText: цифра в начале, прямой призыв, без длинной обёртки.
+  const shareText = `Получи ${BONUS_CONFIG.NEW_USER_WELCOME}₽ на первую визу в Visadel — оформление за 5 минут в Telegram: ${link}`;
 
   const copyLink = async () => {
     try {
@@ -104,7 +105,6 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   };
 
   // Native share — Web Share API → Telegram fallback.
-  // Открывает системный share sheet (iOS/Android) либо нативный Telegram-шаринг.
   const nativeShare = async () => {
     const data = { title: 'Visadel Agency', text: shareText, url: link };
     const nav = navigator as Navigator & { share?: (d: ShareData) => Promise<void> };
@@ -184,28 +184,6 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     shareSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Activity Timeline — последние 10 событий, построенные из referrals.
-  // Каждый ref → событие "registered". Если has_paid → ещё событие "paid".
-  // (без отдельного paid_at используем joined_at — в активном prod-режиме обычно
-  // оплата идёт в тот же день что и регистрация, разницей пренебрегаем).
-  const timelineEvents = useMemo(() => {
-    type Evt = { when: Date; text: string; type: 'register' | 'paid' };
-    const events: Evt[] = [];
-    for (const r of stats.referrals) {
-      const date = new Date(r.joined_at);
-      const name = (r.name || 'Друг').split(' ')[0];
-      events.push({ when: date, text: `${name} перешёл по вашей ссылке`, type: 'register' });
-      if (r.has_paid) {
-        events.push({
-          when: date,
-          text: `${name} оплатил визу${r.earned_bonus > 0 ? ` — +${r.earned_bonus}₽` : ''}`,
-          type: 'paid',
-        });
-      }
-    }
-    return events.sort((a, b) => b.when.getTime() - a.when.getTime()).slice(0, 10);
-  }, [stats.referrals]);
-
   if (!referralCode) {
     return (
       <div className="flex items-center justify-center py-20 text-sm text-gray-400">
@@ -218,33 +196,61 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
   return (
     <div className="space-y-4 pb-6">
 
-      {/* ── 1. Hero — clean premium header ─────────────────────────────── */}
+      {/* ── 1. Hero — earnings front and center, single CTA ────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
-        <h2 className="text-[19px] font-semibold text-[#0F2A36] tracking-tight">
-          Партнёрская программа
-        </h2>
-        <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
-          Получайте бонусы за визы, брони отелей и авиабилеты приглашённых пользователей.
+        <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
+          Заработано
         </p>
-        <div className={`grid ${isPartner ? 'grid-cols-1' : 'grid-cols-2'} gap-2 mt-4`}>
-          <button
-            onClick={scrollToShare}
-            className="vd-grad text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition vd-shadow-cta"
-          >
-            <UserPlus className="w-4 h-4" /> Пригласить
-          </button>
-          {!isPartner && (
-            <button
-              onClick={onOpenPartnerApplication}
-              className="bg-[#EAF1FF] text-[#3B5BFF] py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 hover:bg-[#DCE6FF] active:scale-[0.98] transition"
-            >
-              <Sparkles className="w-4 h-4" /> Стать партнёром
-            </button>
-          )}
+        <p className="text-[34px] font-semibold text-emerald-600 tabular-nums leading-none mt-1">
+          {loading ? '—' : `${stats.totalEarnings.toLocaleString('ru-RU')}₽`}
+        </p>
+        <p className="text-sm text-gray-500 mt-3 leading-relaxed">
+          Приглашайте друзей — каждый, кто оплатит первую визу,
+          приносит вам <span className="font-semibold text-[#0F2A36]">+{BONUS_CONFIG.REFERRER_REGULAR}₽</span>.
+        </p>
+        <button
+          onClick={scrollToShare}
+          className="w-full mt-4 vd-grad text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition vd-shadow-cta"
+        >
+          <UserPlus className="w-4 h-4" /> Пригласить друга
+        </button>
+      </div>
+
+      {/* ── 2. Earnings stats — 3 compact cards ────────────────────────── */}
+      <div className="grid grid-cols-3 gap-2">
+        <SummaryCard
+          icon={<Users className="w-3.5 h-3.5 text-gray-400" />}
+          label="Перешли"
+          value={stats.clicks}
+          loading={loading}
+        />
+        <SummaryCard
+          icon={<UserPlus className="w-3.5 h-3.5 text-gray-400" />}
+          label="Зарегистр."
+          value={stats.registered}
+          loading={loading}
+        />
+        <SummaryCard
+          icon={<CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />}
+          label="Купили визу"
+          value={stats.paidReferrals}
+          loading={loading}
+        />
+      </div>
+
+      {/* ── 3. How it works — 3 шага onboarding ─────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-3">
+          Как это работает
+        </p>
+        <div className="space-y-2.5">
+          <Step n={1} text="Поделитесь своей реферальной ссылкой" />
+          <Step n={2} text="Друг регистрируется и оплачивает первую визу" />
+          <Step n={3} text={`+${BONUS_CONFIG.REFERRER_REGULAR}₽ моментально на ваш баланс`} />
         </div>
       </div>
 
-      {/* ── 2. Share section — link + per-network buttons + native share ─ */}
+      {/* ── 4. Share section — link + per-network buttons + native share ─ */}
       <div ref={shareSectionRef} className="bg-white rounded-2xl border border-gray-100 p-5">
         <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">
           Ваша ссылка
@@ -302,7 +308,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         )}
       </div>
 
-      {/* ── 3. Levels — compact pills ──────────────────────────────────── */}
+      {/* ── 5. Levels — compact pills ──────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-gray-100 p-5">
         <div className="flex items-center justify-between mb-3">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Уровень</p>
@@ -355,44 +361,19 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             );
           })}
         </div>
+        <p className="text-[11px] text-gray-400 mt-3 leading-relaxed">
+          Уровни доступны всем участникам. Премиум-партнёры дополнительно
+          получают % с каждой брони — см. ниже.
+        </p>
       </div>
 
-      {/* ── 4. Earnings summary — compact stat cards ───────────────────── */}
-      <div className="grid grid-cols-2 gap-2">
-        <SummaryCard
-          icon={<Wallet className="w-3.5 h-3.5 text-emerald-600" />}
-          label="Заработано"
-          value={`${stats.totalEarnings.toLocaleString('ru-RU')}₽`}
-          accent
-          loading={loading}
-        />
-        <SummaryCard
-          icon={<Users className="w-3.5 h-3.5 text-[#3B5BFF]" />}
-          label="Приглашено"
-          value={stats.registered}
-          loading={loading}
-        />
-        <SummaryCard
-          icon={<Activity className="w-3.5 h-3.5 text-amber-500" />}
-          label="Активных заявок"
-          value={Math.max(0, stats.registered - stats.paidReferrals)}
-          loading={loading}
-        />
-        <SummaryCard
-          icon={<Award className="w-3.5 h-3.5 text-violet-500" />}
-          label="Оплатили"
-          value={stats.paidReferrals}
-          loading={loading}
-        />
-      </div>
-
-      {/* ── 5. Partner banner — premium dark card, only for non-partners ─ */}
+      {/* ── 6. Premium-Partner banner — only for non-partners ──────────── */}
       {!isPartner && (
         <div className="bg-gradient-to-br from-[#0F2A36] to-[#1F3A48] rounded-2xl p-5 text-white">
           <div className="flex items-center gap-2 mb-2">
             <Crown className="w-4 h-4 text-amber-300" />
             <span className="text-[11px] font-medium text-amber-300 uppercase tracking-wider">
-              Партнёрская программа
+              Премиум-партнёр
             </span>
           </div>
           <h3 className="text-[22px] font-semibold leading-tight tabular-nums">
@@ -423,7 +404,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             onClick={onOpenPartnerApplication}
             className="w-full mt-5 bg-white text-[#0F2A36] py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-50 active:scale-[0.98] transition"
           >
-            Стать партнёром <ChevronRight className="w-4 h-4" />
+            Стать премиум-партнёром <ChevronRight className="w-4 h-4" />
           </button>
           <p className="text-[11px] text-white/50 text-center mt-2">
             Заявка 2 минуты · ответ за 24 часа
@@ -431,7 +412,26 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         </div>
       )}
 
-      {/* ── 6. Referrals list — activity-style rows ─────────────────────── */}
+      {/* ── 7. Partner status card — shown if user is already a partner ── */}
+      {isPartner && (
+        <div className="bg-gradient-to-br from-amber-50 to-amber-100/50 border border-amber-200 rounded-2xl p-5">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Crown className="w-4 h-4 text-amber-600" />
+            <span className="text-[11px] font-medium text-amber-700 uppercase tracking-wider">
+              Премиум-партнёр
+            </span>
+          </div>
+          <h3 className="text-base font-semibold text-amber-900 leading-tight">
+            Вы — премиум-партнёр Visadel
+          </h3>
+          <p className="text-sm text-amber-800/80 mt-1.5 leading-relaxed">
+            Получаете повышенный % с каждого оплаченного заказа ваших рефералов.
+            Подробная статистика по доходу будет доступна в партнёрском кабинете.
+          </p>
+        </div>
+      )}
+
+      {/* ── 8. Referrals list — activity-style rows ─────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-8 text-sm text-gray-400">
           <Loader2 className="w-5 h-5 animate-spin mr-2" /> Загружаем…
@@ -440,7 +440,7 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">
-              Рефералы
+              Ваши рефералы
             </p>
             <p className="text-xs text-gray-400 tabular-nums">{stats.referrals.length}</p>
           </div>
@@ -456,21 +456,22 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           )}
         </div>
       ) : null}
-
-      {/* ── 7. Activity timeline ─────────────────────────────────────────── */}
-      {timelineEvents.length > 0 && (
-        <div className="bg-white rounded-2xl border border-gray-100 p-5">
-          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-3">
-            Активность
-          </p>
-          <Timeline events={timelineEvents} />
-        </div>
-      )}
     </div>
   );
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+function Step({ n, text }: { n: number; text: string }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className="w-6 h-6 rounded-full bg-[#EAF1FF] text-[#3B5BFF] flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5 tabular-nums">
+        {n}
+      </div>
+      <p className="text-sm text-gray-700 leading-snug pt-0.5">{text}</p>
+    </div>
+  );
+}
 
 function SocialBtn({
   label, color, onClick, children,
@@ -496,7 +497,6 @@ function SocialBtn({
 }
 
 // Иконка мессенджера MAX — кастомный SVG (нет в react-icons/fa).
-// Используется в Share-блоке наравне с TG/WA/VK/Insta/TikTok.
 function MaxIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 1000 1000" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
@@ -515,23 +515,22 @@ function MaxIcon({ className }: { className?: string }) {
 }
 
 function SummaryCard({
-  icon, label, value, accent, loading,
+  icon, label, value, loading,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
-  accent?: boolean;
   loading: boolean;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-3.5">
+    <div className="bg-white rounded-2xl border border-gray-100 p-3">
       <div className="flex items-center gap-1 mb-1">
         {icon}
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight">
+        <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight truncate">
           {label}
         </span>
       </div>
-      <p className={`text-xl font-semibold tabular-nums ${accent ? 'text-emerald-600' : 'text-[#0F2A36]'}`}>
+      <p className="text-xl font-semibold tabular-nums text-[#0F2A36]">
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : value}
       </p>
     </div>
@@ -560,37 +559,6 @@ function ReferralRow({ r }: { r: ReferralStats['referrals'][number] }) {
           {status.text}
         </span>
       </div>
-    </div>
-  );
-}
-
-function Timeline({ events }: { events: Array<{ when: Date; text: string; type: 'register' | 'paid' }> }) {
-  // Group events by relative date bucket (Сегодня / Вчера / N дней назад)
-  const groups = useMemo(() => {
-    const map = new Map<string, typeof events>();
-    for (const e of events) {
-      const k = relativeDate(e.when.toISOString());
-      if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(e);
-    }
-    return Array.from(map.entries());
-  }, [events]);
-
-  return (
-    <div className="space-y-3">
-      {groups.map(([when, items]) => (
-        <div key={when}>
-          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mb-1.5 flex items-center gap-1">
-            <Clock className="w-3 h-3" /> {when}
-          </p>
-          {items.map((e, i) => (
-            <div key={i} className="flex items-start gap-2 py-1.5">
-              <div className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${e.type === 'paid' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-              <p className="text-sm text-gray-700 leading-snug">{e.text}</p>
-            </div>
-          ))}
-        </div>
-      ))}
     </div>
   );
 }
