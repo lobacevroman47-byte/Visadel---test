@@ -14,7 +14,6 @@ import { AdditionalServices } from '../pages/AdditionalServices';
 import { Reviews } from '../pages/Reviews';
 import { BonusLogs } from '../pages/BonusLogs';
 import { Bookings } from '../pages/Bookings';
-import { Payouts } from '../pages/Payouts';
 import { Partners } from '../pages/Partners';
 import { AuditLog } from '../pages/AuditLog';
 import { useAdmin } from '../contexts/AdminContext';
@@ -168,15 +167,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         ) : (
           <PermissionDenied />
         );
+      // 'payouts' — legacy alias (старая отдельная страница), остаётся для
+      // backwards-совместимости URL'ов; рендерит ту же объединённую Partners.
       case 'partners':
-        return hasPermission(['owner', 'admin']) ? (
-          <Partners />
-        ) : (
-          <PermissionDenied />
-        );
       case 'payouts':
         return hasPermission(['owner', 'admin']) ? (
-          <Payouts />
+          <Partners />
         ) : (
           <PermissionDenied />
         );

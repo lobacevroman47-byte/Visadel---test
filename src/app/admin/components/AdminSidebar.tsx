@@ -13,7 +13,6 @@ import {
   MessageSquare,
   Gift,
   Calendar,
-  Wallet,
   Crown,
   X
 } from 'lucide-react';
@@ -188,15 +187,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
         <SidebarItem
           icon={<Crown size={20} />}
           label="Партнёры"
-          active={activeSection === 'partners'}
+          active={activeSection === 'partners' || activeSection === 'payouts'}
           onClick={() => onSectionChange('partners')}
-          disabled={!hasPermission(['owner', 'admin'])}
-        />
-        <SidebarItem
-          icon={<Wallet size={20} />}
-          label="Партнёрские выплаты"
-          active={activeSection === 'payouts'}
-          onClick={() => onSectionChange('payouts')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
