@@ -251,6 +251,10 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
   const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
   const [settings, setSettings] = useState<PartnerSettings>(DEFAULT_SETTINGS);
   const [vanity, setVanity] = useState(appUser?.vanity_code ?? '');
+  // Переходы по ссылке: clicks из referral_clicks + список зарегистрированных
+  // юзеров (users.referred_by = canonical referral_code).
+  const [clicksCount, setClicksCount] = useState(0);
+  const [referredUsers, setReferredUsers] = useState<{ first_name: string; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -267,7 +271,14 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
     (async () => {
       setLoading(true);
       try {
-        const [logsRes, payoutsRes, settingsRes] = await Promise.all([
+        const myReferralCode = appUser?.referral_code ?? '';
+        const myVanityCode   = (appUser?.vanity_code ?? '').toUpperCase();
+        // Коды по которым считаем клики — каноничный + vanity (если есть).
+        // referral_clicks хранит код AS-TYPED (без resolve), поэтому матчить
+        // нужно по обоим вариантам.
+        const codesToMatch = [myReferralCode, myVanityCode].filter(Boolean);
+
+        const [logsRes, payoutsRes, settingsRes, clicksRes, referredRes] = await Promise.all([
           supabase.from('bonus_logs')
             .select('id, type, amount, description, dedupe_key, created_at')
             .eq('telegram_id', telegramId)
@@ -280,10 +291,27 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             .order('created_at', { ascending: false })
             .limit(20),
           supabase.from('partner_settings').select('*').eq('telegram_id', telegramId).maybeSingle(),
+          // Клики: count через head=true + Prefer count=exact
+          codesToMatch.length > 0
+            ? supabase.from('referral_clicks')
+                .select('id', { count: 'exact', head: true })
+                .in('referral_code', codesToMatch)
+            : Promise.resolve({ count: 0 } as { count: number }),
+          // Зарегистрированные юзеры по канонической ссылке партнёра.
+          // users.referred_by всегда canonical (resolveReferralCode на signup).
+          myReferralCode
+            ? supabase.from('users')
+                .select('first_name, created_at')
+                .eq('referred_by', myReferralCode)
+                .order('created_at', { ascending: false })
+                .limit(50)
+            : Promise.resolve({ data: [] }),
         ]);
         if (cancelled) return;
         setLogs((logsRes.data ?? []) as BonusLogEntry[]);
         setPayouts((payoutsRes.data ?? []) as PayoutEntry[]);
+        setClicksCount((clicksRes as { count: number | null }).count ?? 0);
+        setReferredUsers(((referredRes as { data: { first_name: string; created_at: string }[] | null }).data ?? []) as { first_name: string; created_at: string }[]);
         if (settingsRes.data) {
           const s = settingsRes.data as Partial<PartnerSettings> & { entity_type: string | null };
           setSettings({
@@ -598,6 +626,53 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
                   onClick={() => setSelectedLog(l)}
                 />
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Переходы по ссылке: clicks + список зарегистрированных рефералов */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5">
+          <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-3">
+            Переходы по ссылке
+          </p>
+
+          {/* Stats grid: переходы / зарегистрировались */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Переходов</p>
+              <p className="text-xl font-bold tabular-nums text-[#0F2A36] mt-0.5">
+                {clicksCount.toLocaleString('ru-RU')}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Зарегистрировались</p>
+              <p className="text-xl font-bold tabular-nums text-emerald-600 mt-0.5">
+                {referredUsers.length}
+              </p>
+            </div>
+          </div>
+
+          {/* Список имён */}
+          {referredUsers.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-3">
+              Когда кто-то перейдёт по твоей ссылке и зарегистрируется — увидишь здесь имена.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {referredUsers.slice(0, 30).map((u, i) => (
+                <span
+                  key={i}
+                  className="text-xs bg-blue-50 text-[#3B5BFF] px-2.5 py-1 rounded-full font-medium"
+                  title={`Присоединился ${new Date(u.created_at).toLocaleDateString('ru-RU')}`}
+                >
+                  {u.first_name || 'Аноним'}
+                </span>
+              ))}
+              {referredUsers.length > 30 && (
+                <span className="text-xs text-gray-400 px-2.5 py-1">
+                  +{referredUsers.length - 30}
+                </span>
+              )}
             </div>
           )}
         </div>
