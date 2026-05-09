@@ -8,6 +8,7 @@ import ReviewsTab from './profile-tabs/ReviewsTab';
 interface UserProfileProps {
   onBack: () => void;
   onOpenPartnerApplication?: () => void;
+  onOpenPartnerDashboard?: () => void;
   onContinueDraft?: (draft: any) => void;
   onContinueHotelDraft?: () => void;
   onContinueFlightDraft?: () => void;
@@ -24,7 +25,7 @@ const TABS = [
 ];
 
 export default function UserProfile({
-  onBack, onOpenPartnerApplication,
+  onBack, onOpenPartnerApplication, onOpenPartnerDashboard,
   onContinueDraft, onContinueHotelDraft, onContinueFlightDraft, initialTab,
 }: UserProfileProps) {
   const [activeTab, setActiveTab]       = useState<Tab>(initialTab ?? 'profile');
@@ -145,7 +146,7 @@ export default function UserProfile({
               onBonusChange={handleBonusChange}
             />
           )}
-          {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} />}
+          {activeTab === 'referrals'    && <ReferralsTab onOpenPartnerApplication={onOpenPartnerApplication} onOpenPartnerDashboard={onOpenPartnerDashboard} />}
           {activeTab === 'reviews'      && <ReviewsTab />}
         </div>
       </div>

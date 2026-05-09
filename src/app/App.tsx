@@ -11,6 +11,7 @@ const ApplicationForm        = lazy(() => import('./components/ApplicationForm')
 const UserProfile            = lazy(() => import('./components/UserProfile'));
 const SriLankaExtensionForm  = lazy(() => import('./components/SriLankaExtensionForm'));
 const PartnerApplicationForm = lazy(() => import('./components/PartnerApplicationForm'));
+const PartnerDashboard       = lazy(() => import('./components/PartnerDashboard'));
 const HotelBookingForm       = lazy(() => import('./components/HotelBookingForm'));
 const FlightBookingForm      = lazy(() => import('./components/FlightBookingForm'));
 const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
@@ -63,6 +64,7 @@ type Screen =
   | 'profile'
   | 'extension'
   | 'partner_application'
+  | 'partner_dashboard'
   | 'hotel_booking'
   | 'flight_booking'
   | 'admin';
@@ -324,6 +326,7 @@ function App() {
             <UserProfile
               onBack={handleBackToHome}
               onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
+              onOpenPartnerDashboard={() => setCurrentScreen('partner_dashboard')}
               onContinueDraft={handleContinueDraft}
               onContinueHotelDraft={() => setCurrentScreen('hotel_booking')}
               onContinueFlightDraft={() => setCurrentScreen('flight_booking')}
@@ -344,6 +347,11 @@ function App() {
         {currentScreen === 'partner_application' && (
           <Suspense fallback={<SplashScreen />}>
             <PartnerApplicationForm onBack={handleBackToHome} onSubmit={handleBackToHome} />
+          </Suspense>
+        )}
+        {currentScreen === 'partner_dashboard' && (
+          <Suspense fallback={<SplashScreen />}>
+            <PartnerDashboard onBack={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }} />
           </Suspense>
         )}
         {currentScreen === 'hotel_booking' && (
