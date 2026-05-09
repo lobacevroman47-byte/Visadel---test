@@ -9,28 +9,13 @@
 -- • partner_settings — реквизиты партнёра (карта/ИНН/самозанятый etc)
 --
 -- Идемпотентно: ADD COLUMN IF NOT EXISTS, CREATE TABLE IF NOT EXISTS.
-
--- ═══════════════════════════════════════════════════════════════════════════
--- 0. Гарантируем что helper-функции существуют (на случай если 004/001 не
---    были применены к этой БД). CREATE OR REPLACE — идемпотентно.
--- ═══════════════════════════════════════════════════════════════════════════
-CREATE OR REPLACE FUNCTION public.current_tg_id()
-RETURNS BIGINT
-LANGUAGE sql
-STABLE
-AS $$
-  SELECT NULLIF(current_setting('request.jwt.claim.tg_id', true), '')::bigint
-$$;
-
-CREATE OR REPLACE FUNCTION public.update_updated_at()
-RETURNS TRIGGER
-LANGUAGE plpgsql
-AS $$
-BEGIN
-  NEW.updated_at = now();
-  RETURN NEW;
-END;
-$$;
+--
+-- ⚠️ Phase 1 НЕ создаёт user-facing RLS-политики на partner_payouts /
+-- partner_settings — обращение к этим таблицам идёт ТОЛЬКО через backend
+-- API endpoints с service-key (который обходит RLS). RLS включён
+-- (ENABLE) для default-deny anon-доступа. Когда добавим Phase 2
+-- (партнёрский кабинет UI с прямыми SELECT-ами с фронта) — отдельной
+-- миграцией пропишем policies через current_tg_id().
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 1. users — партнёрский баланс (отдельно от bonus_balance)
@@ -85,7 +70,7 @@ CREATE INDEX IF NOT EXISTS idx_flight_bookings_partner_status
   ON public.flight_bookings(partner_commission_status) WHERE partner_commission_status IS NOT NULL;
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 5. partner_payouts — журнал выплат партнёрам
+-- 5. partner_payouts — журнал выплат партнёрам (admin-managed)
 -- ═══════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.partner_payouts (
   id            UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -107,22 +92,12 @@ CREATE INDEX IF NOT EXISTS idx_partner_payouts_status
 CREATE INDEX IF NOT EXISTS idx_partner_payouts_created_at
   ON public.partner_payouts(created_at DESC);
 
--- RLS: anon insert/select запрещены, всё через service-key (admin/cron)
+-- RLS: enabled, без anon-policy (= no anon access). Backend через service-key.
+-- Phase 2 добавит read-policy для партнёров через current_tg_id().
 ALTER TABLE public.partner_payouts ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "anon_select_own_payouts" ON public.partner_payouts;
-CREATE POLICY "anon_select_own_payouts" ON public.partner_payouts
-  FOR SELECT TO anon
-  USING (telegram_id = public.current_tg_id());
-
--- updated_at trigger
-DROP TRIGGER IF EXISTS partner_payouts_updated_at ON public.partner_payouts;
-CREATE TRIGGER partner_payouts_updated_at
-  BEFORE UPDATE ON public.partner_payouts
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
-
 -- ═══════════════════════════════════════════════════════════════════════════
--- 6. partner_settings — реквизиты для выплат (1 строка на партнёра)
+-- 6. partner_settings — реквизиты партнёра (admin-managed)
 -- ═══════════════════════════════════════════════════════════════════════════
 CREATE TABLE IF NOT EXISTS public.partner_settings (
   telegram_id            BIGINT PRIMARY KEY,
@@ -139,34 +114,13 @@ CREATE TABLE IF NOT EXISTS public.partner_settings (
 
 ALTER TABLE public.partner_settings ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "anon_select_own_settings" ON public.partner_settings;
-CREATE POLICY "anon_select_own_settings" ON public.partner_settings
-  FOR SELECT TO anon
-  USING (telegram_id = public.current_tg_id());
-
-DROP POLICY IF EXISTS "anon_upsert_own_settings" ON public.partner_settings;
-CREATE POLICY "anon_upsert_own_settings" ON public.partner_settings
-  FOR INSERT TO anon
-  WITH CHECK (telegram_id = public.current_tg_id());
-
-DROP POLICY IF EXISTS "anon_update_own_settings" ON public.partner_settings;
-CREATE POLICY "anon_update_own_settings" ON public.partner_settings
-  FOR UPDATE TO anon
-  USING (telegram_id = public.current_tg_id())
-  WITH CHECK (telegram_id = public.current_tg_id());
-
-DROP TRIGGER IF EXISTS partner_settings_updated_at ON public.partner_settings;
-CREATE TRIGGER partner_settings_updated_at
-  BEFORE UPDATE ON public.partner_settings
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at();
-
 -- ═══════════════════════════════════════════════════════════════════════════
--- 7. bonus_logs — расширение типов
+-- 7. bonus_logs — расширение типов (документация, без миграции)
 -- ═══════════════════════════════════════════════════════════════════════════
 -- Добавляем новые типы для партнёрского flow:
---   partner_pending  — комиссия начислена, в hold-периоде (30 дней) после оплаты клиентом
---   partner_approved — hold прошёл, добавлено в users.partner_balance
---   partner_paid     — выплата произведена (списание с partner_balance)
+--   partner_pending   — комиссия начислена, в hold-периоде (30 дней) после оплаты клиентом
+--   partner_approved  — hold прошёл, добавлено в users.partner_balance
+--   partner_paid      — выплата произведена (списание с partner_balance)
 --   partner_cancelled — отмена клиента → откат комиссии
 --
 -- bonus_logs.type — TEXT без CHECK, миграция не нужна. Просто документируем здесь.
