@@ -282,15 +282,15 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     if (selectedHotel?.id === id) setSelectedHotel(s => s ? { ...s, status } : s);
     if (selectedFlight?.id === id) setSelectedFlight(s => s ? { ...s, status } : s);
 
-    // Push клиенту — best-effort. Маппим booking-статус на нотификацию:
-    //   in_progress → booking_in_progress («Бронь в работе»)
-    //   confirmed   → booking_confirmed («Бронь готова!»)
-    //   cancelled   → booking_cancelled («Бронь отменена»)
-    //   new / pending_* — без push (это юзер ещё не был информирован)
+    // Push клиенту — best-effort. Маппим booking-статус на нотификацию.
+    // Тип брони (hotel/flight) добавляется суффиксом, чтобы у клиента
+    // в push'е было «Бронь отеля готова!» или «Бронь авиабилета готова!»,
+    // а не общее «Бронь готова!».
+    const kind = table === 'hotel_bookings' ? 'hotel' : 'flight';
     const NOTIFY_STATUS_MAP: Record<string, string> = {
-      in_progress: 'booking_in_progress',
-      confirmed:   'booking_confirmed',
-      cancelled:   'booking_cancelled',
+      in_progress: `booking_in_progress_${kind}`,
+      confirmed:   `booking_confirmed_${kind}`,
+      cancelled:   `booking_cancelled_${kind}`,
     };
     const notifyStatus = NOTIFY_STATUS_MAP[status];
     if (notifyStatus) {
@@ -562,10 +562,11 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       await dialog.warning('Telegram ID не указан', 'У этой брони нет привязки к юзеру — отправить нельзя.');
       return;
     }
+    const kind = table === 'hotel_bookings' ? 'hotel' : 'flight';
     const NOTIFY_STATUS_MAP: Record<string, string> = {
-      in_progress: 'booking_in_progress',
-      confirmed:   'booking_confirmed',
-      cancelled:   'booking_cancelled',
+      in_progress: `booking_in_progress_${kind}`,
+      confirmed:   `booking_confirmed_${kind}`,
+      cancelled:   `booking_cancelled_${kind}`,
     };
     const notifyStatus = NOTIFY_STATUS_MAP[booking.status];
     if (!notifyStatus) {
