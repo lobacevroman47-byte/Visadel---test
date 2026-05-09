@@ -781,8 +781,8 @@ function PaymentBlock({ price, screenshotUrl }: { price: number | null; screensh
 
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+      <div className="bg-white w-full sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
         {children}
       </div>
       <button onClick={onClose}
