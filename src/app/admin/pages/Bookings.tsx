@@ -787,7 +787,7 @@ function ModalShell({ children, onClose }: { children: React.ReactNode; onClose:
       onClick={onClose}
     >
       <div
-        className="bg-white w-full sm:max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto flex flex-col"
+        className="bg-white w-full sm:max-w-2xl rounded-2xl max-h-[92vh] overflow-hidden flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {children}
@@ -1082,7 +1082,9 @@ function BookingDetailModal({
         ))}
       </div>
 
-      <div className="px-5 py-5">
+      {/* Scrollable body — header и tabs остаются sticky сверху, контент
+          скроллится отдельно. Идентично разметке визовой модалки. */}
+      <div className="overflow-y-auto flex-1 px-5 py-5">
         {/* ── Tab: Основное ── */}
         {activeTab === 'info' && (
           <div className="space-y-5">
