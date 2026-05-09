@@ -630,8 +630,12 @@ function EarningDetailModal({
 
   const dataLoadedRef = useRef(false);
   useEffect(() => {
-    if (dataLoadedRef.current || !sourceType || !sourceId) return;
+    if (dataLoadedRef.current) return;
     dataLoadedRef.current = true;
+    if (!sourceType || !sourceId) {
+      setDetailLoading(false);
+      return;
+    }
     (async () => {
       try {
         if (sourceType === 'visa') {
