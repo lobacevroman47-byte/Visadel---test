@@ -151,9 +151,14 @@ export function Partners() {
           bank_bic:                (s.bank_bic as string | null) ?? null,
           entity_type:             (s.entity_type as string | null) ?? null,
           agreement_accepted_at:   (s.agreement_accepted_at as string | null) ?? null,
-          pending_hold:            a.pending,
+          // HOLD = pending - approved (clip 0): pending запись остаётся в БД
+          // после approval, и без вычета HOLD визуально удваивает деньги.
+          pending_hold:            Math.max(0, a.pending - a.approved),
           total_paid:              Math.abs(a.paid),
-          total_approved_lifetime: a.approved + Math.abs(a.paid),
+          // Lifetime earnings = approved (paid это снятие с balance, оно
+          // не earnings; раньше суммировали approved + |paid| что давало
+          // double-count для уже выплаченных денег).
+          total_approved_lifetime: a.approved,
         };
       });
       setPartners(enriched);

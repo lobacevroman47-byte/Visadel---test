@@ -395,11 +395,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
     return () => { cancelled = true; };
   }, [logs]);
 
-  // Статистика
-  const pendingHold = useMemo(
-    () => logs.filter(l => l.type === 'partner_pending').reduce((s, l) => s + l.amount, 0),
-    [logs],
-  );
+  // Статистика. HOLD = pending - approved (без минусов): после того как cron
+  // переводит pending → approved, запись pending остаётся (audit trail), но
+  // деньги уже в partner_balance. Чтобы не показывать «2× деньги», вычитаем
+  // approved из pending.
+  const pendingHold = useMemo(() => {
+    const pending = logs.filter(l => l.type === 'partner_pending').reduce((s, l) => s + l.amount, 0);
+    const approved = logs.filter(l => l.type === 'partner_approved').reduce((s, l) => s + l.amount, 0);
+    return Math.max(0, pending - approved);
+  }, [logs]);
   const approvedInPeriod = useMemo(() => {
     const since = Date.now() - PERIOD_MS[period];
     return logs
