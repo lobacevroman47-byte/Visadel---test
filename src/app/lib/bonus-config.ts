@@ -16,8 +16,10 @@ export const BONUS_CONFIG = {
   PARTNER_COMMISSION_MAX_PCT: 20,        // marketing cap shown in UI ("до 20%")
 
   // ── Bonus usage limits at checkout ─────────────────────────────────────────
-  // Base limit; per-level limits unlocked via achievements (see getMaxBonusUsage)
-  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — base limit per order
+  // Flat per-order limit. До удаления уровней (commit XXX) лимит рос с уровнем
+  // (500/600/800/1000₽). После удаления — единый flat-лимит для всех обычных
+  // юзеров. Партнёрам по-прежнему 100%.
+  MAX_BONUS_USAGE_REGULAR: 500,          // ₽ — flat limit per order for regular users
   MAX_BONUS_USAGE_PARTNER: null as number | null, // null = 100% allowed for partners
 
   // ── Finance ────────────────────────────────────────────────────────────────
@@ -25,48 +27,16 @@ export const BONUS_CONFIG = {
   TAX_PCT_DEFAULT: 4,                    // налог % по умолчанию для НОВЫХ заявок (УСН для самозанятых)
 };
 
-// Maximum bonus usage per order, derived from PAID referrals count (level)
-export function getMaxBonusUsage(paidRefCount: number, isPartner: boolean): number | null {
-  if (isPartner) return null;          // 100% — no cap
-  if (paidRefCount >= 25) return 1000; // Легенда
-  if (paidRefCount >= 10) return 800;  // Амбассадор
-  if (paidRefCount >= 3)  return 600;  // Активист
-  return 500;                          // Базовый / Новичок
+// Maximum bonus usage per order. Flat для обычных юзеров, без cap для партнёров.
+// Раньше зависело от уровня (Старт/Активный/Эксперт/VIP — 500/600/800/1000₽);
+// убрано чтобы не плодить gamification вокруг реф-программы.
+export function getMaxBonusUsage(_paidRefCount: number, isPartner: boolean): number | null {
+  if (isPartner) return null;
+  return BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR;
 }
 
 // Compute partner commission for a given product/order
 export function partnerCommission(orderPriceRub: number, productCommissionPct?: number | null): number {
   const pct = productCommissionPct ?? BONUS_CONFIG.PARTNER_COMMISSION_PCT_DEFAULT;
   return Math.round((orderPriceRub * pct) / 100);
-}
-
-// ─── Referral achievement levels ───────────────────────────────────────────
-// Counts use total invited users (not only paid). Bonus is granted once per level.
-export interface ReferralLevel {
-  id: 1 | 2 | 3 | 4;
-  name: string;
-  minRefs: number;
-  bonus: number;
-  icon: string;
-  gradient: string;
-  perk: string;
-}
-
-// Premium-tone level names — отображаются в Mini App и в bonus_logs.
-// Старые исторические записи (Новичок/Активист/Амбассадор/Легенда) остаются
-// в bonus_logs как есть — переименование не миграция, просто новые описания
-// будут с новыми именами.
-export const REFERRAL_LEVELS: ReferralLevel[] = [
-  { id: 1, name: 'Старт',     minRefs: 1,  bonus: 0,    icon: '⭐', gradient: 'from-slate-400 to-slate-600',     perk: 'Лимит оплаты бонусами 500₽' },
-  { id: 2, name: 'Активный',  minRefs: 3,  bonus: 500,  icon: '🏆', gradient: 'from-blue-400 to-blue-600',       perk: 'Лимит оплаты бонусами 600₽' },
-  { id: 3, name: 'Эксперт',   minRefs: 10, bonus: 2000, icon: '✨', gradient: 'from-violet-400 to-violet-600',   perk: 'Лимит оплаты бонусами 800₽' },
-  { id: 4, name: 'VIP',       minRefs: 25, bonus: 5000, icon: '👑', gradient: 'from-amber-400 to-amber-600',     perk: 'Лимит оплаты бонусами 1000₽' },
-];
-
-export function getCurrentLevel(refCount: number): ReferralLevel | null {
-  return [...REFERRAL_LEVELS].reverse().find(l => refCount >= l.minRefs) ?? null;
-}
-
-export function getNextLevel(refCount: number): ReferralLevel | null {
-  return REFERRAL_LEVELS.find(l => refCount < l.minRefs) ?? null;
 }
