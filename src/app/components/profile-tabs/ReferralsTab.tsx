@@ -272,10 +272,11 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             до {BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа
           </h3>
           <p className="text-sm text-white/70 mt-1.5 leading-relaxed">
-            Распространяется на визы, брони отелей и авиабилеты.
+            Начисляются за <span className="font-medium text-white">визы,
+            брони отелей и брони авиабилетов</span>.
             <span className="text-white/50">
-              {' '}Не входят: готовые билеты, экскурсии, каталог отелей,
-              eSIM и прочие услуги.
+              {' '}Не начисляются за готовые авиабилеты, отели из каталога,
+              экскурсии, страховки, eSIM и прочие услуги.
             </span>
           </p>
           <ul className="mt-4 space-y-2 text-sm text-white/90">
