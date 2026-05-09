@@ -194,8 +194,8 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
   });
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6 md:mb-8">
         <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Пользователи</h1>
         <div className="flex items-center gap-3">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0F2A36]/45" />}
@@ -236,7 +236,7 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
       {/* Table */}
       <Card variant="flat" padding="none" radius="xl" className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Имя / Telegram</th>

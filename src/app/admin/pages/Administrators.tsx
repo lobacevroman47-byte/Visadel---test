@@ -163,13 +163,13 @@ export const Administrators: React.FC = () => {
   FOUNDER_IDS.forEach(() => counts.founder++);
 
   return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-8">
-        <div>
+    <div className="p-4 md:p-8">
+      <div className="flex flex-wrap justify-between items-start gap-3 mb-6 md:mb-8">
+        <div className="min-w-0">
           <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Сотрудники</h1>
           <p className="text-sm text-[#0F2A36]/60">Управление доступом к админ-панели</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0F2A36]/45" />}
           <Button
             variant="ghost"
@@ -191,16 +191,17 @@ export const Administrators: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      {/* Stats — на мобилке layout column'ом, чтобы длинные подписи
+          (Администраторы, Модераторы) не обрезались. */}
+      <div className="grid grid-cols-3 gap-3 mb-6">
         {(['founder', 'admin', 'moderator'] as AdminRole[]).map(role => (
-          <Card key={role} variant="flat" padding="md" radius="xl" className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ROLE_COLORS[role]}`}>
+          <Card key={role} variant="flat" padding="md" radius="xl" className="flex flex-col items-start gap-2 min-w-0">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${ROLE_COLORS[role]}`}>
               {ROLE_ICON[role]}
             </div>
-            <div>
-              <p className="text-xs text-[#0F2A36]/60">{ROLE_LABELS_PLURAL[role]}</p>
-              <p className="text-2xl font-semibold text-[#0F2A36]">{counts[role]}</p>
+            <div className="min-w-0 w-full">
+              <p className="text-[11px] text-[#0F2A36]/60 leading-tight break-words">{ROLE_LABELS_PLURAL[role]}</p>
+              <p className="text-2xl font-semibold text-[#0F2A36] leading-tight mt-0.5">{counts[role]}</p>
             </div>
           </Card>
         ))}
@@ -209,16 +210,16 @@ export const Administrators: React.FC = () => {
       {/* Founders row (from env var) */}
       {FOUNDER_IDS.length > 0 && (
         <Card variant="flat" padding="none" radius="xl" className="overflow-hidden mb-4">
-          <div className="px-5 py-3 bg-purple-50 border-b border-purple-100">
+          <div className="px-4 md:px-5 py-3 bg-purple-50 border-b border-purple-100">
             <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Основатели (защищены)</p>
           </div>
           {FOUNDER_IDS.map(id => (
-            <div key={id} className="px-5 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-[#0F2A36]">Telegram ID: {id}</p>
+            <div key={id} className="px-4 md:px-5 py-4 flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-[#0F2A36] truncate">Telegram ID: {id}</p>
                 <p className="text-xs text-[#0F2A36]/45">Настроен через Vercel ENV</p>
               </div>
-              <Badge variant="neutral" className="bg-purple-100 text-purple-700">
+              <Badge variant="neutral" className="bg-purple-100 text-purple-700 shrink-0 whitespace-nowrap">
                 {ROLE_ICON.founder} {ROLE_LABELS.founder}
               </Badge>
             </div>
@@ -226,7 +227,8 @@ export const Administrators: React.FC = () => {
         </Card>
       )}
 
-      {/* Admins table */}
+      {/* Admins table — обёрнута в overflow-x-auto чтобы на узких экранах
+          таблица скроллилась горизонтально, а не уходила за край. */}
       <Card variant="flat" padding="none" radius="xl" className="overflow-hidden">
         {admins.length === 0 && !loading ? (
           <EmptyState
@@ -235,27 +237,28 @@ export const Administrators: React.FC = () => {
             subtitle="Нажмите «Добавить» чтобы выдать доступ"
           />
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px]">
             <thead className="bg-gray-50 border-b border-[#E1E5EC]">
               <tr>
-                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Имя</th>
-                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Telegram ID</th>
-                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Роль</th>
-                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Добавлен</th>
-                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium"></th>
+                <th className="px-4 md:px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Имя</th>
+                <th className="px-4 md:px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Telegram ID</th>
+                <th className="px-4 md:px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Роль</th>
+                <th className="px-4 md:px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Добавлен</th>
+                <th className="px-4 md:px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {admins.map(row => (
                 <tr key={row.telegram_id} className="hover:bg-gray-50">
-                  <td className="px-5 py-4">
+                  <td className="px-4 md:px-5 py-4">
                     <p className="text-sm font-medium text-[#0F2A36]">{row.name}</p>
                     {row.telegram_username && (
                       <p className="text-xs text-[#0F2A36]/45">@{row.telegram_username}</p>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-sm text-[#0F2A36]/65">{row.telegram_id}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 md:px-5 py-4 text-sm text-[#0F2A36]/65 whitespace-nowrap">{row.telegram_id}</td>
+                  <td className="px-4 md:px-5 py-4">
                     <select
                       value={row.role}
                       onChange={e => handleRoleChange(row, e.target.value as AdminRole)}
@@ -266,10 +269,10 @@ export const Administrators: React.FC = () => {
                       <option value="moderator">Модератор</option>
                     </select>
                   </td>
-                  <td className="px-5 py-4 text-sm text-[#0F2A36]/45">
+                  <td className="px-4 md:px-5 py-4 text-sm text-[#0F2A36]/45 whitespace-nowrap">
                     {row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : '—'}
                   </td>
-                  <td className="px-5 py-4">
+                  <td className="px-4 md:px-5 py-4">
                     <button
                       onClick={() => handleDelete(row)}
                       disabled={FOUNDER_IDS.includes(String(row.telegram_id))}
@@ -283,6 +286,7 @@ export const Administrators: React.FC = () => {
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </Card>
 
