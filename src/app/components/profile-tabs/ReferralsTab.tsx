@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Users, Loader2, Copy, Share2, Check, Crown,
+  Loader2, Copy, Share2, Check, Crown,
   ChevronRight, QrCode, Download, UserPlus,
-  CheckCircle2, Info,
+  Info,
 } from 'lucide-react';
 import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -178,20 +178,18 @@ export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDa
         </button>
       </div>
 
-      {/* ── 2. Earnings stats — 2 compact cards (funnel: top vs bottom) ─ */}
-      <div className="grid grid-cols-2 gap-2">
-        <SummaryCard
-          icon={<Users className="w-3.5 h-3.5 text-gray-400" />}
-          label="Перешли по ссылке"
-          value={stats.clicks}
-          loading={loading}
-        />
-        <SummaryCard
-          icon={<CheckCircle2 className="w-3.5 h-3.5 text-gray-400" />}
-          label="Купили визу"
-          value={stats.paidReferrals}
-          loading={loading}
-        />
+      {/* ── 2. Funnel: clicks → registrations → orders ─────────────────── */}
+      {/* Та же воронка что и в Партнёрском кабинете — единый язык метрик
+          для обычных юзеров и партнёров (логика в getReferralStats). */}
+      <div className="bg-white rounded-2xl border border-gray-100 p-5">
+        <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-3">
+          Переходы по ссылке
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          <FunnelCard label="Кликов" value={stats.clicks} valueCls="text-[#0F2A36]" loading={loading} />
+          <FunnelCard label="Регистраций" value={stats.registered} valueCls="text-[#3B5BFF]" loading={loading} />
+          <FunnelCard label="Оформили заказ" value={stats.paidReferrals} valueCls="text-emerald-600" loading={loading} />
+        </div>
       </div>
 
       {/* ── 3. How it works — 3 шага onboarding ─────────────────────────── */}
@@ -430,24 +428,24 @@ function MaxIcon({ className }: { className?: string }) {
   );
 }
 
-function SummaryCard({
-  icon, label, value, loading,
+// Карточка для воронки клик→регистрация→заказ. Лейбл фиксированной высоты
+// (min-h) чтобы значения 3 карточек выстраивались по одной горизонтали даже
+// когда лейбл переносится на 2 строки («Оформили заказ»).
+function FunnelCard({
+  label, value, valueCls, loading,
 }: {
-  icon: React.ReactNode;
   label: string;
-  value: string | number;
+  value: number;
+  valueCls: string;
   loading: boolean;
 }) {
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-3">
-      <div className="flex items-center gap-1 mb-1">
-        {icon}
-        <span className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight truncate">
-          {label}
-        </span>
-      </div>
-      <p className="text-xl font-semibold tabular-nums text-[#0F2A36]">
-        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : value}
+    <div className="bg-gray-50 rounded-xl p-3 flex flex-col">
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight min-h-[24px]">
+        {label}
+      </p>
+      <p className={`text-xl font-bold tabular-nums mt-auto ${valueCls}`}>
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : value.toLocaleString('ru-RU')}
       </p>
     </div>
   );

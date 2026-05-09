@@ -24,7 +24,7 @@ import {
   getMockUser,
   type TelegramUser,
 } from './lib/telegram';
-import { upsertUser, resolveReferralCode, getAdminRole, type AppUser, type AdminRole } from './lib/db';
+import { upsertUser, resolveReferralCode, getAdminRole, markUserEngaged, type AppUser, type AdminRole } from './lib/db';
 import { AppCatalogProvider } from './contexts/AppCatalogContext';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
@@ -246,6 +246,20 @@ function App() {
     }, minSplash);
     return () => clearTimeout(earlyTimer);
   }, []);
+
+  // Engagement tracking: при первой навигации ВНЕ home (юзер «остался» в апп
+  // и сделал хотя бы одно действие) — ставим users.engaged_at. Используется
+  // в реф-метриках чтобы отделить «открыл и закрыл» от «остался и взаимодействовал».
+  // Один раз: повторно не пингуем (engaged_at уже стоит — markUserEngaged идемпотентно).
+  const [hasEngaged, setHasEngaged] = useState(false);
+  useEffect(() => {
+    if (hasEngaged) return;
+    if (!appUser?.telegram_id) return;
+    // Не считаем splash и home — это «открыл и сразу закрыл» сценарии
+    if (currentScreen === 'splash' || currentScreen === 'home') return;
+    setHasEngaged(true);
+    markUserEngaged(appUser.telegram_id).catch(e => console.warn('markUserEngaged failed:', e));
+  }, [currentScreen, appUser?.telegram_id, hasEngaged]);
 
   const handleVisaSelect = (visa: VisaOption, urgent = false, addons?: { urgent: boolean; hotel: boolean; ticket: boolean }) => {
     setSelectedVisa(visa);

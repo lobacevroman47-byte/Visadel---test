@@ -257,10 +257,14 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
   const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
   const [settings, setSettings] = useState<PartnerSettings>(DEFAULT_SETTINGS);
   const [vanity, setVanity] = useState(appUser?.vanity_code ?? '');
-  // Переходы по ссылке: clicks из referral_clicks + список зарегистрированных
-  // юзеров (users.referred_by = canonical referral_code).
+  // Переходы по ссылке: воронка clicks → registrations → orders.
+  // • Кликов = referral_clicks (anonymous, любое открытие по ссылке)
+  // • Регистраций = users где referred_by=мой код И engaged_at NOT NULL
+  //   (юзер не просто открыл, но сделал действие — миграция 023)
+  // • Оформили заказ = unique source_id из partner_pending+approved (вычисляется
+  //   из bonus_logs, см. ordersCount ниже)
   const [clicksCount, setClicksCount] = useState(0);
-  const [referredUsers, setReferredUsers] = useState<{ first_name: string; created_at: string }[]>([]);
+  const [referredUsers, setReferredUsers] = useState<{ first_name: string; created_at: string; engaged_at: string | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [savingSettings, setSavingSettings] = useState(false);
   const [settingsSaved, setSettingsSaved] = useState(false);
@@ -305,19 +309,20 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             : Promise.resolve({ count: 0 } as { count: number }),
           // Зарегистрированные юзеры по канонической ссылке партнёра.
           // users.referred_by всегда canonical (resolveReferralCode на signup).
+          // engaged_at — отделяем «остались» от «открыли и закрыли» (миграция 023).
           myReferralCode
             ? supabase.from('users')
-                .select('first_name, created_at')
+                .select('first_name, created_at, engaged_at')
                 .eq('referred_by', myReferralCode)
                 .order('created_at', { ascending: false })
-                .limit(50)
+                .limit(100)
             : Promise.resolve({ data: [] }),
         ]);
         if (cancelled) return;
         setLogs((logsRes.data ?? []) as BonusLogEntry[]);
         setPayouts((payoutsRes.data ?? []) as PayoutEntry[]);
         setClicksCount((clicksRes as { count: number | null }).count ?? 0);
-        setReferredUsers(((referredRes as { data: { first_name: string; created_at: string }[] | null }).data ?? []) as { first_name: string; created_at: string }[]);
+        setReferredUsers(((referredRes as { data: { first_name: string; created_at: string; engaged_at: string | null }[] | null }).data ?? []) as { first_name: string; created_at: string; engaged_at: string | null }[]);
         if (settingsRes.data) {
           const s = settingsRes.data as Partial<PartnerSettings> & { entity_type: string | null };
           setSettings({
@@ -675,26 +680,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             Переходы по ссылке
           </p>
 
-          {/* 3 stats: воронка клик → регистрация → заказ */}
+          {/* 3 stats: воронка клик → регистрация → заказ. */}
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Кликов</p>
-              <p className="text-xl font-bold tabular-nums text-[#0F2A36] mt-0.5">
-                {clicksCount.toLocaleString('ru-RU')}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Регистраций</p>
-              <p className="text-xl font-bold tabular-nums text-[#3B5BFF] mt-0.5">
-                {referredUsers.length}
-              </p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Оформили заказ</p>
-              <p className="text-xl font-bold tabular-nums text-emerald-600 mt-0.5">
-                {ordersCount}
-              </p>
-            </div>
+            <FunnelStat label="Кликов" value={clicksCount.toLocaleString('ru-RU')} valueCls="text-[#0F2A36]" />
+            <FunnelStat
+              label="Регистраций"
+              value={String(referredUsers.filter(u => u.engaged_at).length)}
+              valueCls="text-[#3B5BFF]"
+            />
+            <FunnelStat label="Оформили заказ" value={String(ordersCount)} valueCls="text-emerald-600" />
           </div>
 
           {/* Список имён */}
@@ -973,6 +967,22 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+// Карточка для воронки «Переходы по ссылке». Лейбл с min-h гарантирует
+// что значения 3 карточек выстроятся по одной горизонтали даже когда
+// текст лейбла переносится на 2 строки (например «Оформили заказ»).
+function FunnelStat({ label, value, valueCls }: { label: string; value: string; valueCls: string }) {
+  return (
+    <div className="bg-gray-50 rounded-xl p-3 flex flex-col">
+      <p className="text-[10px] text-gray-500 uppercase tracking-wider leading-tight min-h-[24px]">
+        {label}
+      </p>
+      <p className={`text-xl font-bold tabular-nums mt-auto ${valueCls}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
 
 function StatCard({
   icon, label, value, loading,
