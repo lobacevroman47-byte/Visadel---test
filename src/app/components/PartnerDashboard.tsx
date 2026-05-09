@@ -53,11 +53,15 @@ function countryFlag(country?: string | null): string {
   return COUNTRY_FLAGS[country] ?? '🌍';
 }
 
-// Парсим dedupe_key → { service, sourceId }. service из 'partner_<service>_<id>'.
+// Парсим dedupe_key → { service, sourceId }. Реальный формат от api/grant-bonus.js:
+//   "<bonus_type>:partner_<service>_<id>"  — например "partner_pending:partner_visa_<uuid>"
+// Старые/легаси записи могут идти без префикса <type>: → поддерживаем оба варианта.
 type ServiceType = 'visa' | 'hotel_bookings' | 'flight_bookings';
 function parseDedupe(key: string | null | undefined): { service: ServiceType; sourceId: string } | null {
   if (!key) return null;
-  const m = key.match(/^partner_(visa|hotel_bookings|flight_bookings)_(.+)$/);
+  // Убираем опциональный префикс "<bonus_type>:" который добавляет grant-bonus.js
+  const stripped = key.replace(/^partner_[a-z]+:/i, '');
+  const m = stripped.match(/^partner_(visa|hotel_bookings|flight_bookings)_(.+)$/);
   if (!m) return null;
   return { service: m[1] as ServiceType, sourceId: m[2] };
 }
