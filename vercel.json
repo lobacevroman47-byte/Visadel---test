@@ -31,10 +31,6 @@
     {
       "path": "/api/update-usd-rate",
       "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/process-partner-holds",
-      "schedule": "0 7 * * *"
     }
   ]
 }
