@@ -67,6 +67,10 @@ function parseDedupe(key: string | null | undefined): { service: ServiceType; so
 }
 
 // Enrichment — данные заявки/брони, привязанные к bonus_log.id для отображения в строке.
+// Намеренно НЕ включаем PII клиента (имя, фамилию, @username, telegram_id) —
+// партнёру их видеть не нужно, чтобы:
+//   • не уводить клиента «мимо» сервиса при повторном заказе
+//   • соблюсти приватность (юзер не давал согласия на передачу)
 interface Enrichment {
   service: ServiceType;
   country?: string;
@@ -79,10 +83,6 @@ interface Enrichment {
   check_out?: string;
   price?: number;
   pct?: number;
-  customer_first_name?: string;
-  customer_last_name?: string;
-  customer_username?: string | null;
-  customer_telegram_id?: number;
 }
 
 function serviceLabel(service: ServiceType): string {
@@ -284,13 +284,13 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
 
       const map = new Map<string, Enrichment>();
 
-      // Визы
+      // Визы — только данные о заказе, без PII клиента
       if (visaPairs.length) {
         const { data } = await supabase
           .from('applications')
-          .select('id, country, visa_type, price, user_telegram_id')
+          .select('id, country, visa_type, price')
           .in('id', visaPairs.map(x => x.sourceId));
-        const rows = (data ?? []) as Array<{ id: string; country: string; visa_type: string; price: number; user_telegram_id: number }>;
+        const rows = (data ?? []) as Array<{ id: string; country: string; visa_type: string; price: number }>;
         for (const row of rows) {
           const pair = visaPairs.find(x => x.sourceId === row.id);
           if (!pair) continue;
@@ -299,16 +299,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             country: row.country,
             visa_type: row.visa_type,
             price: row.price,
-            customer_telegram_id: row.user_telegram_id,
           });
         }
       }
 
-      // Отели
+      // Отели — без PII
       if (hotelPairs.length) {
         const { data } = await supabase
           .from('hotel_bookings')
-          .select('id, country, city, check_in, check_out, price, partner_commission_pct, first_name, last_name, username')
+          .select('id, country, city, check_in, check_out, price, partner_commission_pct')
           .in('id', hotelPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
@@ -322,18 +321,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             check_out: row.check_out as string | undefined,
             price: row.price as number | undefined,
             pct: row.partner_commission_pct as number | undefined,
-            customer_first_name: row.first_name as string | undefined,
-            customer_last_name: row.last_name as string | undefined,
-            customer_username: (row.username as string | null) ?? null,
           });
         }
       }
 
-      // Авиа
+      // Авиа — без PII
       if (flightPairs.length) {
         const { data } = await supabase
           .from('flight_bookings')
-          .select('id, from_city, to_city, booking_date, price, partner_commission_pct, first_name, last_name, username')
+          .select('id, from_city, to_city, booking_date, price, partner_commission_pct')
           .in('id', flightPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
@@ -346,35 +342,6 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             booking_date: row.booking_date as string | undefined,
             price: row.price as number | undefined,
             pct: row.partner_commission_pct as number | undefined,
-            customer_first_name: row.first_name as string | undefined,
-            customer_last_name: row.last_name as string | undefined,
-            customer_username: (row.username as string | null) ?? null,
-          });
-        }
-      }
-
-      // Догрузим имена клиентов для виз (по telegram_id)
-      const visaCustomerIds = Array.from(map.values())
-        .filter(e => e.service === 'visa' && e.customer_telegram_id)
-        .map(e => e.customer_telegram_id!) ;
-      if (visaCustomerIds.length) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('telegram_id, first_name, last_name, username')
-          .in('telegram_id', visaCustomerIds);
-        const userMap = new Map<number, { first_name?: string; last_name?: string; username?: string | null }>();
-        for (const u of (users ?? []) as Array<{ telegram_id: number; first_name?: string; last_name?: string; username?: string | null }>) {
-          userMap.set(u.telegram_id, u);
-        }
-        for (const [logId, e] of map.entries()) {
-          if (e.service !== 'visa' || !e.customer_telegram_id) continue;
-          const u = userMap.get(e.customer_telegram_id);
-          if (!u) continue;
-          map.set(logId, {
-            ...e,
-            customer_first_name: u.first_name,
-            customer_last_name: u.last_name,
-            customer_username: u.username ?? null,
           });
         }
       }
@@ -828,10 +795,6 @@ function EarningDetailModal({
   const daysLeft = Math.max(0, HOLD_DAYS - Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)));
 
   const flag = countryFlag(enrichment?.country);
-  const customerName = enrichment
-    ? [enrichment.customer_first_name, enrichment.customer_last_name?.[0] ? `${enrichment.customer_last_name[0]}.` : '']
-        .filter(Boolean).join(' ') || null
-    : null;
   const sourceLabel = sourceType ? serviceLabel(sourceType) : 'Начисление';
   const titleLine = buildEarningTitle(enrichment, sourceType ?? undefined);
   const subtitleLine = buildEarningSubtitle(enrichment);
@@ -891,16 +854,6 @@ function EarningDetailModal({
 
         {/* Details */}
         <div className="px-5 py-4 space-y-3">
-          {customerName && (
-            <DetailRow label="Клиент" value={
-              <>
-                {customerName}
-                {enrichment?.customer_username && (
-                  <span className="text-[#3B5BFF] ml-1">@{enrichment.customer_username}</span>
-                )}
-              </>
-            } />
-          )}
           {enrichment?.price !== undefined && (
             <DetailRow label="Стоимость заказа" value={`${enrichment.price.toLocaleString('ru-RU')}₽`} />
           )}
