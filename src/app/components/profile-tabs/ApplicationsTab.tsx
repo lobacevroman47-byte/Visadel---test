@@ -145,17 +145,29 @@ function StatusProgress({ status }: { status: string }) {
 }
 
 // ── Booking status progress ──────────────────────────────────────────────────
-// Тот же визуальный паттерн что и StatusProgress для виз, но с лейблами под
-// бронь: Заявка подана → Проверка оплаты → Бронь оформляется → Готово.
+// Зеркалит визовый StatusProgress 1-в-1: те же 4 шага, тот же mapping
+// статусов на индексы. Различается только лейбл шага 2 («Бронь
+// оформляется» вместо «Виза оформляется»).
+//
+// Mapping booking-status → step (как у виз):
+//   pending_confirmation → 0 (Заявка подана)
+//   in_progress          → 2 (Бронь оформляется) — step 1 «проверка оплаты»
+//                              автоматически done, как у визы
+//   confirmed            → 3 (Готово)
+//   cancelled            → -1 (timeline скрывается)
+//
+// Старый legacy 'new' тоже мапим на 0 — на случай если в БД остались
+// записи с этим статусом (раньше форма ставила 'new' до момента когда мы
+// перешли на pending_confirmation).
 const BOOKING_PROGRESS_STEPS = [
-  { id: 'new',         label: 'Заявка\nподана',     icon: '📋' },
-  { id: 'checking',    label: 'Проверка\nоплаты',   icon: '✅' },
-  { id: 'in_progress', label: 'Бронь\nоформляется', icon: '⚙️' },
-  { id: 'confirmed',   label: 'Готово',              icon: '🎉' },
+  { id: 'pending_confirmation', label: 'Заявка\nподана',     icon: '📋' },
+  { id: 'in_progress',          label: 'Проверка\nоплаты',   icon: '✅' },
+  { id: 'working',              label: 'Бронь\nоформляется', icon: '⚙️' },
+  { id: 'confirmed',            label: 'Готово',              icon: '🎉' },
 ];
 
 function getBookingProgressIndex(status: string): number {
-  if (status === 'new') return 0;
+  if (status === 'pending_confirmation' || status === 'new' || status === 'pending_payment') return 0;
   if (status === 'in_progress') return 2;
   if (status === 'confirmed') return 3;
   return -1; // cancelled и прочее не показываем
@@ -889,10 +901,12 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
 // ── Booking card components ─────────────────────────────────────────────────
 
 const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
-  new:         { label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
-  in_progress: { label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
-  confirmed:   { label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
-  cancelled:   { label: 'Отменена',              color: 'bg-red-100 text-red-700' },
+  new:                  { label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  pending_payment:      { label: 'Ждёт оплаты',           color: 'bg-amber-100 text-amber-700' },
+  pending_confirmation: { label: 'Ожидает подтверждения', color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  in_progress:          { label: 'В работе',              color: 'bg-amber-100 text-amber-700' },
+  confirmed:            { label: 'Готово',                color: 'bg-emerald-100 text-emerald-700' },
+  cancelled:            { label: 'Отменена',              color: 'bg-red-100 text-red-700' },
 };
 
 const fmtBookingDate = (s: string) =>
