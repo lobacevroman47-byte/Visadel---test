@@ -56,22 +56,35 @@ interface FlightBooking {
 
 type Tab = 'hotels' | 'flights';
 
-// Те же лейблы и цвета, что у статусов виз — единый стиль во всём админ-интерфейсе.
-// Underlying enum в БД для броней: 'new' / 'in_progress' / 'confirmed' / 'cancelled'.
-// Дополнительно поддерживаем 'pending_payment' / 'pending_confirmation' если они появятся
-// в будущем — список options остаётся консистентным с визовой формой.
+// Статусы броней — упрощённый набор по запросу пользователя:
+//   new (default)  → «Ожидает подтверждения»
+//   in_progress    → «В работе»
+//   confirmed      → «Готово»
+//   cancelled      → «Отменена»
+//
+// 'pending_payment' убран — раньше был для случая когда юзер ещё не
+// прикрепил скрин оплаты, но теперь форма сразу пишет 'new' с прикреплённым
+// payment_screenshot. Старые brони с pending_payment всё равно отображаются
+// корректно (lookup в STATUS_OPTIONS), просто нельзя выбрать в дропдауне.
+//
+// 'pending_confirmation' оставлен в lookup для legacy записей (если кто-то
+// раньше написал такой статус), но в дропдауне не показывается — он
+// семантически = 'new'.
 const STATUS_OPTIONS = [
-  { value: 'pending_payment',      label: 'Ожидает оплаты',         color: 'bg-amber-100 text-amber-700' },
   { value: 'new',                  label: 'Ожидает подтверждения',  color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
   { value: 'pending_confirmation', label: 'Ожидает подтверждения',  color: 'bg-[#EAF1FF] text-[#3B5BFF]' },
+  { value: 'pending_payment',      label: 'Ожидает оплаты',         color: 'bg-amber-100 text-amber-700' },
   { value: 'in_progress',          label: 'В работе',               color: 'bg-amber-100 text-amber-700' },
   { value: 'confirmed',            label: 'Готово',                 color: 'bg-emerald-100 text-emerald-700' },
   { value: 'cancelled',            label: 'Отменена',               color: 'bg-red-100 text-red-700' },
 ];
 
-// Что показывать в селекте — без дублирующего pending_confirmation
-// (он маппится в БД на 'new' для броней, но визуально один и тот же лейбл).
-const STATUS_DROPDOWN = STATUS_OPTIONS.filter(s => s.value !== 'pending_confirmation');
+// Что показывать в селекте — только 4 целевых статуса.
+// Legacy 'pending_payment' и 'pending_confirmation' видны в badge'ах если
+// есть в БД, но менять на них из админки нельзя.
+const STATUS_DROPDOWN = STATUS_OPTIONS.filter(s =>
+  ['new', 'in_progress', 'confirmed', 'cancelled'].includes(s.value)
+);
 
 const fmtDate = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
 const fmtDateTime = (s: string) => new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
@@ -185,7 +198,14 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
 
   const updateStatus = async (table: 'hotel_bookings' | 'flight_bookings', id: string, status: string) => {
     if (!isSupabaseConfigured()) return;
-    await supabase.from(table).update({ status }).eq('id', id);
+    const { error } = await supabase.from(table).update({ status }).eq('id', id);
+    if (error) {
+      // CHECK violation видим явно вместо тихого молчания — частая причина
+      // когда статус не разрешён в БД (например 'pending_confirmation' для
+      // hotel_bookings, чей CHECK не включает этот статус).
+      alert(`Не удалось обновить статус: ${error.message}`);
+      return;
+    }
 
     // При переходе в любой «paid» статус — начислить партнёрскую комиссию
     // (если бронь привязана к партнёру и комиссия ещё не начислялась).
