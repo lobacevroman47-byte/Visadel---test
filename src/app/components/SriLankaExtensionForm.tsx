@@ -3,6 +3,7 @@ import { ChevronLeft, Upload, CheckCircle2, CreditCard, User } from 'lucide-reac
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 import { useDialog } from './shared/BrandDialog';
+import { Button } from './ui/brand';
 
 interface SriLankaExtensionFormProps {
   visa: VisaOption;
@@ -452,12 +453,15 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
           </div>
 
           {/* Submit Button */}
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            className="!py-4 !rounded-2xl"
             onClick={handleGoToPayment}
-            className="w-full bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition"
           >
             Перейти к оплате
-          </button>
+          </Button>
         </div>
       </div>
     </div>

@@ -13,6 +13,7 @@ import {
   haptic,
 } from '../lib/telegram';
 import { useBookingProduct, resolveFieldOverride } from '../hooks/useBookingProduct';
+import { Button } from './ui/brand';
 
 interface FlightBookingFormProps {
   onBack: () => void;
@@ -438,13 +439,18 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         )}
 
         {/* Submit */}
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          shape="rounded"
+          className="!py-4 !rounded-2xl !font-bold"
           disabled={submitting}
-          className="w-full py-4 rounded-2xl vd-grad text-white font-bold shadow-md vd-shadow-cta active:scale-[0.99] transition flex items-center justify-center gap-2 disabled:opacity-60"
+          loading={submitting}
         >
-          {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> Отправляем…</> : 'Оплатил — отправить заявку'}
-        </button>
+          {submitting ? 'Отправляем…' : 'Оплатил — отправить заявку'}
+        </Button>
 
         {/* .vd-input now lives globally in src/styles/globals.css */}
       </form>

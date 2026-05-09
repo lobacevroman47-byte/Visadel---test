@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Mail, Phone, MessageCircle } from 'lucide-react';
 import { useTelegram } from '../../App';
 import { useDialog } from '../shared/BrandDialog';
+import { Button } from '../ui/brand';
 
 interface Step4Props {
   data: {
@@ -135,20 +136,26 @@ export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Ste
       </div>
 
       <div className="flex gap-3">
-        <button
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
+          className="!py-4"
           onClick={onPrev}
-          className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2"
+          leftIcon={<ChevronLeft className="w-5 h-5" />}
         >
-          <ChevronLeft className="w-5 h-5" />
           Назад
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          className="!py-4 !rounded-2xl"
           onClick={validateAndNext}
-          className="flex-1 bg-[#3B5BFF] text-white py-4 rounded-[16px] hover:bg-[#4F2FE6] transition flex items-center justify-center gap-2"
+          rightIcon={<ChevronRight className="w-5 h-5" />}
         >
           Далее
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

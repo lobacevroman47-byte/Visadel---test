@@ -1,6 +1,7 @@
 import { ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
+import { Button } from '../ui/brand';
 
 interface Step6Props {
   formData: FormData;
@@ -171,20 +172,26 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
       </div>
 
       <div className="flex gap-3">
-        <button
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
+          className="!py-4"
           onClick={onPrev}
-          className="flex-1 bg-gray-100 text-gray-700 py-4 rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2"
+          leftIcon={<ChevronLeft className="w-5 h-5" />}
         >
-          <ChevronLeft className="w-5 h-5" />
           Назад
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          className="!py-4 !rounded-2xl !font-bold"
           onClick={onNext}
-          className="flex-1 vd-grad text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold flex items-center justify-center gap-2 vd-shadow-cta"
+          rightIcon={<ChevronRight className="w-5 h-5" />}
         >
           К оплате
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

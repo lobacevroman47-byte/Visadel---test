@@ -25,6 +25,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { apiFetch } from '../lib/apiFetch';
 import { HeaderActions } from './HeaderActions';
 import { useDialog } from './shared/BrandDialog';
+import { Button } from './ui/brand';
 
 interface PartnerApplicationFormProps {
   onBack: () => void;
@@ -306,14 +307,18 @@ export default function PartnerApplicationForm({ onBack, onSubmit }: PartnerAppl
           </label>
 
           {/* CTA */}
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            className="!py-3.5 mt-3"
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full vd-grad text-white py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition vd-shadow-cta disabled:opacity-60 mt-3"
+            loading={submitting}
+            leftIcon={!submitting ? <Send className="w-4 h-4" /> : undefined}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             Отправить заявку
-          </button>
+          </Button>
         </div>
 
         {/* Info */}
@@ -394,12 +399,16 @@ function ApplicationStatusView({
         </div>
 
         {app.status === 'rejected' && (
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            className="!py-3.5"
             onClick={onResubmit}
-            className="w-full vd-grad text-white py-3.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition vd-shadow-cta"
+            leftIcon={<Send className="w-4 h-4" />}
           >
-            <Send className="w-4 h-4" /> Подать новую заявку
-          </button>
+            Подать новую заявку
+          </Button>
         )}
       </div>
     </div>

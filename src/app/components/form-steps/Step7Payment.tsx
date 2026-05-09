@@ -9,6 +9,7 @@ import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
 import { useDialog } from '../shared/BrandDialog';
+import { Button } from '../ui/brand';
 
 interface Step7Props {
   formData: FormData;
@@ -451,22 +452,40 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
 
       {/* Кнопки */}
       <div className="space-y-3">
-        <button
+        <Button
+          variant="success"
+          size="lg"
+          fullWidth
+          className="!py-4 !rounded-2xl !font-bold shadow-[0_10px_30px_-8px_rgba(16,185,129,0.6)]"
           onClick={handlePaymentComplete}
           disabled={submitting}
-          className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold tracking-wide flex items-center justify-center gap-2 disabled:opacity-60 shadow-[0_10px_30px_-8px_rgba(16,185,129,0.6)]"
+          loading={submitting}
+          leftIcon={!submitting ? <CheckCircle2 className="w-5 h-5" /> : undefined}
         >
-          {submitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
           {submitting ? 'Отправляем…' : 'Оплатил — отправить заявку'}
-        </button>
+        </Button>
 
-        <button onClick={handleSaveDraft} className="w-full vd-grad-soft text-[#3B5BFF] py-3 rounded-2xl hover:bg-blue-100 transition flex items-center justify-center gap-2 text-sm font-semibold border border-blue-100/60">
-          <Save className="w-4 h-4" /> Сохранить черновик
-        </button>
+        <Button
+          variant="soft"
+          size="md"
+          fullWidth
+          className="!py-3 !rounded-2xl"
+          onClick={handleSaveDraft}
+          leftIcon={<Save className="w-4 h-4" />}
+        >
+          Сохранить черновик
+        </Button>
 
-        <button onClick={onPrev} className="w-full bg-gray-100 text-gray-600 py-3 rounded-2xl hover:bg-gray-200 transition flex items-center justify-center gap-2 text-sm font-medium">
-          <ChevronLeft className="w-4 h-4" /> Назад
-        </button>
+        <Button
+          variant="secondary"
+          size="md"
+          fullWidth
+          className="!py-3 !rounded-2xl !bg-gray-100 !border-0 !text-[#0F2A36]/70 hover:!bg-gray-200"
+          onClick={onPrev}
+          leftIcon={<ChevronLeft className="w-4 h-4" />}
+        >
+          Назад
+        </Button>
       </div>
     </div>
   );
