@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronDown, Calculator, Check, Loader2, Shield, TrendingUp } from 'lucide-react';
 import BrandHeader from './shared/BrandHeader';
 import type { VisaOption } from '../App';
+import { Button } from './ui/brand';
 import {
   getReferralStats, getVisaProducts, getAdditionalServices,
   type VisaProduct, type AdditionalService,
@@ -300,16 +301,17 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
         )}
       </AnimatePresence>
 
-      <button
-        onClick={handleSubmit}
-        className={`w-full py-3.5 rounded-2xl transition font-bold tracking-wide active:scale-[0.98] vd-shadow-cta ${
-          isUrgent
-            ? 'bg-gradient-to-r from-red-600 to-orange-500 text-white'
-            : 'vd-grad text-white'
+      <Button
+        variant="primary"
+        size="lg"
+        fullWidth
+        className={`!py-3.5 !rounded-2xl !font-bold tracking-wide ${
+          isUrgent ? '!bg-gradient-to-r !from-red-600 !to-orange-500 !text-white' : ''
         }`}
+        onClick={handleSubmit}
       >
         Оформить{hasAddons ? ` за ${total.toLocaleString('ru-RU')}₽` : ''} →
-      </button>
+      </Button>
     </div>
   );
 }

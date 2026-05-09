@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Gift, Flame, Save, Check, User, Mail, Phone, RefreshCw, History } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
+import { Button } from '../ui/brand';
 
 interface ProfileTabProps {
   onBonusChange?: (newBalance: number) => void;
@@ -487,11 +488,17 @@ export default function ProfileTab({ onBonusChange }: ProfileTabProps = {}) {
               placeholder="example@mail.com"
               className="w-full rounded-xl border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:border-[#5C7BFF]" />
           </div>
-          <button onClick={handleSaveProfile} disabled={savingProfile}
-            className="w-full py-2.5 rounded-xl bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all active:scale-95">
-            {profileSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />}
+          <Button
+            variant="primary"
+            size="md"
+            fullWidth
+            onClick={handleSaveProfile}
+            disabled={savingProfile}
+            loading={savingProfile}
+            leftIcon={!savingProfile ? (profileSaved ? <Check className="w-4 h-4" /> : <Save className="w-4 h-4" />) : undefined}
+          >
             {profileSaved ? 'Сохранено!' : savingProfile ? 'Сохраняем...' : 'Сохранить данные'}
-          </button>
+          </Button>
         </div>
       </div>
 

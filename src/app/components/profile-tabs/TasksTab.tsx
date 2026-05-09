@@ -169,7 +169,7 @@ export default function TasksTab() {
                       href={task.link}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block w-full bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white py-2 rounded-lg transition text-sm text-center"
+                      className="block w-full vd-grad text-white py-2 rounded-lg transition text-sm text-center font-semibold shadow-md vd-shadow-cta active:opacity-90"
                     >
                       Открыть ссылку
                     </a>
