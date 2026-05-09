@@ -24,7 +24,7 @@ import {
   getMockUser,
   type TelegramUser,
 } from './lib/telegram';
-import { upsertUser, getAdminRole, type AppUser, type AdminRole } from './lib/db';
+import { upsertUser, resolveReferralCode, getAdminRole, type AppUser, type AdminRole } from './lib/db';
 import { AppCatalogProvider } from './contexts/AppCatalogContext';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
@@ -172,16 +172,25 @@ function App() {
         setCurrentScreen('partner_dashboard'); referralCode = undefined;
       }
 
-      // Track referral click (если действительно реф.код, а не deeplink-команда)
+      // Резолв реф-кода: если это vanity (например ANYA) — найти каноничный
+      // referral_code (VIS...) партнёра. Если это уже VIS-код — пройдёт проверкой.
+      // Резолв через .then() чтобы не делать useEffect async (нельзя).
+      const resolvedPromise: Promise<string | null> = referralCode
+        ? resolveReferralCode(referralCode).catch(e => { console.warn('resolve refcode failed:', e); return null; })
+        : Promise.resolve(null);
+
+      resolvedPromise.then(resolvedRefCode => {
+      // Track referral click (по введённому коду или каноническому)
       if (referralCode) {
         fetch('/api/track-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referral_code: referralCode, telegram_id: tg.id }),
+          body: JSON.stringify({ referral_code: resolvedRefCode ?? referralCode, telegram_id: tg.id }),
         }).catch(() => {});
       }
 
-      upsertUser(tg, referralCode)
+      return upsertUser(tg, resolvedRefCode ?? undefined);
+      })
         .then(async u => {
           setAppUser(u);
           localStorage.setItem('vd_user', JSON.stringify(u));
