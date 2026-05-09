@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Save, Gift, Percent, Loader2, Settings as SettingsIcon, Package, CreditCard, Hotel, Plane, Plus, Trash2, GripVertical } from 'lucide-react';
 import { getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField } from '../../lib/db';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Button, Card } from '../../components/ui/brand';
 
 export const Settings: React.FC = () => {
   const dialog = useDialog();
@@ -50,8 +51,8 @@ export const Settings: React.FC = () => {
     <div className="p-8">
       <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
         <div>
-          <h1 className="mb-1">Настройки</h1>
-          <p className="text-sm text-gray-600">
+          <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Настройки</h1>
+          <p className="text-sm text-[#0F2A36]/65">
             Глобальные параметры реферальной и бонусной систем (применяются ко всем юзерам)
           </p>
         </div>
@@ -59,24 +60,25 @@ export const Settings: React.FC = () => {
           {savedAt && !saving && (
             <span className="text-xs text-emerald-600">✓ сохранено в {savedAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}</span>
           )}
-          <button
+          <Button
             type="button"
+            variant="primary"
+            size="md"
             onClick={handleSave}
-            disabled={saving}
-            className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-lg flex items-center gap-2 select-none"
+            loading={saving}
+            leftIcon={!saving ? <Save size={18} /> : undefined}
           >
-            {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
             {saving ? 'Сохраняем…' : 'Сохранить'}
-          </button>
+          </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Реферальная система */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <Card variant="flat" padding="lg" radius="xl">
           <div className="flex items-center gap-3 mb-5">
-            <div className="p-2.5 bg-blue-100 rounded-lg"><Gift className="text-blue-600" size={20} /></div>
-            <h3>Реферальная система</h3>
+            <div className="p-2.5 bg-[#EAF1FF] rounded-lg"><Gift className="text-[#3B5BFF]" size={20} /></div>
+            <h3 className="text-base font-bold text-[#0F2A36]">Реферальная система</h3>
           </div>
           <div className="space-y-4">
             <NumberRow
@@ -116,13 +118,13 @@ export const Settings: React.FC = () => {
               onChange={v => set('flight_partner_pct_default', v)}
             />
           </div>
-        </div>
+        </Card>
 
         {/* Бонусная система */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <Card variant="flat" padding="lg" radius="xl">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2.5 bg-emerald-100 rounded-lg"><Percent className="text-emerald-600" size={20} /></div>
-            <h3>Бонусная система</h3>
+            <h3 className="text-base font-bold text-[#0F2A36]">Бонусная система</h3>
           </div>
           <div className="space-y-4">
             <NumberRow
@@ -165,47 +167,47 @@ export const Settings: React.FC = () => {
               onChange={v => set('bonus_expiration_days', v)}
             />
           </div>
-        </div>
+        </Card>
 
         {/* Доп. услуги — ссылка на отдельную страницу */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
+        <Card variant="flat" padding="lg" radius="xl" className="lg:col-span-2">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2.5 bg-amber-100 rounded-lg"><Package className="text-amber-600" size={20} /></div>
-            <h3>Дополнительные услуги</h3>
+            <h3 className="text-base font-bold text-[#0F2A36]">Дополнительные услуги</h3>
           </div>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-[#0F2A36]/65">
             Цены на срочное оформление, бронь отеля, билеты и пр. редактируются на отдельной странице
             <span className="mx-1 px-2 py-0.5 bg-gray-100 rounded text-xs font-mono">Доп. услуги</span>
             в боковом меню — там же можно добавлять новые услуги, скрывать ненужные и менять иконки.
           </p>
-        </div>
+        </Card>
 
         {/* Реквизиты оплаты */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
+        <Card variant="flat" padding="lg" radius="xl" className="lg:col-span-2">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2.5 bg-purple-100 rounded-lg"><CreditCard className="text-purple-600" size={20} /></div>
-            <h3>Реквизиты оплаты</h3>
+            <h3 className="text-base font-bold text-[#0F2A36]">Реквизиты оплаты</h3>
           </div>
-          <p className="text-sm text-gray-600 mb-4">
+          <p className="text-sm text-[#0F2A36]/65 mb-4">
             Используется на всех формах: визы, бронь отеля, бронь авиабилета. Изменения подтянутся клиентам сразу.
           </p>
           <div>
-            <label className="block text-sm text-gray-700 mb-1">Номер карты</label>
+            <label className="block text-sm text-[#0F2A36] mb-1">Номер карты</label>
             <input
               type="text" value={settings.payment_card_number}
               onChange={e => set('payment_card_number', e.target.value)}
               placeholder="5536 9140 3834 6908"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
+              className="w-full px-3 py-2.5 border border-[#E1E5EC] rounded-xl font-mono text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF]"
             />
-            <p className="text-xs text-gray-500 mt-1">Можно с пробелами. Клиенты копируют без пробелов автоматически.</p>
+            <p className="text-xs text-[#0F2A36]/45 mt-1">Можно с пробелами. Клиенты копируют без пробелов автоматически.</p>
           </div>
-        </div>
+        </Card>
 
         {/* Бронь отеля */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <Card variant="flat" padding="lg" radius="xl">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2.5 bg-[#EAF1FF] rounded-lg"><Hotel className="text-[#3B5BFF]" size={20} /></div>
-            <h3>Бронь отеля</h3>
+            <h3 className="text-base font-bold text-[#0F2A36]">Бронь отеля</h3>
           </div>
           <NumberRow
             label="Цена услуги"
@@ -218,13 +220,13 @@ export const Settings: React.FC = () => {
             value={settings.hotel_extra_fields ?? []}
             onChange={v => set('hotel_extra_fields', v)}
           />
-        </div>
+        </Card>
 
         {/* Бронь билета */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200">
+        <Card variant="flat" padding="lg" radius="xl">
           <div className="flex items-center gap-3 mb-5">
             <div className="p-2.5 bg-[#EAF1FF] rounded-lg"><Plane className="text-[#3B5BFF]" size={20} /></div>
-            <h3>Бронь авиабилета</h3>
+            <h3 className="text-base font-bold text-[#0F2A36]">Бронь авиабилета</h3>
           </div>
           <NumberRow
             label="Цена услуги"
@@ -237,15 +239,15 @@ export const Settings: React.FC = () => {
             value={settings.flight_extra_fields ?? []}
             onChange={v => set('flight_extra_fields', v)}
           />
-        </div>
+        </Card>
       </div>
 
       {/* System Info */}
-      <div className="mt-6 bg-blue-50 border border-blue-200 p-5 rounded-xl flex items-start gap-3">
-        <SettingsIcon className="text-blue-600 mt-0.5 shrink-0" size={20} />
+      <div className="mt-6 bg-[#EAF1FF] border border-[#5C7BFF]/30 p-5 rounded-xl flex items-start gap-3">
+        <SettingsIcon className="text-[#3B5BFF] mt-0.5 shrink-0" size={20} />
         <div>
-          <p className="text-sm font-medium text-blue-900 mb-1">Где это применяется</p>
-          <ul className="text-sm text-blue-800 space-y-1 list-disc pl-5">
+          <p className="text-sm font-medium text-[#0F2A36] mb-1">Где это применяется</p>
+          <ul className="text-sm text-[#0F2A36]/70 space-y-1 list-disc pl-5">
             <li>Welcome-бонус — при создании нового юзера через реферальную ссылку</li>
             <li>Бонус реферреру — когда админ переводит заявку реферала в «В работе»</li>
             <li>Партнёрская % — для виз без своего <code className="text-xs bg-white px-1 rounded">partner_commission_pct</code></li>

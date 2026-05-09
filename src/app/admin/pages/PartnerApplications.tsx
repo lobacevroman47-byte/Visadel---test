@@ -19,6 +19,7 @@ import {
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Button, Input, Card, Modal, Tabs } from '../../components/ui/brand';
 
 interface ApplicationRow {
   id: string;
@@ -102,51 +103,43 @@ export function PartnerApplications() {
             {' · '}Отклонено: <b className="text-rose-700">{counts.rejected}</b>
           </p>
         </div>
-        <button
+        <Button
+          variant="soft"
+          size="sm"
           onClick={() => void refresh()}
-          className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition flex items-center gap-1.5 text-sm"
+          leftIcon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw size={14} />}
         >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw size={14} />}
           Обновить
-        </button>
+        </Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
+        <div className="flex-1 min-w-[200px]">
+          <Input
             type="text"
             placeholder="Поиск: имя, @username, email, площадка"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#3B5BFF]"
+            leftIcon={<Search className="w-4 h-4" />}
           />
         </div>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-          {([
-            ['all', `Все (${applications.length})`],
-            ['pending', `На рассмотрении (${counts.pending})`],
-            ['approved', `Одобрено (${counts.approved})`],
-            ['rejected', `Отклонено (${counts.rejected})`],
-          ] as const).map(([f, label]) => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                statusFilter === f ? 'bg-white text-[#0F2A36] shadow-sm' : 'text-gray-600 hover:text-[#0F2A36]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs<typeof statusFilter>
+          value={statusFilter}
+          onChange={setStatusFilter}
+          items={[
+            { value: 'all',      label: `Все (${applications.length})` },
+            { value: 'pending',  label: `На рассмотрении (${counts.pending})` },
+            { value: 'approved', label: `Одобрено (${counts.approved})` },
+            { value: 'rejected', label: `Отклонено (${counts.rejected})` },
+          ]}
+        />
       </div>
 
       {/* List */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+      <Card variant="flat" padding="none" radius="xl" className="overflow-hidden">
         {filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">
+          <div className="p-8 text-center text-sm text-[#0F2A36]/45">
             {loading ? 'Загружаем…' : 'Нет заявок в этом фильтре.'}
           </div>
         ) : (
@@ -182,7 +175,7 @@ export function PartnerApplications() {
             })}
           </div>
         )}
-      </div>
+      </Card>
 
       {/* Detail modal */}
       {selected && (
@@ -297,26 +290,20 @@ const ApplicationDetailModal: React.FC<{
   const cfg = STATUS_CONFIG[app.status];
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-lg rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 sticky top-0 bg-white z-10">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-base font-bold text-[#0F2A36] truncate">{app.full_name}</p>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>
-                {cfg.label}
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              {new Date(app.created_at).toLocaleString('ru-RU')}
-            </p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition shrink-0" aria-label="Закрыть">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
+    <Modal
+      open
+      onClose={onClose}
+      icon="👑"
+      label="Заявка на партнёрство"
+      title={(
+        <span className="inline-flex items-center gap-2 flex-wrap">
+          {app.full_name}
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${cfg.cls}`}>{cfg.label}</span>
+        </span>
+      )}
+      subtitle={new Date(app.created_at).toLocaleString('ru-RU')}
+      size="md"
+    >
         {/* Details */}
         <div className="p-5 space-y-2.5">
           <Detail icon={<AtSign className="w-3.5 h-3.5 text-gray-400" />} label="Telegram" value={
@@ -356,7 +343,7 @@ const ApplicationDetailModal: React.FC<{
 
         {/* Actions */}
         {app.status === 'pending' && (
-          <div className="px-5 py-4 border-t border-gray-100 sticky bottom-0 bg-white">
+          <div className="px-5 py-4 border-t border-gray-100 bg-white">
             {error && (
               <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs text-rose-700 flex items-start gap-2 mb-3">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" /> {error}
@@ -366,78 +353,79 @@ const ApplicationDetailModal: React.FC<{
             {rejectMode ? (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1.5">Причина отказа (увидит юзер)</label>
+                  <label className="block text-xs font-medium text-[#0F2A36] mb-1.5">Причина отказа (увидит юзер)</label>
                   <textarea
                     rows={3}
                     value={rejectReason}
                     onChange={e => setRejectReason(e.target.value)}
                     placeholder="Например: «маленькая аудитория, попробуй позже»"
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#3B5BFF] resize-none"
+                    className="w-full px-3 py-2.5 border border-[#E1E5EC] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] resize-none"
                   />
                 </div>
                 <div className="flex items-center justify-end gap-2">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="md"
                     onClick={() => { setRejectMode(false); setError(null); }}
                     disabled={processing}
-                    className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
                   >
                     Назад
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="md"
                     onClick={handleReject}
                     disabled={processing || !rejectReason.trim()}
-                    className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                    loading={processing}
+                    leftIcon={!processing ? <X className="w-4 h-4" /> : undefined}
                   >
-                    {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <X className="w-4 h-4" />}
                     Подтвердить отказ
-                  </button>
+                  </Button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-end gap-2 flex-wrap">
-                <button
-                  onClick={onClose}
-                  className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
-                >
+                <Button variant="ghost" size="md" onClick={onClose}>
                   Закрыть
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="md"
                   onClick={() => setRejectMode(true)}
                   disabled={processing}
-                  className="px-4 py-2.5 bg-white border border-rose-300 text-rose-700 hover:bg-rose-50 rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                  className="border-rose-300 text-rose-700 hover:bg-rose-50"
+                  leftIcon={<X className="w-4 h-4" />}
                 >
-                  <X className="w-4 h-4" /> Отклонить
-                </button>
-                <button
+                  Отклонить
+                </Button>
+                <Button
+                  variant="primary"
+                  size="md"
                   onClick={handleApprove}
                   disabled={processing}
-                  className="px-4 py-2.5 vd-grad text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-50"
+                  loading={processing}
+                  leftIcon={!processing ? <Check className="w-4 h-4" /> : undefined}
                 >
-                  {processing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Одобрить
-                </button>
+                </Button>
               </div>
             )}
           </div>
         )}
 
         {app.status !== 'pending' && (
-          <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white">
+          <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 bg-white">
             {app.reviewed_at && (
-              <p className="text-[11px] text-gray-400 mr-auto">
+              <p className="text-[11px] text-[#0F2A36]/45 mr-auto">
                 Решено: {new Date(app.reviewed_at).toLocaleString('ru-RU')}
               </p>
             )}
-            <button
-              onClick={onClose}
-              className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
-            >
+            <Button variant="ghost" size="md" onClick={onClose}>
               Закрыть
-            </button>
+            </Button>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 };
 

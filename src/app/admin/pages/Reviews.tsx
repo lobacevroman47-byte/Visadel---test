@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Star, Trash2, RefreshCw, MessageSquare, TrendingUp,
-  AlertTriangle, Plus, X, Check, Clock, Eye,
+  Star, Trash2, RefreshCw, MessageSquare,
+  AlertTriangle, Plus, Check, Clock, Eye,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
+import { Button, Modal } from '../../components/ui/brand';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,17 +114,31 @@ function ReviewModal({ initial, title, onSave, onClose }: {
   const canSave = form.text.trim().length > 0 && form.rating > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl z-10">
-          <h3 className="text-base font-semibold text-gray-900">{title}</h3>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+    <Modal
+      open
+      onClose={onClose}
+      icon="⭐"
+      label="Отзыв"
+      title={title}
+      size="sm"
+      footer={(
+        <div className="flex gap-3">
+          <Button variant="secondary" size="md" fullWidth onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            fullWidth
+            onClick={handleSave}
+            disabled={!canSave || saving}
+            loading={saving}
+          >
+            {saving ? 'Сохраняем...' : 'Сохранить'}
+          </Button>
         </div>
-
+      )}
+    >
         <div className="px-6 py-5 space-y-5">
           {/* Rating */}
           <div>
@@ -199,19 +214,7 @@ function ReviewModal({ initial, title, onSave, onClose }: {
           </div>
         </div>
 
-        <div className="flex gap-3 px-6 pb-5">
-          <button onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 transition-colors">
-            Отмена
-          </button>
-          <button onClick={handleSave} disabled={!canSave || saving}
-            className="flex-1 py-2.5 rounded-xl bg-[#3B5BFF] text-white text-sm font-semibold hover:bg-[#4F2FE6] transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-            {saving && <RefreshCw className="w-4 h-4 animate-spin" />}
-            {saving ? 'Сохраняем...' : 'Сохранить'}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -221,28 +224,32 @@ function ConfirmModal({ review, onConfirm, onCancel, loading }: {
   review: Review; onConfirm: () => void; onCancel: () => void; loading: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 animate-in zoom-in-95 duration-150">
-        <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4">
-          <AlertTriangle className="w-6 h-6 text-red-500" />
+    <Modal open onClose={onCancel} size="sm">
+      <div className="p-6">
+        <div className="w-12 h-12 bg-rose-100 rounded-xl flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="w-6 h-6 text-rose-500" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 text-center mb-1">Удалить отзыв?</h3>
-        <p className="text-sm text-gray-500 text-center mb-1">{review.author_name ?? 'Клиент'} · {review.country}</p>
-        <p className="text-sm text-gray-700 text-center bg-gray-50 rounded-xl px-3 py-2 mb-5 line-clamp-2">"{review.text}"</p>
+        <h3 className="text-lg font-semibold text-[#0F2A36] text-center mb-1">Удалить отзыв?</h3>
+        <p className="text-sm text-[#0F2A36]/60 text-center mb-1">{review.author_name ?? 'Клиент'} · {review.country}</p>
+        <p className="text-sm text-[#0F2A36]/70 text-center bg-gray-50 rounded-xl px-3 py-2 mb-5 line-clamp-2">"{review.text}"</p>
         <div className="flex gap-3">
-          <button onClick={onCancel} disabled={loading}
-            className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50">
+          <Button variant="secondary" size="md" fullWidth onClick={onCancel} disabled={loading}>
             Отмена
-          </button>
-          <button onClick={onConfirm} disabled={loading}
-            className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-            {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+          </Button>
+          <Button
+            variant="danger"
+            size="md"
+            fullWidth
+            onClick={onConfirm}
+            disabled={loading}
+            loading={loading}
+            leftIcon={!loading ? <Trash2 className="w-4 h-4" /> : undefined}
+          >
             {loading ? 'Удаляем...' : 'Удалить'}
-          </button>
+          </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -441,20 +448,27 @@ export const Reviews: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Отзывы</h1>
-          <p className="text-sm text-gray-400 mt-0.5">@visadel_recall · новые попадают на модерацию</p>
+          <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">Отзывы</h1>
+          <p className="text-sm text-[#0F2A36]/45 mt-0.5">@visadel_recall · новые попадают на модерацию</p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={loadReviews} disabled={loading}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm font-medium hover:bg-gray-50 active:scale-95 transition-all disabled:opacity-50">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={loadReviews}
+            disabled={loading}
+            leftIcon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
+          >
             Обновить
-          </button>
-          <button onClick={() => setAddOpen(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#3B5BFF] text-white rounded-xl text-sm font-semibold hover:bg-[#4F2FE6] active:scale-95 transition-all shadow-sm">
-            <Plus className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setAddOpen(true)}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
             Добавить
-          </button>
+          </Button>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Package, Plus, Edit2, Trash2, X, Save, Loader2, RefreshCw, Eye, EyeOff, Hotel,
+  Package, Plus, Edit2, Trash2, Save, Loader2, RefreshCw, Eye, EyeOff, Hotel,
 } from 'lucide-react';
 import {
   getAdditionalServices, upsertAdditionalService, deleteAdditionalService,
@@ -8,6 +8,7 @@ import {
 } from '../../lib/db';
 import { auditLog } from '../lib/audit';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Button, Modal } from '../../components/ui/brand';
 
 const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
 type Mode = 'addons' | 'bookings';
@@ -284,17 +285,15 @@ const ServiceFormModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 px-5 py-4 flex justify-between items-center">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Package className="w-5 h-5 text-blue-500" />
-            {service ? 'Редактировать услугу' : 'Добавить услугу'}
-          </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><X size={20} /></button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+    <Modal
+      open
+      onClose={onClose}
+      icon="📦"
+      label={service ? 'Редактирование' : 'Новая услуга'}
+      title={service ? 'Редактировать услугу' : 'Добавить услугу'}
+      size="md"
+    >
+      <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="md:col-span-1">
               <label className="block text-sm text-gray-700 mb-1">Иконка (emoji)</label>
@@ -448,22 +447,21 @@ const ServiceFormModal: React.FC<{
           )}
 
           <div className="flex gap-2 pt-2">
-            <button
-              type="button" onClick={onClose}
-              className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl"
-            >
+            <Button type="button" variant="secondary" size="lg" fullWidth onClick={onClose}>
               Отмена
-            </button>
-            <button
-              type="submit" disabled={saving}
-              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 disabled:pointer-events-none text-white rounded-xl flex items-center justify-center gap-2 font-medium select-none"
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={saving}
+              leftIcon={!saving ? <Save size={16} /> : undefined}
             >
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save size={16} />}
               {saving ? 'Сохраняем…' : 'Сохранить'}
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+    </Modal>
   );
 };
