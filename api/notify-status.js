@@ -45,6 +45,46 @@ const STATUS_MESSAGES = {
   },
 };
 
+// Партнёрские события — динамические сообщения (используют body.amount).
+// Открывают partner_dashboard в Mini App вместо обычного applications.
+const PARTNER_STATUSES = new Set([
+  'partner_referral_paid',
+  'partner_hold_approved',
+  'partner_payout_processed',
+]);
+
+function buildPartnerMessage(status, { amount, country, source, card_last4 }) {
+  const amt = `${(amount ?? 0).toLocaleString('ru-RU')}₽`;
+  const sourceLabel = source === 'hotel' ? 'бронь отеля'
+                    : source === 'flight' ? 'бронь авиабилета'
+                    : 'визу';
+  switch (status) {
+    case 'partner_referral_paid':
+      return {
+        emoji: '💰',
+        title: `Партнёрская комиссия +${amt}`,
+        body: `Ваш реферал оплатил ${sourceLabel}${country ? ` (${country})` : ''}.\n\n`
+            + `Сумма поступит на ваш баланс через 30 дней (hold-период).`,
+      };
+    case 'partner_hold_approved':
+      return {
+        emoji: '✅',
+        title: `+${amt} доступно к выплате`,
+        body: `Hold-период закончился. ${amt} теперь в вашем партнёрском балансе.\n\n`
+            + `Ближайшая выплата на карту — в течение 2 недель.`,
+      };
+    case 'partner_payout_processed':
+      return {
+        emoji: '💸',
+        title: `Выплата ${amt} отправлена`,
+        body: `Деньги переведены на вашу карту${card_last4 ? ` •• ${card_last4}` : ''}.\n\n`
+            + `Спасибо за партнёрство 🤝`,
+      };
+    default:
+      return null;
+  }
+}
+
 // ─── Layer 1: in-memory dedup ─────────────────────────────────────────────────
 const recentSends = new Map();
 function isDuplicateInMemory(application_id, status) {
@@ -129,7 +169,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body ?? {};
-  const { status, country, visa_type, application_id } = body;
+  const { status, country, visa_type, application_id, amount, source, card_last4 } = body;
   // user — только себе; admin / service — кому угодно
   const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
@@ -149,7 +189,10 @@ export default async function handler(req, res) {
     return;
   }
 
-  const msg = STATUS_MESSAGES[status];
+  const isPartnerEvent = PARTNER_STATUSES.has(status);
+  const msg = isPartnerEvent
+    ? buildPartnerMessage(status, { amount, country, source, card_last4 })
+    : STATUS_MESSAGES[status];
   if (!msg) {
     console.error('[notify-status] unknown status:', status);
     res.status(400).json({ error: `Unknown status: "${status}"` });
@@ -173,16 +216,20 @@ export default async function handler(req, res) {
   // 'new' or 'unavailable' → proceed to send
 
   // ── Build message ─────────────────────────────────────────────────────────
-  const text =
-    `${msg.emoji} <b>${msg.title}</b>\n\n` +
-    `🌍 Страна: ${country ?? ''}\n\n` +
-    `${msg.body}`;
+  const text = isPartnerEvent
+    ? `${msg.emoji} <b>${msg.title}</b>\n\n${msg.body}`
+    : `${msg.emoji} <b>${msg.title}</b>\n\n🌍 Страна: ${country ?? ''}\n\n${msg.body}`;
 
+  // Партнёрские события открывают partner_dashboard, обычные — applications.
   let reply_markup;
   if (appUrl && appUrl.startsWith('https://')) {
+    const dashboardUrl = isPartnerEvent
+      ? `${appUrl}?tab=partner_dashboard`
+      : `${appUrl}?tab=applications`;
+    const buttonText = isPartnerEvent ? '👑 Партнёрский кабинет' : '📱 Открыть приложение';
     reply_markup = {
       inline_keyboard: [[
-        { text: '📱 Открыть приложение', web_app: { url: `${appUrl}?tab=applications` } }
+        { text: buttonText, web_app: { url: dashboardUrl } }
       ]]
     };
   }

@@ -239,6 +239,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     if (amount <= 0) return;
 
     const kind = table === 'hotel_bookings' ? 'отеля' : 'авиабилета';
+    const dedupeKey = `partner_${table}_${bookingId}`;
     await apiFetch('/api/grant-bonus', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -247,7 +248,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         type: 'partner_pending',
         amount,
         description: `+${amount}₽ партнёру (${pct}% от ${b.price}₽ за бронь ${kind}) — в hold-периоде 30д`,
-        application_id: `partner_${table}_${bookingId}`,
+        application_id: dedupeKey,
       }),
     });
 
@@ -257,6 +258,19 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       partner_commission_amount_rub: amount,
       partner_commission_status: 'pending',
     }).eq('id', bookingId);
+
+    // Push-уведомление партнёру (best-effort, не блокирует)
+    apiFetch('/api/notify-status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: r.telegram_id,
+        status: 'partner_referral_paid',
+        amount,
+        source: table === 'hotel_bookings' ? 'hotel' : 'flight',
+        application_id: `partner_notify_${dedupeKey}`,
+      }),
+    }).catch(e => console.warn('partner notify (booking) error:', e));
   }
 
   const handleExportCsv = () => {

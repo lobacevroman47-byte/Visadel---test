@@ -112,6 +112,29 @@ async function processPartnerHolds() {
         continue;
       }
       approved++;
+
+      // Push-уведомление партнёру: «+X₽ доступно к выплате» (best-effort).
+      // Используем service-key чтобы notify-status позволил отправить любому.
+      try {
+        const appUrl = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL ?? '';
+        if (appUrl) {
+          await fetch(`${appUrl.replace(/\/$/, '')}/api/notify-status`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-service-key': SERVICE_KEY,
+            },
+            body: JSON.stringify({
+              telegram_id: p.telegram_id,
+              status: 'partner_hold_approved',
+              amount: p.amount,
+              application_id: `partner_notify_approved_${p.dedupe_key}`,
+            }),
+          });
+        }
+      } catch (e) {
+        console.warn('[partner-holds] notify error (non-fatal):', e?.message ?? e);
+      }
     } catch (e) {
       errors.push({ dedupe_key: p.dedupe_key, error: String(e?.message ?? e) });
     }
