@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Users, Loader2, Copy, Share2, Check, Crown,
-  ChevronRight, ChevronDown, QrCode, Download, UserPlus,
+  ChevronRight, QrCode, Download, UserPlus,
   CheckCircle2, Info,
 } from 'lucide-react';
 import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
@@ -274,18 +274,20 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           </h3>
           <p className="text-sm text-white/70 mt-2 leading-relaxed">
             Начисляются за <span className="font-medium text-white">визы,
-            брони отелей и авиабилетов</span>.
+            брони отелей и авиабилетов</span>.{' '}
+            <button
+              onClick={() => setShowExclusions(s => !s)}
+              className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition align-middle"
+              aria-label="Что не входит"
+              title="Что не входит"
+            >
+              <Info className="w-2.5 h-2.5 text-white/80" />
+            </button>
           </p>
-          <button
-            onClick={() => setShowExclusions(s => !s)}
-            className="mt-2 inline-flex items-center gap-1 text-xs text-white/60 hover:text-white/90 transition"
-          >
-            <Info className="w-3 h-3" /> Что не входит
-            <ChevronDown className={`w-3 h-3 transition-transform ${showExclusions ? 'rotate-180' : ''}`} />
-          </button>
           {showExclusions && (
             <p className="mt-2 text-xs text-white/50 leading-relaxed bg-white/5 rounded-lg px-3 py-2">
-              Готовые авиабилеты, отели из каталога, экскурсии,
+              <span className="text-white/70 font-medium">Не входят:</span>{' '}
+              готовые авиабилеты, отели из каталога, экскурсии,
               страховки, eSIM и прочие услуги.
             </p>
           )}
