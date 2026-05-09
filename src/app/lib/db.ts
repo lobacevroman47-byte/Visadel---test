@@ -378,6 +378,7 @@ export async function getUserApplications(telegramId: number): Promise<Applicati
       .from('applications')
       .select('*')
       .eq('user_telegram_id', telegramId)
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
     return (data as Application[]) ?? [];
   }
@@ -449,6 +450,7 @@ export async function getUserHotelBookings(telegramId: number): Promise<HotelBoo
     .from('hotel_bookings')
     .select('*')
     .eq('telegram_id', telegramId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error) { console.warn('getUserHotelBookings error', error.message); return []; }
   return (data as HotelBookingRow[]) ?? [];
@@ -460,6 +462,7 @@ export async function getUserFlightBookings(telegramId: number): Promise<FlightB
     .from('flight_bookings')
     .select('*')
     .eq('telegram_id', telegramId)
+    .is('deleted_at', null)
     .order('created_at', { ascending: false });
   if (error) { console.warn('getUserFlightBookings error', error.message); return []; }
   return (data as FlightBookingRow[]) ?? [];
@@ -1455,6 +1458,7 @@ export async function getAdditionalServices(): Promise<AdditionalService[]> {
   const { data } = await supabase
     .from('additional_services')
     .select('*')
+    .is('deleted_at', null)
     .order('sort_order', { ascending: true });
   return (data as AdditionalService[]) ?? [];
 }
@@ -1467,9 +1471,14 @@ export async function upsertAdditionalService(s: Omit<AdditionalService, 'create
   );
 }
 
+// Soft-delete: помечаем deleted_at = now() вместо физического DELETE.
+// Восстановление через SQL: UPDATE additional_services SET deleted_at = NULL WHERE id = ?
 export async function deleteAdditionalService(id: string): Promise<void> {
   if (!isSupabaseConfigured()) return;
-  await supabase.from('additional_services').delete().eq('id', id);
+  await supabase
+    .from('additional_services')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id);
 }
 
 // ─── Finance / Analytics ──────────────────────────────────────────────────────
@@ -1512,6 +1521,7 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   let appsQ = supabase
     .from('applications')
     .select('price, bonuses_used, visa_id, status, created_at, updated_at, usd_rate_rub, tax_pct, form_data')
+    .is('deleted_at', null)
     .in('status', ['in_progress', 'ready']);
   if (sinceISO) appsQ = appsQ.gte('updated_at', sinceISO);
 
@@ -1529,10 +1539,10 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   const addonsQ = supabase.from('additional_services').select('id, cost_rub');
 
   // Standalone bookings — confirmed = "paid" for revenue purposes
-  let hotelBookingsQ = supabase.from('hotel_bookings').select('price, status, created_at').eq('status', 'confirmed');
+  let hotelBookingsQ = supabase.from('hotel_bookings').select('price, status, created_at').is('deleted_at', null).eq('status', 'confirmed');
   if (sinceISO) hotelBookingsQ = hotelBookingsQ.gte('created_at', sinceISO);
 
-  let flightBookingsQ = supabase.from('flight_bookings').select('price, status, created_at').eq('status', 'confirmed');
+  let flightBookingsQ = supabase.from('flight_bookings').select('price, status, created_at').is('deleted_at', null).eq('status', 'confirmed');
   if (sinceISO) flightBookingsQ = flightBookingsQ.gte('created_at', sinceISO);
 
   const [appsRes, bonusRes, balanceRes, productsRes, addonsRes, hotelBookingsRes, flightBookingsRes] = await Promise.all([

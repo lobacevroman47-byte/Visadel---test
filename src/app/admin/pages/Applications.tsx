@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
-import { Search, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, Clock, ChevronRight, Check } from 'lucide-react';
+import { Search, Upload, X, Loader2, RefreshCw, ExternalLink, Download, ArrowUp, ArrowDown, ArrowUpDown, FileDown, Flame, Filter, Clock, ChevronRight, Check, Trash2 } from 'lucide-react';
 import { statusLabels, statusChipClass } from '../data/mockData';
 import {
   useAdminApplications,
@@ -17,6 +17,7 @@ import { auditLog } from '../lib/audit';
 import { useAdmin } from '../contexts/AdminContext';
 import { useDialog } from '../../components/shared/BrandDialog';
 import { Modal } from '../../components/ui/brand';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 
 interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
@@ -1508,8 +1509,36 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedApp, setSelectedApp] = useState<Application | null>(null);
+  const dialog = useDialog();
 
   const { applications, loading, refetch } = useAdminApplications();
+
+  // Soft-delete заявки — UPDATE deleted_at = now() вместо DELETE.
+  // Запись остаётся в БД и может быть восстановлена через SQL:
+  //   UPDATE applications SET deleted_at = NULL WHERE id = '<uuid>';
+  // status_log не трогаем — он остаётся как полная история (по
+  // application_id всё ещё JOIN'ится).
+  const handleDeleteApplication = async (app: Application) => {
+    const ok = await dialog.confirm(
+      `Удалить заявку${app.clientName ? ` ${app.clientName}` : ''}?`,
+      'Заявка будет скрыта из админки. Данные остаются в БД и могут быть восстановлены при необходимости.',
+      { confirmLabel: 'Удалить', cancelLabel: 'Отмена' },
+    );
+    if (!ok) return;
+    if (!isSupabaseConfigured()) return;
+
+    const { error } = await supabase
+      .from('applications')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', app.id);
+    if (error) {
+      await dialog.error('Не удалось удалить', error.message);
+      return;
+    }
+
+    if (selectedApp?.id === app.id) setSelectedApp(null);
+    void refetch();
+  };
   const countries = useMemo(() => Array.from(new Set(applications.map(app => app.country))), [applications]);
 
   const filtered = useMemo(() => {
@@ -1714,47 +1743,60 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
           {sorted.map((app) => {
             const tgUser = ((app.formData as { contactInfo?: { telegram?: string } })?.contactInfo?.telegram ?? app.telegram ?? '').replace('@', '');
             return (
-              <button
+              <div
                 key={app.id}
-                type="button"
-                onClick={() => setSelectedApp(app)}
-                className={`w-full bg-white rounded-xl border hover:shadow-md active:scale-[0.99] transition p-4 flex items-center gap-4 text-left ${app.urgent ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
-                title="Открыть заявку"
+                className={`w-full bg-white rounded-xl border hover:shadow-md transition flex items-center gap-2 pr-2 ${app.urgent ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}
               >
-                <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-2xl shrink-0">
-                  {app.countryFlag ?? '🌍'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-bold text-[#0F2A36]">{app.clientName || 'Без имени'}</p>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>
-                      {statusLabels[app.status]}
-                    </span>
-                    {app.urgent && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
-                        <Flame className="w-3 h-3" /> Срочно
-                      </span>
-                    )}
-                    <span className="text-[11px] font-bold text-[#3B5BFF]">
-                      {(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽
-                    </span>
-                    {app.bonusesUsed > 0 && (
-                      <span className="text-[10px] text-emerald-600 font-semibold">
-                        −{app.bonusesUsed} ₽ бонусом
-                      </span>
-                    )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedApp(app)}
+                  className="flex-1 min-w-0 active:scale-[0.99] transition p-4 flex items-center gap-4 text-left"
+                  title="Открыть заявку"
+                >
+                  <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-2xl shrink-0">
+                    {app.countryFlag ?? '🌍'}
                   </div>
-                  <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
-                    {app.country} · {app.visaType}
-                    {tgUser && <> · <span className="text-[#3B5BFF]" onClick={(e) => { e.stopPropagation(); window.open(`https://t.me/${tgUser}`, '_blank'); }}>@{tgUser}</span></>}
-                    {app.phone && <> · {app.phone}</>}
-                  </p>
-                  <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-                    <Clock className="w-3 h-3" /> {new Date(app.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-                <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-              </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold text-[#0F2A36]">{app.clientName || 'Без имени'}</p>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>
+                        {statusLabels[app.status]}
+                      </span>
+                      {app.urgent && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
+                          <Flame className="w-3 h-3" /> Срочно
+                        </span>
+                      )}
+                      <span className="text-[11px] font-bold text-[#3B5BFF]">
+                        {(app.cost - app.bonusesUsed).toLocaleString('ru-RU')} ₽
+                      </span>
+                      {app.bonusesUsed > 0 && (
+                        <span className="text-[10px] text-emerald-600 font-semibold">
+                          −{app.bonusesUsed} ₽ бонусом
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
+                      {app.country} · {app.visaType}
+                      {tgUser && <> · <span className="text-[#3B5BFF]" onClick={(e) => { e.stopPropagation(); window.open(`https://t.me/${tgUser}`, '_blank'); }}>@{tgUser}</span></>}
+                      {app.phone && <> · {app.phone}</>}
+                    </p>
+                    <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                      <Clock className="w-3 h-3" /> {new Date(app.date).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); void handleDeleteApplication(app); }}
+                  className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition active:scale-95 shrink-0"
+                  title="Удалить заявку"
+                  aria-label="Удалить заявку"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             );
           })}
         </div>
