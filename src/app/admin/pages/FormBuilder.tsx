@@ -742,7 +742,7 @@ const BookingProductEditor: React.FC<{
   const setRow = <K extends keyof typeof draftRow>(k: K, v: typeof draftRow[K]) =>
     setDraftRow(p => ({ ...p, [k]: v }));
 
-  const updateOverride = (key: string, patch: Partial<{ label: string; required: boolean; visible: boolean }>) => {
+  const updateOverride = (key: string, patch: Partial<{ label: string; required: boolean; visible: boolean; sort_order: number }>) => {
     setDraftOverrides(p => ({ ...p, [key]: { ...(p[key] ?? {}), ...patch } }));
   };
   const resetOverride = (key: string) => {
@@ -751,6 +751,43 @@ const BookingProductEditor: React.FC<{
       delete next[key];
       return next;
     });
+  };
+
+  // Сортировка core-полей: используем override.sort_order если задан,
+  // иначе исходный индекс в type.coreFields. Это даёт админу возможность
+  // менять порядок встроенных полей (как у дополнительных).
+  const sortedCoreFields = useMemo(() => {
+    return [...type.coreFields]
+      .map((f, originalIdx) => ({ f, idx: draftOverrides[f.key]?.sort_order ?? originalIdx }))
+      .sort((a, b) => a.idx - b.idx)
+      .map(x => x.f);
+  }, [type.coreFields, draftOverrides]);
+
+  // Двигаем core-поле вверх/вниз — записываем sort_order парам (текущему
+  // и соседу), чтобы они поменялись местами.
+  const moveCoreField = (key: string, dir: -1 | 1) => {
+    const current = sortedCoreFields.findIndex(f => f.key === key);
+    const target = current + dir;
+    if (current === -1 || target < 0 || target >= sortedCoreFields.length) return;
+    const a = sortedCoreFields[current];
+    const b = sortedCoreFields[target];
+    setDraftOverrides(p => ({
+      ...p,
+      [a.key]: { ...(p[a.key] ?? {}), sort_order: target },
+      [b.key]: { ...(p[b.key] ?? {}), sort_order: current },
+    }));
+  };
+
+  // «Удалить» core-поле = скрыть его (visible: false). Хардкод-поля нельзя
+  // удалить из типа, но можно скрыть от клиента.
+  const hideCoreField = async (key: string, label: string) => {
+    const ok = await dialog.confirm(
+      `Скрыть поле «${label}»?`,
+      'Поле не пропадёт из БД (это встроенное поле), но клиент его не увидит. Можно снова включить через «Показывать клиенту» в редактировании.',
+      { confirmLabel: 'Скрыть', cancelLabel: 'Отмена' },
+    );
+    if (!ok) return;
+    updateOverride(key, { visible: false });
   };
 
   const addField = () => {
@@ -915,16 +952,36 @@ const BookingProductEditor: React.FC<{
             </div>
           </div>
           <div className="divide-y divide-gray-100 border-t border-gray-100">
-            {type.coreFields.map(f => {
+            {sortedCoreFields.map((f, idx) => {
               const ov = draftOverrides[f.key] ?? {};
               const label = ov.label ?? f.defaultLabel;
               const required = ov.required ?? f.defaultRequired;
               const visible = ov.visible !== false;
-              const isCustom = ov.label !== undefined || ov.required !== undefined || ov.visible !== undefined;
+              const isCustom = ov.label !== undefined || ov.required !== undefined || ov.visible !== undefined || ov.sort_order !== undefined;
               const expanded = expandedCore === f.key;
               return (
                 <div key={f.key} className={!visible ? 'opacity-60' : ''}>
                   <div className="px-4 py-3 flex flex-wrap items-center gap-3">
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveCoreField(f.key, -1)}
+                        disabled={idx === 0}
+                        className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Переместить выше"
+                      >
+                        <ChevronUp size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveCoreField(f.key, 1)}
+                        disabled={idx === sortedCoreFields.length - 1}
+                        className="p-1 rounded text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title="Переместить ниже"
+                      >
+                        <ChevronDown size={16} />
+                      </button>
+                    </div>
                     <div className="flex-1 min-w-[200px]">
                       <p className="text-gray-800 font-medium">
                         {label} {required && <span className="text-red-500">*</span>}
@@ -936,14 +993,25 @@ const BookingProductEditor: React.FC<{
                         {isCustom && <span className="px-1.5 py-0.5 bg-[#EAF1FF] text-[#3B5BFF] rounded">изменено</span>}
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => setExpandedCore(expanded ? null : f.key)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                      title="Редактировать"
-                    >
-                      <Edit2 size={16} />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedCore(expanded ? null : f.key)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Редактировать"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => hideCoreField(f.key, label)}
+                        disabled={!visible}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={visible ? 'Скрыть от клиента' : 'Поле уже скрыто'}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                   {expanded && (
                     <div className="px-4 pb-4 -mt-1 bg-gray-50 border-t border-gray-100 space-y-3 pt-3">
