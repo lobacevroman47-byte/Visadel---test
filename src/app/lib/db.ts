@@ -864,24 +864,66 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   let bonusType = 'referral';
   let dedupeKey = `referral_${refereeTelegramId}`;
 
-  // Partner override: percentage of the actual order price + pending status
+  // Partner override: процент по компонентам заказа + pending статус.
+  // Заявка может содержать визу + addons (срочное, бронь отеля, бронь авиа),
+  // у каждого свой % партнёрского вознаграждения. Считаем взвешенно:
+  //   commission = visa_base × visa_pct
+  //              + (urgent ? urgent_price × urgent_pct : 0)
+  //              + (hotel  ? hotel_price  × hotel_pct  : 0)
+  //              + (ticket ? ticket_price × ticket_pct : 0)
   if (isPartner && applicationId) {
     const { data: app } = await supabase
       .from('applications')
-      .select('price, visa_id')
+      .select('price, visa_id, urgent, form_data')
       .eq('id', applicationId)
       .single();
     if (app) {
-      const a = app as { price: number; visa_id: string };
-      const { data: product } = await supabase
-        .from('visa_products')
-        .select('partner_commission_pct')
-        .eq('id', a.visa_id)
-        .single();
-      const pct = (product as { partner_commission_pct: number } | null)?.partner_commission_pct
-        ?? settings.partner_commission_pct_default;
-      amount = partnerCommission(a.price, pct);
-      description = `+${amount}₽ партнёру (${pct}% от ${a.price}₽ за визу) — в hold-периоде 30д`;
+      const a = app as {
+        price: number; visa_id: string; urgent: boolean;
+        form_data: { additionalDocs?: { hotelBooking?: boolean; returnTicket?: boolean; urgentProcessing?: boolean } } | null;
+      };
+
+      // Параллельно подгружаем visa_products + additional_services
+      const [productRes, addonsRes] = await Promise.all([
+        supabase.from('visa_products')
+          .select('price, partner_commission_pct')
+          .eq('id', a.visa_id)
+          .maybeSingle(),
+        supabase.from('additional_services')
+          .select('id, price, partner_commission_pct')
+          .in('id', ['urgent-processing', 'hotel-booking', 'flight-booking']),
+      ]);
+
+      const product = productRes.data as { price: number; partner_commission_pct: number } | null;
+      const visaPct = product?.partner_commission_pct ?? settings.partner_commission_pct_default;
+      const visaBase = product?.price ?? a.price; // fallback на app.price если visa_product исчез
+      const visaCommission = partnerCommission(visaBase, visaPct);
+
+      const addonMap = new Map<string, { price: number; pct: number }>();
+      for (const row of (addonsRes.data ?? []) as Array<{ id: string; price: number; partner_commission_pct: number }>) {
+        addonMap.set(row.id, { price: row.price, pct: row.partner_commission_pct });
+      }
+
+      const addOns = a.form_data?.additionalDocs ?? {};
+      const isUrgent = !!(a.urgent || addOns.urgentProcessing);
+      const urgentInfo = addonMap.get('urgent-processing');
+      const hotelInfo  = addonMap.get('hotel-booking');
+      const flightInfo = addonMap.get('flight-booking');
+
+      const urgentCommission = isUrgent && urgentInfo ? partnerCommission(urgentInfo.price, urgentInfo.pct) : 0;
+      const hotelCommission  = addOns.hotelBooking && hotelInfo  ? partnerCommission(hotelInfo.price,  hotelInfo.pct)  : 0;
+      const flightCommission = addOns.returnTicket && flightInfo ? partnerCommission(flightInfo.price, flightInfo.pct) : 0;
+
+      amount = visaCommission + urgentCommission + hotelCommission + flightCommission;
+
+      // Описание включает разбивку для прозрачности и для парсинга на клиенте
+      // (на случай если application/services будут удалены в будущем).
+      const parts: string[] = [`виза ${visaBase}₽×${visaPct}%=${visaCommission}₽`];
+      if (urgentCommission) parts.push(`срочно ${urgentInfo!.price}₽×${urgentInfo!.pct}%=${urgentCommission}₽`);
+      if (hotelCommission)  parts.push(`отель ${hotelInfo!.price}₽×${hotelInfo!.pct}%=${hotelCommission}₽`);
+      if (flightCommission) parts.push(`авиа ${flightInfo!.price}₽×${flightInfo!.pct}%=${flightCommission}₽`);
+      description = `+${amount}₽ партнёру (${parts.join(' + ')}) — hold 30д`;
+
       bonusType = 'partner_pending';
       // Уникальный dedupe per visa application — позволяет иметь и
       // partner_pending, и потом partner_approved для того же applicationId.
