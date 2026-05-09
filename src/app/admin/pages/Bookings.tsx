@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown, ExternalLink,
+  Hotel, Plane, RefreshCw, X, Check, Clock, FileText, Search, ChevronRight, Loader2, Upload, FileDown, ExternalLink, Trash2,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadFile, getAppSettings } from '../../lib/db';
@@ -162,6 +162,51 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  // Удаление брони — с подтверждением. Дополнительно вычищает связанные
+  // записи в booking_status_log, чтобы не остались orphan'ы.
+  const handleDeleteBooking = async (
+    table: 'hotel_bookings' | 'flight_bookings',
+    id: string,
+    name: string,
+  ) => {
+    const ok = await dialog.confirm(
+      `Удалить бронь${name ? ` ${name}` : ''}?`,
+      'Запись удалится из БД безвозвратно. История изменений статусов тоже сотрётся.',
+      { confirmLabel: 'Удалить', cancelLabel: 'Отмена' },
+    );
+    if (!ok) return;
+
+    if (!isSupabaseConfigured()) return;
+
+    // 1) sweep status-log (best-effort — если миграции 025 нет, просто
+    //    игнорируем, как и в остальном коде с booking_status_log)
+    try {
+      const entityType = table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking';
+      await supabase.from('booking_status_log')
+        .delete()
+        .eq('entity_type', entityType)
+        .eq('entity_id', id);
+    } catch (e) {
+      console.warn('[booking-delete] status_log cleanup failed:', e);
+    }
+
+    // 2) delete the booking row itself
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) {
+      await dialog.error('Не удалось удалить', error.message);
+      return;
+    }
+
+    // 3) optimistic UI: убираем из state'а
+    if (table === 'hotel_bookings') {
+      setHotels(prev => prev.filter(b => b.id !== id));
+      if (selectedHotel?.id === id) setSelectedHotel(null);
+    } else {
+      setFlights(prev => prev.filter(b => b.id !== id));
+      if (selectedFlight?.id === id) setSelectedFlight(null);
+    }
+  };
 
   const matchesSearch = (b: HotelBooking | FlightBooking, q: string, type: 'hotel' | 'flight') => {
     if (!q) return true;
@@ -507,7 +552,12 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         <BookingList
           items={filteredHotels}
           renderRow={(b) => (
-            <HotelRow key={b.id} b={b} onClick={() => setSelectedHotel(b)} />
+            <HotelRow
+              key={b.id}
+              b={b}
+              onClick={() => setSelectedHotel(b)}
+              onDelete={() => handleDeleteBooking('hotel_bookings', b.id, `${b.first_name} ${b.last_name}`.trim())}
+            />
           )}
           emptyIcon={<Hotel className="w-12 h-12 text-gray-300" />}
           emptyText={hotels.length === 0 ? 'Заявок на отель пока нет' : 'По выбранным фильтрам ничего не найдено'}
@@ -518,7 +568,12 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         <BookingList
           items={filteredFlights}
           renderRow={(b) => (
-            <FlightRow key={b.id} b={b} onClick={() => setSelectedFlight(b)} />
+            <FlightRow
+              key={b.id}
+              b={b}
+              onClick={() => setSelectedFlight(b)}
+              onDelete={() => handleDeleteBooking('flight_bookings', b.id, `${b.first_name} ${b.last_name}`.trim())}
+            />
           )}
           emptyIcon={<Plane className="w-12 h-12 text-gray-300" />}
           emptyText={flights.length === 0 ? 'Заявок на авиабилет пока нет' : 'По выбранным фильтрам ничего не найдено'}
@@ -630,53 +685,75 @@ function BookingList<T extends { id: string }>({ items, renderRow, emptyIcon, em
   return <div className="space-y-2">{items.map(renderRow)}</div>;
 }
 
-function HotelRow({ b, onClick }: { b: HotelBooking; onClick: () => void }) {
+function HotelRow({ b, onClick, onDelete }: { b: HotelBooking; onClick: () => void; onDelete: () => void }) {
   return (
-    <button onClick={onClick}
-      className="w-full bg-white rounded-xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition p-4 flex items-center gap-4 text-left">
-      <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
-        <Hotel className="w-5 h-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
-          <StatusBadge status={b.status} />
-          {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
+    <div className="w-full bg-white rounded-xl border border-gray-100 hover:shadow-md transition flex items-center gap-2 pr-2">
+      <button onClick={onClick}
+        className="flex-1 min-w-0 active:scale-[0.99] transition p-4 flex items-center gap-4 text-left">
+        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+          <Hotel className="w-5 h-5" />
         </div>
-        <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
-          {b.country}, {b.city} · {fmtDate(b.check_in)} → {fmtDate(b.check_out)} · {b.guests} гост.{b.children_ages.length > 0 ? ` + ${b.children_ages.length} реб.` : ''}
-        </p>
-        <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-          <Clock className="w-3 h-3" /> {fmtDateTime(b.created_at)}
-        </p>
-      </div>
-      <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-    </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
+            <StatusBadge status={b.status} />
+            {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
+          </div>
+          <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
+            {b.country}, {b.city} · {fmtDate(b.check_in)} → {fmtDate(b.check_out)} · {b.guests} гост.{b.children_ages.length > 0 ? ` + ${b.children_ages.length} реб.` : ''}
+          </p>
+          <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> {fmtDateTime(b.created_at)}
+          </p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition active:scale-95 shrink-0"
+        title="Удалить бронь"
+        aria-label="Удалить бронь"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 
-function FlightRow({ b, onClick }: { b: FlightBooking; onClick: () => void }) {
+function FlightRow({ b, onClick, onDelete }: { b: FlightBooking; onClick: () => void; onDelete: () => void }) {
   return (
-    <button onClick={onClick}
-      className="w-full bg-white rounded-xl border border-gray-100 hover:shadow-md active:scale-[0.99] transition p-4 flex items-center gap-4 text-left">
-      <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
-        <Plane className="w-5 h-5" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
-          <StatusBadge status={b.status} />
-          {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
+    <div className="w-full bg-white rounded-xl border border-gray-100 hover:shadow-md transition flex items-center gap-2 pr-2">
+      <button onClick={onClick}
+        className="flex-1 min-w-0 active:scale-[0.99] transition p-4 flex items-center gap-4 text-left">
+        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
+          <Plane className="w-5 h-5" />
         </div>
-        <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
-          {b.from_city} → {b.to_city} · {fmtDate(b.booking_date)}
-        </p>
-        <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
-          <Clock className="w-3 h-3" /> {fmtDateTime(b.created_at)}
-        </p>
-      </div>
-      <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
-    </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm font-bold text-[#0F2A36]">{b.first_name} {b.last_name}</p>
+            <StatusBadge status={b.status} />
+            {b.price != null && <span className="text-[11px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>}
+          </div>
+          <p className="text-xs text-[#0F2A36]/60 mt-0.5 truncate">
+            {b.from_city} → {b.to_city} · {fmtDate(b.booking_date)}
+          </p>
+          <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+            <Clock className="w-3 h-3" /> {fmtDateTime(b.created_at)}
+          </p>
+        </div>
+        <ChevronRight className="w-5 h-5 text-gray-300 shrink-0" />
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition active:scale-95 shrink-0"
+        title="Удалить бронь"
+        aria-label="Удалить бронь"
+      >
+        <Trash2 className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 
