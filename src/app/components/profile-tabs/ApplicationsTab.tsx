@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Component, type ReactNode } from 'react';
 import { toast } from 'sonner';
-import { FileText, Clock, Download, Lock, Star, X, Loader2, RefreshCw, Hotel, Plane, Check, AlertTriangle } from 'lucide-react';
+import { FileText, Clock, Download, Lock, Star, Loader2, RefreshCw, Hotel, Plane, Check, AlertTriangle } from 'lucide-react';
+import { Modal, Button as BrandButton } from '../ui/brand';
 
 // ── Error Boundary so a single bad row doesn't blank the whole tab ─────────
 class BookingsErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -262,18 +263,11 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800">Оставить отзыв</h3>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal open onClose={onClose} icon="⭐" label="Отзыв" title="Оставить отзыв" size="sm">
         <div className="p-5 space-y-5">
           {/* Stars */}
           <div>
-            <p className="text-sm text-gray-600 mb-3 text-center">Оцените качество сервиса:</p>
+            <p className="text-sm text-[#0F2A36]/65 mb-3 text-center">Оцените качество сервиса:</p>
             <div className="flex gap-2 justify-center">
               {[1,2,3,4,5].map(s => (
                 <button key={s} onClick={() => setRating(s)} className="transition-transform hover:scale-110">
@@ -284,34 +278,35 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
           </div>
           {/* Comment */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Комментарий <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-[#0F2A36] mb-2">
+              Комментарий <span className="text-rose-500">*</span>
             </label>
             <textarea
               value={comment}
               onChange={e => setComment(e.target.value)}
               rows={3}
               placeholder="Расскажите о вашем опыте..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none resize-none"
+              className="w-full px-4 py-3 border border-[#E1E5EC] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] resize-none"
             />
           </div>
           {/* Bonus hint — hidden for partners */}
           {!isPartner && (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-center">
-              <p className="text-sm text-green-700">🎁 За отзыв вы получите <strong>200 ₽</strong> на бонусный счёт</p>
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <p className="text-sm text-emerald-700">🎁 За отзыв вы получите <strong>200 ₽</strong> на бонусный счёт</p>
             </div>
           )}
-          <button
+          <BrandButton
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2 font-medium"
+            loading={submitting}
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
             {submitting ? 'Отправляем...' : 'Отправить отзыв'}
-          </button>
+          </BrandButton>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
