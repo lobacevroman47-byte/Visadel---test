@@ -74,6 +74,9 @@ interface Enrichment {
   city?: string;
   from_city?: string;
   to_city?: string;
+  booking_date?: string;
+  check_in?: string;
+  check_out?: string;
   price?: number;
   pct?: number;
   customer_first_name?: string;
@@ -88,18 +91,63 @@ function serviceLabel(service: ServiceType): string {
   return 'Авиабилет';
 }
 
-// Заголовок строки: "Виза Шри-Ланка", "Бронь отеля Бали", "Авиабилет Москва → Бали".
+// Заголовок строки (главная): "Южная Корея", "Бали", "Москва → Бали"
+// Подзаголовок (серый): "K-ETA на 3 года …", "12-19 мая, 2 гостя", "14 мая 2026"
 function buildEarningTitle(e: Enrichment | undefined, fallbackService?: ServiceType): string {
   if (!e) return fallbackService ? serviceLabel(fallbackService) : 'Партнёрское начисление';
-  const base = serviceLabel(e.service);
-  if (e.service === 'visa') return e.country ? `${base} ${e.country}` : base;
+  if (e.service === 'visa') return e.country || serviceLabel('visa');
   if (e.service === 'hotel_bookings') {
-    const place = e.country || e.city;
-    return place ? `${base} ${place}` : base;
+    return e.city || e.country || serviceLabel('hotel_bookings');
   }
-  // flight_bookings
-  if (e.from_city && e.to_city) return `${base} ${e.from_city} → ${e.to_city}`;
-  return base;
+  if (e.from_city && e.to_city) return `${e.from_city} → ${e.to_city}`;
+  return serviceLabel('flight_bookings');
+}
+
+function buildEarningSubtitle(e: Enrichment | undefined): string | null {
+  if (!e) return null;
+  if (e.service === 'visa') return e.visa_type ?? null;
+  if (e.service === 'hotel_bookings') {
+    if (e.check_in && e.check_out) {
+      const ci = new Date(e.check_in);
+      const co = new Date(e.check_out);
+      const day = (d: Date) => d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+      return `${day(ci)} – ${day(co)}`;
+    }
+    return e.country ?? null;
+  }
+  if (e.booking_date) {
+    return new Date(e.booking_date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  return null;
+}
+
+// Парсинг разбивки из description вида:
+//   "+724₽ партнёру (виза 3490₽×15%=524₽ + срочно 1000₽×20%=200₽) — hold 30д"
+// Возвращает массив { label, price, pct, amount } для отображения в модалке.
+interface CommissionPart { label: string; price: number; pct: number; amount: number }
+function parseCommissionBreakdown(description: string | null | undefined): CommissionPart[] {
+  if (!description) return [];
+  const inside = description.match(/\(([^)]+)\)/)?.[1];
+  if (!inside) return [];
+  const parts: CommissionPart[] = [];
+  const labelMap: Record<string, string> = {
+    'виза':   'Виза',
+    'срочно': 'Срочное оформление',
+    'отель':  'Бронь отеля',
+    'авиа':   'Бронь авиабилета',
+  };
+  for (const segment of inside.split('+').map(s => s.trim())) {
+    const m = segment.match(/^(\S+)\s+(\d+)₽×(\d+(?:\.\d+)?)%=(\d+)₽$/);
+    if (!m) continue;
+    const key = m[1].toLowerCase();
+    parts.push({
+      label: labelMap[key] ?? m[1],
+      price: parseInt(m[2], 10),
+      pct:   parseFloat(m[3]),
+      amount: parseInt(m[4], 10),
+    });
+  }
+  return parts;
 }
 
 // Period selector
@@ -260,7 +308,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       if (hotelPairs.length) {
         const { data } = await supabase
           .from('hotel_bookings')
-          .select('id, country, city, price, partner_commission_pct, first_name, last_name, username')
+          .select('id, country, city, check_in, check_out, price, partner_commission_pct, first_name, last_name, username')
           .in('id', hotelPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
@@ -270,6 +318,8 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             service: 'hotel_bookings',
             country: row.country as string | undefined,
             city: row.city as string | undefined,
+            check_in: row.check_in as string | undefined,
+            check_out: row.check_out as string | undefined,
             price: row.price as number | undefined,
             pct: row.partner_commission_pct as number | undefined,
             customer_first_name: row.first_name as string | undefined,
@@ -283,7 +333,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       if (flightPairs.length) {
         const { data } = await supabase
           .from('flight_bookings')
-          .select('id, from_city, to_city, price, partner_commission_pct, first_name, last_name, username')
+          .select('id, from_city, to_city, booking_date, price, partner_commission_pct, first_name, last_name, username')
           .in('id', flightPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
@@ -293,6 +343,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             service: 'flight_bookings',
             from_city: row.from_city as string | undefined,
             to_city: row.to_city as string | undefined,
+            booking_date: row.booking_date as string | undefined,
             price: row.price as number | undefined,
             pct: row.partner_commission_pct as number | undefined,
             customer_first_name: row.first_name as string | undefined,
@@ -738,18 +789,24 @@ function EarningRow({
   const parsed = parseDedupe(log.dedupe_key);
   const fallbackService = parsed?.service;
   const title = buildEarningTitle(enrichment, fallbackService);
+  const subtitle = buildEarningSubtitle(enrichment);
   const flag = countryFlag(enrichment?.country);
 
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-gray-50/50 active:bg-gray-100/50 -mx-2 px-2 rounded-lg transition text-left"
+      className="w-full flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-gray-50/50 active:bg-gray-100/50 -mx-2 px-2 rounded-lg transition text-left gap-3"
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
         <span className="text-xl leading-none shrink-0" aria-hidden>{flag}</span>
-        <p className="text-sm font-medium text-[#0F2A36] truncate">{title}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-[#0F2A36] truncate">{title}</p>
+          {subtitle && (
+            <p className="text-xs text-gray-400 truncate mt-0.5">{subtitle}</p>
+          )}
+        </div>
       </div>
-      <p className={`text-sm font-bold tabular-nums shrink-0 ml-3 ${isPending ? 'text-amber-600' : 'text-emerald-600'}`}>
+      <p className={`text-sm font-bold tabular-nums shrink-0 ${isPending ? 'text-amber-600' : 'text-emerald-600'}`}>
         +{log.amount.toLocaleString('ru-RU')}₽
       </p>
     </button>
@@ -776,7 +833,12 @@ function EarningDetailModal({
         .filter(Boolean).join(' ') || null
     : null;
   const sourceLabel = sourceType ? serviceLabel(sourceType) : 'Начисление';
-  const titleLine = enrichment ? buildEarningTitle(enrichment, sourceType ?? undefined).replace(new RegExp(`^${serviceLabel(enrichment.service)}\\s*`), '') : null;
+  const titleLine = buildEarningTitle(enrichment, sourceType ?? undefined);
+  const subtitleLine = buildEarningSubtitle(enrichment);
+  const breakdown = parseCommissionBreakdown(log.description);
+  const avgPct = enrichment?.price && enrichment.price > 0
+    ? +((log.amount / enrichment.price) * 100).toFixed(1)
+    : null;
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
@@ -787,9 +849,9 @@ function EarningDetailModal({
             <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
             <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5 flex items-center gap-2">
               <span className="text-xl">{flag}</span>
-              {titleLine || 'Партнёрское начисление'}
+              {titleLine}
             </p>
-            {enrichment?.visa_type && <p className="text-xs text-gray-500 mt-0.5">{enrichment.visa_type}</p>}
+            {subtitleLine && <p className="text-xs text-gray-500 mt-0.5">{subtitleLine}</p>}
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть">
             <X className="w-5 h-5 text-gray-500" />
@@ -802,13 +864,30 @@ function EarningDetailModal({
           <p className={`text-[36px] font-bold tabular-nums leading-none mt-1 ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
             +{log.amount.toLocaleString('ru-RU')}₽
           </p>
-          {enrichment?.price !== undefined && (
+          {enrichment?.price !== undefined && avgPct !== null && (
             <p className="text-xs text-gray-500 mt-2">
-              {Math.round((log.amount / enrichment.price) * 100)}% от стоимости заказа{' '}
-              {enrichment.price.toLocaleString('ru-RU')}₽
+              средний {avgPct}% от {enrichment.price.toLocaleString('ru-RU')}₽
             </p>
           )}
         </div>
+
+        {/* Commission breakdown — если description содержит разбивку */}
+        {breakdown.length > 0 && (
+          <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/40">
+            <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">Разбивка</p>
+            <div className="space-y-1.5">
+              {breakdown.map((p, i) => (
+                <div key={i} className="flex items-baseline justify-between text-sm">
+                  <span className="text-[#0F2A36]">{p.label}</span>
+                  <span className="text-gray-500 tabular-nums text-xs">
+                    {p.price.toLocaleString('ru-RU')}₽ × {p.pct}%
+                    <span className="ml-2 text-emerald-700 font-medium">= {p.amount}₽</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Details */}
         <div className="px-5 py-4 space-y-3">
