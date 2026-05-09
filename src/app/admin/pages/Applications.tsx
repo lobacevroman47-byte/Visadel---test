@@ -1140,8 +1140,8 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 z-50">
-      <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
+      <div className="bg-white rounded-2xl w-full sm:max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
 
         {/* Header — same brand pattern as Брони */}
         <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100 shrink-0">
