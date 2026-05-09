@@ -35,6 +35,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
 import { useTelegram } from '../../App';
 import { useDialog } from '../shared/BrandDialog';
+import { countryFlag } from '../../lib/countryFlags';
 
 interface Draft {
   id: string;
@@ -744,9 +745,12 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                 return (
                   <div key={app.id} className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <h4 className="text-gray-800 font-medium">{app.country}</h4>
-                        <p className="text-sm text-gray-600">{app.visa_type}</p>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
+                          <span aria-hidden>{countryFlag(app.country)}</span>
+                          <span className="truncate">{app.country}</span>
+                        </h4>
+                        <p className="text-sm text-gray-500 mt-0.5">{app.visa_type}</p>
                       </div>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
                         {cfg.label}
@@ -1131,8 +1135,8 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-[#0F2A36] leading-tight">{place}</h3>
-          <p className="text-sm text-[#0F2A36]/60 mt-0.5">Бронь отеля</p>
+          <p className="text-sm font-bold text-[#0F2A36] leading-tight">Бронь отеля</p>
+          <p className="text-base text-[#0F2A36]/60 mt-0.5">{place}</p>
         </div>
         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
           {cfg.label}
@@ -1187,8 +1191,8 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-bold text-[#0F2A36] leading-tight">{route}</h3>
-          <p className="text-sm text-[#0F2A36]/60 mt-0.5">Бронь авиабилета</p>
+          <p className="text-sm font-bold text-[#0F2A36] leading-tight">Бронь авиабилета</p>
+          <p className="text-base text-[#0F2A36]/60 mt-0.5">{route}</p>
         </div>
         <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
           {cfg.label}
