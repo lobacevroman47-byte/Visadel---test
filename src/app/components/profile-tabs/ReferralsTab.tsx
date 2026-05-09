@@ -21,7 +21,9 @@ const MINI_APP_SHORT_NAME = 'app';
 
 export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDashboard }: ReferralTabProps) {
   const { appUser } = useTelegram();
-  const referralCode = appUser?.referral_code ?? '';
+  // Партнёр может задать vanity-код в кабинете — используем его если есть.
+  // Для обычных юзеров vanity не предлагается, остаётся system referral_code.
+  const referralCode = (appUser?.vanity_code || appUser?.referral_code) ?? '';
   const isPartner = appUser?.is_influencer ?? false;
   const myTelegramId = appUser?.telegram_id ?? 0;
 

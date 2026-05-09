@@ -20,6 +20,10 @@ export interface AppUser {
   partner_balance?: number;
   is_influencer: boolean;
   referral_code: string;
+  // Vanity-код — короткий кастомный alias реф-кода (партнёры в кабинете).
+  // Если задан — отображается в ссылке t.me/.../app?startapp=<vanity_code>.
+  // При входе по такой ссылке резолвится в канонический referral_code.
+  vanity_code?: string | null;
   referred_by?: string;
   last_bonus_date?: string;
   bonus_streak: number;
@@ -62,6 +66,39 @@ export interface Task {
 
 function generateReferralCode(telegramId: number): string {
   return `VIS${telegramId.toString(36).toUpperCase()}`;
+}
+
+/**
+ * Резолв любого реф-кода (system или vanity) в канонический referral_code.
+ * Используется при входе по реф-ссылке: friend кликает t.me/.../app?startapp=ANYA,
+ * мы находим партнёра по vanity_code, возвращаем его referral_code (VIS...).
+ * Так вся остальная логика работает с одним стабильным идентификатором.
+ *
+ * Returns: canonical referral_code или null если нет совпадений.
+ */
+export async function resolveReferralCode(input: string): Promise<string | null> {
+  if (!input || !isSupabaseConfigured()) return null;
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  // Быстрый путь: если выглядит как system code (VIS...) — он канонический.
+  // Проверим только что такой юзер существует.
+  if (trimmed.toUpperCase().startsWith('VIS')) {
+    const { data } = await supabase
+      .from('users')
+      .select('referral_code')
+      .eq('referral_code', trimmed.toUpperCase())
+      .maybeSingle();
+    return (data as { referral_code?: string } | null)?.referral_code ?? null;
+  }
+
+  // Иначе — пробуем как vanity_code (UPPERCASE для case-insensitive).
+  const { data } = await supabase
+    .from('users')
+    .select('referral_code')
+    .eq('vanity_code', trimmed.toUpperCase())
+    .maybeSingle();
+  return (data as { referral_code?: string } | null)?.referral_code ?? null;
 }
 
 const LS_KEY = 'vd_user';
