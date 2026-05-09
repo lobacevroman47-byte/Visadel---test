@@ -1,16 +1,20 @@
-// Админка → Партнёры. Расширенная таблица всех партнёров (is_influencer=true)
-// со всеми реквизитами в одном вью — для bulk-просмотра и быстрого поиска.
+// Админка → Партнёры. Единая страница работы с партнёрской программой.
 //
-// Отличается от Payouts (которая фокусируется на «кому платить сейчас»):
-// здесь показаны все партнёры независимо от баланса, со всеми колонками
-// реквизитов. Можно отсортировать по любой колонке, скопировать строку
-// одним кликом, экспортировать всё в CSV.
+// Содержит две вкладки:
+//   • Все партнёры — расширенная таблица со всеми реквизитами + кнопка
+//     «Выплатить» прямо в строке (если есть баланс и указан налоговый статус)
+//   • История выплат — все partner_payouts отсортированные по дате
+//
+// Заменила собой Payouts.tsx (который был отдельной страницей) — функционал
+// был фактически дублирующий, обе работали с одним и тем же набором данных.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Crown, Loader2, Search, FileDown, RefreshCw, Copy, Check, AlertCircle,
+  X, Wallet,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -41,6 +45,18 @@ interface PartnerFullRow {
   total_approved_lifetime: number;
 }
 
+interface PayoutHistoryRow {
+  id: string;
+  telegram_id: number;
+  amount_rub: number;
+  status: string;
+  card_last4: string | null;
+  note: string | null;
+  processed_at: string | null;
+  created_at: string;
+  partner_name?: string;
+}
+
 const STATUS_COLORS: Record<string, string> = {
   self_employed: 'bg-blue-100 text-blue-700',
   ip:            'bg-purple-100 text-purple-700',
@@ -51,15 +67,24 @@ const STATUS_LABELS: Record<string, string> = {
   ip:            'ИП',
   legal:         'Юрлицо',
 };
+const PAYOUT_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  pending:   { label: 'В ожидании', cls: 'bg-amber-100 text-amber-700' },
+  processed: { label: 'Выплачено',  cls: 'bg-emerald-100 text-emerald-700' },
+  failed:    { label: 'Ошибка',     cls: 'bg-rose-100 text-rose-700' },
+  cancelled: { label: 'Отменено',   cls: 'bg-gray-100 text-gray-700' },
+};
 
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function Partners() {
   const [partners, setPartners] = useState<PartnerFullRow[]>([]);
+  const [history, setHistory] = useState<PayoutHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'self_employed' | 'ip' | 'legal' | 'none'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'self_employed' | 'ip' | 'legal' | 'none' | 'with_balance'>('all');
+  const [tab, setTab] = useState<'list' | 'history'>('list');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [payoutTarget, setPayoutTarget] = useState<PartnerFullRow | null>(null);
 
   const refresh = useCallback(async () => {
     if (!isSupabaseConfigured()) { setLoading(false); return; }
@@ -119,8 +144,23 @@ export function Partners() {
           total_approved_lifetime: a.approved + Math.abs(a.paid),
         };
       });
-
       setPartners(enriched);
+
+      // История выплат
+      const { data: payoutsData } = await supabase
+        .from('partner_payouts')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      const partnerNameById = new Map<number, string>();
+      for (const u of usersList) {
+        const name = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || `@${u.username ?? u.telegram_id}`;
+        partnerNameById.set(u.telegram_id, name);
+      }
+      setHistory(((payoutsData ?? []) as PayoutHistoryRow[]).map(p => ({
+        ...p,
+        partner_name: partnerNameById.get(p.telegram_id) ?? `tg ${p.telegram_id}`,
+      })));
     } finally {
       setLoading(false);
     }
@@ -132,6 +172,8 @@ export function Partners() {
     let list = partners;
     if (statusFilter === 'none') {
       list = list.filter(p => !p.entity_type);
+    } else if (statusFilter === 'with_balance') {
+      list = list.filter(p => p.partner_balance > 0);
     } else if (statusFilter !== 'all') {
       list = list.filter(p => p.entity_type === statusFilter);
     }
@@ -149,27 +191,26 @@ export function Partners() {
     return list;
   }, [partners, search, statusFilter]);
 
+  const stats = useMemo(() => {
+    const totalAvailable = partners.reduce((s, p) => s + p.partner_balance, 0);
+    const totalHold      = partners.reduce((s, p) => s + p.pending_hold, 0);
+    const totalLifetime  = partners.reduce((s, p) => s + p.total_approved_lifetime, 0);
+    const noStatus       = partners.filter(p => !p.entity_type).length;
+    const readyToPay     = partners.filter(p => p.partner_balance > 0 && p.entity_type).length;
+    return { totalAvailable, totalHold, totalLifetime, noStatus, readyToPay };
+  }, [partners]);
+
   const copyToClipboard = async (text: string, id: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
     } catch {
-      // fallback
       alert('Скопируйте: ' + text);
     }
   };
 
-  // Сводка по фильтру
-  const stats = useMemo(() => {
-    const totalAvailable = filtered.reduce((s, p) => s + p.partner_balance, 0);
-    const totalHold      = filtered.reduce((s, p) => s + p.pending_hold, 0);
-    const totalLifetime  = filtered.reduce((s, p) => s + p.total_approved_lifetime, 0);
-    const noStatus       = filtered.filter(p => !p.entity_type).length;
-    return { totalAvailable, totalHold, totalLifetime, noStatus };
-  }, [filtered]);
-
-  const handleExportCsv = () => {
+  const handleExportRequisitesCsv = () => {
     const rows: string[][] = [
       ['Telegram ID', 'username', 'Имя в TG', 'Реф-код', 'Vanity', 'Статус',
        'ФИО / Название', 'ИНН', 'КПП', 'Карта', 'Last4', 'Банк',
@@ -179,32 +220,43 @@ export function Partners() {
     for (const p of filtered) {
       const tgName = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
       rows.push([
-        String(p.telegram_id),
-        p.username ?? '',
-        tgName,
-        p.referral_code ?? '',
-        p.vanity_code ?? '',
+        String(p.telegram_id), p.username ?? '', tgName,
+        p.referral_code ?? '', p.vanity_code ?? '',
         p.entity_type ? STATUS_LABELS[p.entity_type] ?? p.entity_type : 'Не указан',
         p.organization_name || p.full_name || '',
-        p.inn ?? '',
-        p.kpp ?? '',
-        p.card_number ?? '',
-        p.card_number_last4 ?? '',
-        p.card_bank ?? '',
-        p.phone_for_sbp ?? '',
-        p.bank_account ?? '',
-        p.bank_bic ?? '',
-        String(p.partner_balance),
-        String(p.pending_hold),
-        String(p.total_approved_lifetime),
+        p.inn ?? '', p.kpp ?? '',
+        p.card_number ?? '', p.card_number_last4 ?? '', p.card_bank ?? '',
+        p.phone_for_sbp ?? '', p.bank_account ?? '', p.bank_bic ?? '',
+        String(p.partner_balance), String(p.pending_hold), String(p.total_approved_lifetime),
         p.agreement_accepted_at ? new Date(p.agreement_accepted_at).toLocaleString('ru-RU') : '',
       ]);
     }
+    downloadCsv(rows, `partners_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const handleExportHistoryCsv = () => {
+    const rows: string[][] = [
+      ['Дата', 'Партнёр', 'telegram_id', 'Сумма ₽', 'Карта', 'Статус'],
+    ];
+    for (const p of history) {
+      rows.push([
+        new Date(p.created_at).toLocaleString('ru-RU'),
+        p.partner_name ?? '',
+        String(p.telegram_id),
+        String(p.amount_rub),
+        p.card_last4 ?? '',
+        PAYOUT_STATUS_BADGE[p.status]?.label ?? p.status,
+      ]);
+    }
+    downloadCsv(rows, `partner_payouts_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const downloadCsv = (rows: string[][], filename: string) => {
     const csv = '﻿' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `partners_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -221,7 +273,6 @@ export function Partners() {
           </h1>
           <p className="text-xs text-gray-500 mt-1">
             Всего: <b>{partners.length}</b>
-            {' · '}В фильтре: <b>{filtered.length}</b>
             {' · '}К выплате: <span className="text-emerald-600 font-bold tabular-nums">{stats.totalAvailable.toLocaleString('ru-RU')}₽</span>
             {' · '}В hold: <span className="text-amber-600 font-bold tabular-nums">{stats.totalHold.toLocaleString('ru-RU')}₽</span>
             {' · '}Заработано всего: <span className="text-[#3B5BFF] font-bold tabular-nums">{stats.totalLifetime.toLocaleString('ru-RU')}₽</span>
@@ -236,181 +287,254 @@ export function Partners() {
             <RefreshCw size={14} /> Обновить
           </button>
           <button
-            onClick={handleExportCsv}
-            disabled={filtered.length === 0}
+            onClick={tab === 'list' ? handleExportRequisitesCsv : handleExportHistoryCsv}
+            disabled={tab === 'list' ? filtered.length === 0 : history.length === 0}
             className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition flex items-center gap-1.5 text-sm disabled:opacity-50"
+            title={tab === 'list' ? 'Экспорт реквизитов отфильтрованных партнёров' : 'Экспорт истории выплат'}
           >
             <FileDown size={14} /> CSV
           </button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Поиск: имя, ID, ИНН, телефон, карта, р/с"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#3B5BFF]"
-          />
-        </div>
-        <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
-          {(['all', 'self_employed', 'ip', 'legal', 'none'] as const).map(f => (
-            <button
-              key={f}
-              onClick={() => setStatusFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
-                statusFilter === f ? 'bg-white text-[#0F2A36] shadow-sm' : 'text-gray-600 hover:text-[#0F2A36]'
-              }`}
-            >
-              {f === 'all' ? 'Все' : f === 'none' ? 'Без статуса' : STATUS_LABELS[f]}
-            </button>
-          ))}
-        </div>
+      {/* Tabs */}
+      <div className="flex items-center gap-1 bg-white border border-gray-100 rounded-xl p-1 mb-4 w-fit">
+        <button
+          onClick={() => setTab('list')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+            tab === 'list' ? 'bg-[#0F2A36] text-white' : 'text-gray-600 hover:text-[#0F2A36]'
+          }`}
+        >
+          Все партнёры ({partners.length})
+        </button>
+        <button
+          onClick={() => setTab('history')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
+            tab === 'history' ? 'bg-[#0F2A36] text-white' : 'text-gray-600 hover:text-[#0F2A36]'
+          }`}
+        >
+          История выплат ({history.length})
+        </button>
       </div>
 
-      {stats.noStatus > 0 && statusFilter !== 'none' && (
-        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5 text-xs text-rose-700 flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span>
-            <b>{stats.noStatus}</b> партнёров без налогового статуса — выплаты для них заблокированы.{' '}
-            <button onClick={() => setStatusFilter('none')} className="underline font-medium">Показать только их →</button>
-          </span>
+      {/* Tab content */}
+      {tab === 'list' ? (
+        <>
+          {/* Filters (только в табе «Все партнёры») */}
+          <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск: имя, ID, ИНН, телефон, карта, р/с"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#3B5BFF]"
+              />
+            </div>
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1 flex-wrap">
+              {([
+                ['all', 'Все'],
+                ['with_balance', `К выплате (${stats.readyToPay})`],
+                ['self_employed', 'Самозанятый'],
+                ['ip', 'ИП'],
+                ['legal', 'Юрлицо'],
+                ['none', `Без статуса (${stats.noStatus})`],
+              ] as const).map(([f, label]) => (
+                <button
+                  key={f}
+                  onClick={() => setStatusFilter(f)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                    statusFilter === f ? 'bg-white text-[#0F2A36] shadow-sm' : 'text-gray-600 hover:text-[#0F2A36]'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {stats.noStatus > 0 && statusFilter !== 'none' && (
+            <div className="mb-4 bg-rose-50 border border-rose-200 rounded-xl px-4 py-2.5 text-xs text-rose-700 flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>
+                <b>{stats.noStatus}</b> партнёров без налогового статуса — выплаты для них заблокированы.{' '}
+                <button onClick={() => setStatusFilter('none')} className="underline font-medium">Показать только их →</button>
+              </span>
+            </div>
+          )}
+
+          {/* Partners table */}
+          <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
+            {filtered.length === 0 ? (
+              <div className="p-8 text-center text-sm text-gray-400">
+                {loading ? 'Загружаем…' : 'Нет партнёров в этом фильтре.'}
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase tracking-wider">
+                  <tr>
+                    <Th>Партнёр</Th>
+                    <Th>Статус</Th>
+                    <Th>ИНН / КПП</Th>
+                    <Th>Куда платить</Th>
+                    <Th>Банк</Th>
+                    <Th align="right">Баланс ₽</Th>
+                    <Th align="right">Hold ₽</Th>
+                    <Th align="right">Заработано ₽</Th>
+                    <Th align="right">Действие</Th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filtered.map(p => {
+                    const tgName = [p.first_name, p.last_name].filter(Boolean).join(' ').trim()
+                      || `@${p.username ?? p.telegram_id}`;
+                    const fioOrOrg = p.entity_type === 'legal' ? p.organization_name : p.full_name;
+                    const hasStatus = !!p.entity_type;
+                    const ready = p.partner_balance > 0;
+                    const blocked = ready && !hasStatus;
+                    const canPayOut = ready && hasStatus;
+
+                    let payTo: { label: string; value: string } | null = null;
+                    if (p.entity_type === 'self_employed') {
+                      if (p.card_number) payTo = { label: 'Карта', value: p.card_number };
+                      else if (p.phone_for_sbp) payTo = { label: 'СБП', value: p.phone_for_sbp };
+                      else if (p.card_number_last4) payTo = { label: 'Карта', value: `•• ${p.card_number_last4}` };
+                    } else if (p.entity_type === 'ip' || p.entity_type === 'legal') {
+                      if (p.bank_account) payTo = { label: 'Р/с', value: p.bank_account };
+                    }
+
+                    return (
+                      <tr key={p.telegram_id} className="hover:bg-blue-50/30 transition">
+                        <td className="px-3 py-3 align-top">
+                          <p className="font-semibold text-[#0F2A36]">{fioOrOrg || tgName}</p>
+                          <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
+                            ID {p.telegram_id}{p.username ? ` · @${p.username}` : ''}
+                          </p>
+                          {p.vanity_code && (
+                            <p className="text-[11px] text-[#3B5BFF] mt-0.5 font-mono">/{p.vanity_code}</p>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {p.entity_type ? (
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[p.entity_type] ?? 'bg-gray-100'}`}>
+                              {STATUS_LABELS[p.entity_type] ?? p.entity_type}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-700">
+                              Не указан
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top text-xs text-gray-700 font-mono">
+                          {p.inn || <span className="text-gray-300">—</span>}
+                          {p.kpp && <div className="text-gray-500 mt-0.5">КПП {p.kpp}</div>}
+                        </td>
+                        <td className="px-3 py-3 align-top">
+                          {payTo ? (
+                            <div className="flex items-start gap-1.5">
+                              <div className="min-w-0">
+                                <div className="text-[10px] text-gray-500 uppercase">{payTo.label}</div>
+                                <div className="text-xs text-gray-900 font-mono truncate max-w-[200px]" title={payTo.value}>
+                                  {payTo.value}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => copyToClipboard(payTo!.value, `pay-${p.telegram_id}`)}
+                                className="text-gray-400 hover:text-[#3B5BFF] active:scale-90 transition shrink-0 mt-1"
+                                title="Скопировать"
+                              >
+                                {copiedId === `pay-${p.telegram_id}`
+                                  ? <Check className="w-3.5 h-3.5 text-emerald-600" />
+                                  : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-300">не заполнено</span>
+                          )}
+                          {(p.entity_type === 'ip' || p.entity_type === 'legal') && p.bank_bic && (
+                            <div className="text-[11px] text-gray-500 mt-1 font-mono">БИК {p.bank_bic}</div>
+                          )}
+                        </td>
+                        <td className="px-3 py-3 align-top text-xs text-gray-700">
+                          {p.card_bank || <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-3 align-top text-right">
+                          <span className={`text-sm font-bold tabular-nums ${
+                            blocked ? 'text-rose-500' : ready ? 'text-emerald-600' : 'text-gray-400'
+                          }`}>
+                            {p.partner_balance.toLocaleString('ru-RU')}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 align-top text-right text-sm tabular-nums text-amber-600">
+                          {p.pending_hold > 0 ? p.pending_hold.toLocaleString('ru-RU') : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-3 align-top text-right text-sm tabular-nums text-[#3B5BFF]">
+                          {p.total_approved_lifetime > 0 ? p.total_approved_lifetime.toLocaleString('ru-RU') : <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-3 py-3 align-top text-right">
+                          {canPayOut ? (
+                            <button
+                              onClick={() => setPayoutTarget(p)}
+                              className="px-3 py-1.5 vd-grad text-white text-xs font-semibold rounded-lg flex items-center gap-1 active:scale-95 transition ml-auto"
+                            >
+                              <Wallet className="w-3.5 h-3.5" /> Выплатить
+                            </button>
+                          ) : blocked ? (
+                            <span className="text-[11px] text-rose-600" title="Партнёр не указал налоговый статус">
+                              ⛔ заблокировано
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-gray-300">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </>
+      ) : (
+        /* History tab */
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          {history.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-400">Выплат ещё не было</div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {history.map(h => (
+                <div key={h.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-[#0F2A36] truncate">{h.partner_name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {new Date(h.created_at).toLocaleString('ru-RU')}
+                      {h.card_last4 ? ` · карта •• ${h.card_last4}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                    <p className="text-sm font-bold tabular-nums text-[#0F2A36]">
+                      {h.amount_rub.toLocaleString('ru-RU')}₽
+                    </p>
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full ${PAYOUT_STATUS_BADGE[h.status]?.cls ?? 'bg-gray-100 text-gray-600'}`}>
+                      {PAYOUT_STATUS_BADGE[h.status]?.label ?? h.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-x-auto">
-        {filtered.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-400">
-            {loading ? 'Загружаем…' : 'Нет партнёров в этом фильтре.'}
-          </div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase tracking-wider">
-              <tr>
-                <Th>Партнёр</Th>
-                <Th>Статус</Th>
-                <Th>ИНН / КПП</Th>
-                <Th>Куда платить</Th>
-                <Th>Банк</Th>
-                <Th align="right">Баланс ₽</Th>
-                <Th align="right">Hold ₽</Th>
-                <Th align="right">Заработано ₽</Th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(p => {
-                const tgName = [p.first_name, p.last_name].filter(Boolean).join(' ').trim()
-                  || `@${p.username ?? p.telegram_id}`;
-                const fioOrOrg = p.entity_type === 'legal' ? p.organization_name : p.full_name;
-                const blocked = !p.entity_type && p.partner_balance > 0;
-
-                // Что показать в колонке «Куда платить»
-                let payTo: { label: string; value: string } | null = null;
-                if (p.entity_type === 'self_employed') {
-                  if (p.card_number) payTo = { label: 'Карта', value: p.card_number };
-                  else if (p.phone_for_sbp) payTo = { label: 'СБП', value: p.phone_for_sbp };
-                  else if (p.card_number_last4) payTo = { label: 'Карта', value: `•• ${p.card_number_last4}` };
-                } else if (p.entity_type === 'ip' || p.entity_type === 'legal') {
-                  if (p.bank_account) payTo = { label: 'Р/с', value: p.bank_account };
-                }
-
-                return (
-                  <tr key={p.telegram_id} className="hover:bg-blue-50/30 transition">
-                    {/* Партнёр */}
-                    <td className="px-3 py-3 align-top">
-                      <p className="font-semibold text-[#0F2A36]">{fioOrOrg || tgName}</p>
-                      <p className="text-[11px] text-gray-500 mt-0.5 tabular-nums">
-                        ID {p.telegram_id}{p.username ? ` · @${p.username}` : ''}
-                      </p>
-                      {p.vanity_code && (
-                        <p className="text-[11px] text-[#3B5BFF] mt-0.5 font-mono">/{p.vanity_code}</p>
-                      )}
-                    </td>
-
-                    {/* Статус */}
-                    <td className="px-3 py-3 align-top">
-                      {p.entity_type ? (
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[p.entity_type] ?? 'bg-gray-100'}`}>
-                          {STATUS_LABELS[p.entity_type] ?? p.entity_type}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-700">
-                          Не указан
-                        </span>
-                      )}
-                    </td>
-
-                    {/* ИНН/КПП */}
-                    <td className="px-3 py-3 align-top text-xs text-gray-700 font-mono">
-                      {p.inn || <span className="text-gray-300">—</span>}
-                      {p.kpp && <div className="text-gray-500 mt-0.5">КПП {p.kpp}</div>}
-                    </td>
-
-                    {/* Куда платить + кнопка copy */}
-                    <td className="px-3 py-3 align-top">
-                      {payTo ? (
-                        <div className="flex items-start gap-1.5">
-                          <div className="min-w-0">
-                            <div className="text-[10px] text-gray-500 uppercase">{payTo.label}</div>
-                            <div className="text-xs text-gray-900 font-mono truncate max-w-[200px]" title={payTo.value}>
-                              {payTo.value}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => copyToClipboard(payTo!.value, `pay-${p.telegram_id}`)}
-                            className="text-gray-400 hover:text-[#3B5BFF] active:scale-90 transition shrink-0 mt-1"
-                            title="Скопировать"
-                          >
-                            {copiedId === `pay-${p.telegram_id}`
-                              ? <Check className="w-3.5 h-3.5 text-emerald-600" />
-                              : <Copy className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-300">не заполнено</span>
-                      )}
-                      {p.entity_type === 'ip' || p.entity_type === 'legal' ? (
-                        p.bank_bic && (
-                          <div className="text-[11px] text-gray-500 mt-1 font-mono">БИК {p.bank_bic}</div>
-                        )
-                      ) : null}
-                    </td>
-
-                    {/* Банк */}
-                    <td className="px-3 py-3 align-top text-xs text-gray-700">
-                      {p.card_bank || <span className="text-gray-300">—</span>}
-                    </td>
-
-                    {/* Balance */}
-                    <td className="px-3 py-3 align-top text-right">
-                      <span className={`text-sm font-bold tabular-nums ${
-                        blocked ? 'text-rose-500' : p.partner_balance > 0 ? 'text-emerald-600' : 'text-gray-400'
-                      }`}>
-                        {p.partner_balance.toLocaleString('ru-RU')}
-                      </span>
-                    </td>
-
-                    {/* Hold */}
-                    <td className="px-3 py-3 align-top text-right text-sm tabular-nums text-amber-600">
-                      {p.pending_hold > 0 ? p.pending_hold.toLocaleString('ru-RU') : <span className="text-gray-300">—</span>}
-                    </td>
-
-                    {/* Lifetime */}
-                    <td className="px-3 py-3 align-top text-right text-sm tabular-nums text-[#3B5BFF]">
-                      {p.total_approved_lifetime > 0 ? p.total_approved_lifetime.toLocaleString('ru-RU') : <span className="text-gray-300">—</span>}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+      {/* Payout modal */}
+      {payoutTarget && (
+        <PayoutModal
+          partner={payoutTarget}
+          onClose={() => setPayoutTarget(null)}
+          onDone={() => { setPayoutTarget(null); void refresh(); }}
+        />
+      )}
     </div>
   );
 }
@@ -422,3 +546,230 @@ function Th({ children, align = 'left' }: { children: React.ReactNode; align?: '
     </th>
   );
 }
+
+// ── Payout modal ────────────────────────────────────────────────────────────
+
+const PayoutModal: React.FC<{
+  partner: PartnerFullRow;
+  onClose: () => void;
+  onDone: () => void;
+}> = ({ partner, onClose, onDone }) => {
+  const [amount, setAmount] = useState(String(partner.partner_balance));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const partnerName = (partner.entity_type === 'legal' ? partner.organization_name : partner.full_name)
+    || [partner.first_name, partner.last_name].filter(Boolean).join(' ').trim()
+    || `@${partner.username ?? partner.telegram_id}`;
+  const numericAmount = parseInt(amount, 10) || 0;
+  const isValid = numericAmount > 0 && numericAmount <= partner.partner_balance;
+
+  const handleSubmit = async () => {
+    if (!isValid) {
+      setError(`Сумма должна быть от 1 до ${partner.partner_balance}₽`);
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      // 1. Insert partner_payouts row → возвращаем ID, чтобы использовать его
+      //    как dedupe_key в bonus_logs (защита от двойного списания при ретрае).
+      const { data: payoutRow, error: payoutErr } = await supabase
+        .from('partner_payouts')
+        .insert({
+          telegram_id: partner.telegram_id,
+          amount_rub: numericAmount,
+          status: 'processed',
+          card_last4: partner.card_number_last4 ?? null,
+          note: null,
+          processed_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+      if (payoutErr) throw new Error(`partner_payouts: ${payoutErr.message}`);
+      const payoutId = (payoutRow as { id: string }).id;
+
+      // 2. Audit log с dedupe_key=partner_paid_<payoutId>. Идёт ПЕРЕД балансом —
+      //    если ретрай, unique constraint вернёт 0 строк → знаем что уже списали.
+      const last4 = partner.card_number_last4;
+      const { data: logInserted, error: logErr } = await supabase
+        .from('bonus_logs')
+        .upsert(
+          {
+            telegram_id: partner.telegram_id,
+            type: 'partner_paid',
+            amount: -numericAmount,
+            description: `−${numericAmount}₽ выплата${last4 ? ` на карту •• ${last4}` : ''}`,
+            dedupe_key: `partner_paid_${payoutId}`,
+          },
+          { onConflict: 'telegram_id,type,dedupe_key', ignoreDuplicates: true },
+        )
+        .select('id');
+      if (logErr) console.warn('bonus_logs insert failed (non-fatal):', logErr);
+      const wasNewLog = Array.isArray(logInserted) && logInserted.length > 0;
+
+      // 3. Атомарный декремент через RPC (миграция 020). Запускаем только если
+      //    лог реально вставился — если был дубль, баланс уже списан ранее.
+      if (wasNewLog) {
+        const { error: rpcErr } = await supabase.rpc('inc_partner_balance', {
+          p_telegram_id: partner.telegram_id,
+          p_delta: -numericAmount,
+        });
+        if (rpcErr) throw new Error(`inc_partner_balance: ${rpcErr.message}`);
+      }
+
+      // 4. Push-уведомление партнёру: «X₽ переведено» (best-effort)
+      apiFetch('/api/notify-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: partner.telegram_id,
+          status: 'partner_payout_processed',
+          amount: numericAmount,
+          card_last4: partner.card_number_last4 ?? null,
+          application_id: `partner_notify_payout_${partner.telegram_id}_${Date.now()}`,
+        }),
+      }).catch(e => console.warn('partner notify (payout) error:', e));
+
+      onDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Выплата партнёру</p>
+            <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5">{partnerName}</p>
+            <p className="text-xs text-gray-500 mt-0.5">ID {partner.telegram_id}{partner.username ? ` · @${partner.username}` : ''}</p>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Balance summary */}
+        <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">К выплате</p>
+            <p className="text-xl font-bold text-emerald-600 tabular-nums mt-0.5">
+              {partner.partner_balance.toLocaleString('ru-RU')}₽
+            </p>
+          </div>
+          <div>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">В hold-периоде</p>
+            <p className="text-xl font-bold text-amber-600 tabular-nums mt-0.5">
+              {partner.pending_hold.toLocaleString('ru-RU')}₽
+            </p>
+          </div>
+        </div>
+
+        {/* Partner settings — отображаем поля по entity_type */}
+        <div className="px-5 py-3 border-b border-gray-100 bg-blue-50/30 space-y-1">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Реквизиты партнёра</p>
+            {partner.entity_type && (
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[partner.entity_type] ?? 'bg-gray-100'}`}>
+                {STATUS_LABELS[partner.entity_type] ?? partner.entity_type}
+              </span>
+            )}
+          </div>
+          {partner.entity_type === 'legal' && partner.organization_name && (
+            <p className="text-sm text-gray-700">Организация: {partner.organization_name}</p>
+          )}
+          {partner.entity_type !== 'legal' && partner.full_name && (
+            <p className="text-sm text-gray-700">ФИО: {partner.full_name}</p>
+          )}
+          {partner.inn && <p className="text-sm text-gray-700 font-mono">ИНН: {partner.inn}</p>}
+          {partner.entity_type === 'legal' && partner.kpp && (
+            <p className="text-sm text-gray-700 font-mono">КПП: {partner.kpp}</p>
+          )}
+          {partner.entity_type === 'self_employed' && (
+            <>
+              {partner.card_number && (
+                <p className="text-sm text-gray-700 font-mono">
+                  Карта: {partner.card_number.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                  {partner.card_bank ? ` · ${partner.card_bank}` : ''}
+                </p>
+              )}
+              {!partner.card_number && partner.card_number_last4 && (
+                <p className="text-sm text-gray-700">
+                  Карта: •• {partner.card_number_last4}{partner.card_bank ? ` · ${partner.card_bank}` : ''}
+                </p>
+              )}
+              {partner.phone_for_sbp && (
+                <p className="text-sm text-gray-700">СБП: {partner.phone_for_sbp}</p>
+              )}
+            </>
+          )}
+          {(partner.entity_type === 'ip' || partner.entity_type === 'legal') && (
+            <>
+              {partner.bank_account && <p className="text-sm text-gray-700 font-mono">Р/с: {partner.bank_account}</p>}
+              {partner.bank_bic && <p className="text-sm text-gray-700 font-mono">БИК: {partner.bank_bic}</p>}
+              {partner.card_bank && <p className="text-sm text-gray-700">Банк: {partner.card_bank}</p>}
+            </>
+          )}
+        </div>
+
+        {/* Form */}
+        <div className="px-5 py-4 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1.5">Сумма выплаты, ₽</label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={1}
+                max={partner.partner_balance}
+                value={amount}
+                onChange={e => setAmount(e.target.value)}
+                className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#3B5BFF] tabular-nums"
+              />
+              <button
+                onClick={() => setAmount(String(partner.partner_balance))}
+                className="px-3 py-2.5 text-xs font-semibold text-[#3B5BFF] hover:bg-blue-50 rounded-lg transition whitespace-nowrap"
+              >
+                Всё
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs text-rose-700 flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              {error}
+            </div>
+          )}
+
+          <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
+            <strong>⚠️ Это просто учёт в системе.</strong>{' '}
+            Перевод денег партнёру делаешь сам по реквизитам выше.
+            После нажатия «Подтвердить» баланс партнёра уменьшится на {numericAmount.toLocaleString('ru-RU')}₽.
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
+          >
+            Отмена
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!isValid || saving}
+            className="px-4 py-2.5 vd-grad text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50 active:scale-95 transition"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+            Подтвердить выплату
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
