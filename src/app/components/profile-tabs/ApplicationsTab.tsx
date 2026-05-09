@@ -825,25 +825,6 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                       </div>
                     )}
 
-                    {isReady && !hasVisa && (
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3 text-sm text-purple-700 text-center">
-                        🎉 Виза готовится — скоро появится здесь
-                      </div>
-                    )}
-
-                    {app.status === 'in_progress' && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
-                        <Clock className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-                        <p className="text-sm text-green-800">Заявка в работе — мы уведомим вас когда виза будет готова</p>
-                      </div>
-                    )}
-
-                    {app.status === 'pending_confirmation' && (
-                      <div className="bg-[#EAF1FF] border border-[#5C7BFF]/20 rounded-lg p-3 flex items-start gap-2">
-                        <Clock className="w-4 h-4 text-[#3B5BFF] mt-0.5 shrink-0" />
-                        <p className="text-sm text-[#0F2A36]">Ожидаем подтверждение оплаты. Скоро возьмём заявку в работу</p>
-                      </div>
-                    )}
                   </div>
                 );
               })}
@@ -910,11 +891,14 @@ const BOOKING_STATUS: Record<string, { label: string; color: string }> = {
   cancelled:            { label: 'Отменена',              color: 'bg-red-100 text-red-700' },
 };
 
+// Единый формат даты для всех карточек кабинета — 09.05.2026 (DD.MM.YYYY).
+// Раньше fmtBookingDate использовал двузначный год (09.05.26), а
+// fmtBookingDateTime — формат «09 мая, 21:25». Теперь и брони и визы
+// показывают одну и ту же запись.
 const fmtBookingDate = (s: string) =>
-  new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  new Date(s).toLocaleDateString('ru-RU');
 
-const fmtBookingDateTime = (s: string) =>
-  new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+const fmtBookingDateTime = fmtBookingDate;
 
 interface BookingCardCommon {
   isPartner: boolean;
@@ -1081,38 +1065,6 @@ function BookingActions({
   );
 }
 
-// Универсальный компонент status-message strip (как у визы внизу карточки).
-// Зелёная для in_progress («в работе»), голубая для new/pending_confirmation
-// («ожидаем подтверждение оплаты»), не показывается для confirmed/cancelled.
-function BookingStatusMessage({ status, kind }: { status: string; kind: 'hotel' | 'flight' }) {
-  const what = kind === 'hotel' ? 'бронь отеля' : 'бронь авиабилета';
-  if (status === 'in_progress') {
-    return (
-      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
-        <Clock className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
-        <p className="text-sm text-green-800">Заявка в работе — мы свяжемся с тобой когда {what} будет готова</p>
-      </div>
-    );
-  }
-  if (status === 'new' || status === 'pending_confirmation') {
-    return (
-      <div className="bg-[#EAF1FF] border border-[#5C7BFF]/20 rounded-lg p-3 flex items-start gap-2">
-        <Clock className="w-4 h-4 text-[#3B5BFF] mt-0.5 shrink-0" />
-        <p className="text-sm text-[#0F2A36]">Ожидаем подтверждение оплаты. Скоро возьмём заявку в работу</p>
-      </div>
-    );
-  }
-  if (status === 'confirmed') {
-    return (
-      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
-        <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-        <p className="text-sm text-emerald-800">Готово — подтверждение брони доступно ниже</p>
-      </div>
-    );
-  }
-  return null;
-}
-
 // Карточка брони — зеркалит layout визовой ApplicationCard:
 //   1. Header (заголовок страны/маршрута + visa_type-стиль подзаголовок + бейдж справа)
 //   2. Status timeline
@@ -1127,13 +1079,17 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
   const place = [b.country, b.city].filter(Boolean).join(', ') || 'Бронь отеля';
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      {/* Header — типографика 1-в-1 с визовой ApplicationCard:
+          text-base font-bold для заголовка + text-sm gray-500 для подзаголовка. */}
+      <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-[#0F2A36] leading-tight">Бронь отеля</p>
-          <p className="text-base text-[#0F2A36]/60 mt-0.5">{place}</p>
+          <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
+            <span aria-hidden>🏨</span>
+            <span className="truncate">Бронь отеля</span>
+          </h4>
+          <p className="text-sm text-gray-500 mt-0.5">{place}</p>
         </div>
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
           {cfg.label}
         </span>
       </div>
@@ -1141,34 +1097,31 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
       {/* Status timeline */}
       <BookingProgress status={b.status} />
 
-      {/* Info-строки в стиле визовой карточки */}
-      <div className="space-y-1.5 text-sm">
+      {/* Info-строки — те же стили что и в визовой карточке. */}
+      <div className="space-y-1 text-sm text-gray-500 mb-3 mt-2">
         {b.price != null && (
-          <div className="flex justify-between text-[#0F2A36]/70">
+          <div className="flex justify-between items-center">
             <span>К оплате:</span>
-            <span className="font-bold text-[#0F2A36]">{b.price.toLocaleString('ru-RU')} ₽</span>
+            <span className="text-base font-semibold text-gray-800">{b.price.toLocaleString('ru-RU')} ₽</span>
           </div>
         )}
-        <div className="flex justify-between text-[#0F2A36]/70">
+        <div className="flex justify-between">
           <span>Заезд → Выезд:</span>
-          <span className="font-medium text-[#0F2A36]">
+          <span>
             {b.check_in ? fmtBookingDate(b.check_in) : '—'} → {b.check_out ? fmtBookingDate(b.check_out) : '—'}
           </span>
         </div>
-        <div className="flex justify-between text-[#0F2A36]/70">
+        <div className="flex justify-between">
           <span>Гостей:</span>
-          <span className="font-medium text-[#0F2A36]">
+          <span>
             {b.guests ?? 1}{childrenAges.length > 0 && ` + ${childrenAges.length} реб.`}
           </span>
         </div>
-        <div className="flex justify-between text-[#0F2A36]/70">
-          <span>Дата заявки:</span>
-          <span>{fmtBookingDateTime(b.created_at)}</span>
+        <div className="flex justify-between">
+          <span>Дата:</span>
+          <span>{fmtBookingDate(b.created_at)}</span>
         </div>
       </div>
-
-      {/* Status-message strip (как у визы) */}
-      <BookingStatusMessage status={b.status} kind="hotel" />
 
       {/* Actions: download confirmation, leave review */}
       <BookingActions table="hotel_bookings" booking={b} kindLabel="Бронь отеля" {...common} />
@@ -1183,13 +1136,16 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
   const route = (b.from_city && b.to_city) ? `${b.from_city} → ${b.to_city}` : 'Бронь авиабилета';
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      {/* Header — типографика 1-в-1 с визовой ApplicationCard. */}
+      <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-[#0F2A36] leading-tight">Бронь авиабилета</p>
-          <p className="text-base text-[#0F2A36]/60 mt-0.5">{route}</p>
+          <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
+            <span aria-hidden>✈️</span>
+            <span className="truncate">Бронь авиабилета</span>
+          </h4>
+          <p className="text-sm text-gray-500 mt-0.5">{route}</p>
         </div>
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
+        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
           {cfg.label}
         </span>
       </div>
@@ -1198,27 +1154,22 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
       <BookingProgress status={b.status} />
 
       {/* Info-строки */}
-      <div className="space-y-1.5 text-sm">
+      <div className="space-y-1 text-sm text-gray-500 mb-3 mt-2">
         {b.price != null && (
-          <div className="flex justify-between text-[#0F2A36]/70">
+          <div className="flex justify-between items-center">
             <span>К оплате:</span>
-            <span className="font-bold text-[#0F2A36]">{b.price.toLocaleString('ru-RU')} ₽</span>
+            <span className="text-base font-semibold text-gray-800">{b.price.toLocaleString('ru-RU')} ₽</span>
           </div>
         )}
-        <div className="flex justify-between text-[#0F2A36]/70">
+        <div className="flex justify-between">
           <span>Дата вылета:</span>
-          <span className="font-medium text-[#0F2A36]">
-            {b.booking_date ? fmtBookingDate(b.booking_date) : '—'}
-          </span>
+          <span>{b.booking_date ? fmtBookingDate(b.booking_date) : '—'}</span>
         </div>
-        <div className="flex justify-between text-[#0F2A36]/70">
-          <span>Дата заявки:</span>
-          <span>{fmtBookingDateTime(b.created_at)}</span>
+        <div className="flex justify-between">
+          <span>Дата:</span>
+          <span>{fmtBookingDate(b.created_at)}</span>
         </div>
       </div>
-
-      {/* Status-message strip */}
-      <BookingStatusMessage status={b.status} kind="flight" />
 
       {/* Actions */}
       <BookingActions table="flight_bookings" booking={b} kindLabel="Бронь авиабилета" {...common} />
