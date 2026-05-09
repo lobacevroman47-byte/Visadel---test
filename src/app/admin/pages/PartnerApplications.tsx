@@ -17,6 +17,7 @@ import {
   CheckCircle2, XCircle, AlertCircle, Mail, Phone, AtSign, Tags, Users,
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 
 interface ApplicationRow {
   id: string;
@@ -229,6 +230,17 @@ const ApplicationDetailModal: React.FC<{
           .update({ is_influencer: true })
           .eq('telegram_id', app.telegram_id);
         if (e2) console.warn('users update is_influencer failed:', e2);
+
+        // 3. Push в бот: «🎉 Заявка одобрена, ты теперь партнёр»
+        apiFetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: app.telegram_id,
+            status: 'partner_application_approved',
+            application_id: `partner_app_approved_${app.id}`,
+          }),
+        }).catch(e => console.warn('partner_application_approved notify error:', e));
       } else {
         console.warn('[approve] application has no telegram_id — нельзя выдать is_influencer автоматически');
       }
@@ -257,6 +269,20 @@ const ApplicationDetailModal: React.FC<{
         })
         .eq('id', app.id);
       if (e1) throw new Error(e1.message);
+
+      // Push в бот юзеру с причиной отказа
+      if (app.telegram_id) {
+        apiFetch('/api/notify-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegram_id: app.telegram_id,
+            status: 'partner_application_rejected',
+            reject_reason: rejectReason.trim(),
+            application_id: `partner_app_rejected_${app.id}`,
+          }),
+        }).catch(e => console.warn('partner_application_rejected notify error:', e));
+      }
       onDone();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

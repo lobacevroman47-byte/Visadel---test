@@ -871,10 +871,12 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   //              + (urgent ? urgent_price × urgent_pct : 0)
   //              + (hotel  ? hotel_price  × hotel_pct  : 0)
   //              + (ticket ? ticket_price × ticket_pct : 0)
+  // Country отдельно — нужен для красивого push-уведомления партнёру
+  let visaCountry: string | undefined;
   if (isPartner && applicationId) {
     const { data: app } = await supabase
       .from('applications')
-      .select('price, visa_id, urgent, form_data')
+      .select('price, visa_id, urgent, form_data, country')
       .eq('id', applicationId)
       .single();
     if (!app) {
@@ -885,9 +887,10 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
       return;
     }
     const a = app as {
-      price: number; visa_id: string; urgent: boolean;
+      price: number; visa_id: string; urgent: boolean; country: string;
       form_data: { additionalDocs?: { hotelBooking?: boolean; returnTicket?: boolean; urgentProcessing?: boolean } } | null;
     };
+    visaCountry = a.country;
 
     // Параллельно подгружаем visa_products + additional_services
     const [productRes, addonsRes] = await Promise.all([
@@ -962,7 +965,7 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
             telegram_id: referrerId,
             status: 'partner_referral_paid',
             amount,
-            country: undefined, // visa country добавим если нужно — пока без
+            country: visaCountry,
             source: 'visa',
             application_id: `partner_notify_${dedupeKey}`,
           }),

@@ -51,21 +51,28 @@ const PARTNER_STATUSES = new Set([
   'partner_referral_paid',
   'partner_hold_approved',
   'partner_payout_processed',
+  'partner_application_approved',
+  'partner_application_rejected',
 ]);
 
-function buildPartnerMessage(status, { amount, country, source, card_last4 }) {
+function buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason }) {
   const amt = `${(amount ?? 0).toLocaleString('ru-RU')}₽`;
   const sourceLabel = source === 'hotel' ? 'бронь отеля'
                     : source === 'flight' ? 'бронь авиабилета'
                     : 'визу';
   switch (status) {
-    case 'partner_referral_paid':
+    case 'partner_referral_paid': {
+      // Дата когда сумма станет доступна (через 30 дней hold-периода).
+      const approvedAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const approvedDate = approvedAt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
       return {
         emoji: '💰',
         title: `Партнёрская комиссия +${amt}`,
         body: `Ваш реферал оплатил ${sourceLabel}${country ? ` (${country})` : ''}.\n\n`
-            + `Сумма поступит на ваш баланс через 30 дней (hold-период).`,
+            + `<b>${amt}</b> станет доступно к выплате ${approvedDate} — после 30-дневного hold-периода.\n\n`
+            + `<i>Hold защищает от refund клиента: если клиент отменит заказ в течение 30 дней, комиссия аннулируется.</i>`,
       };
+    }
     case 'partner_hold_approved':
       return {
         emoji: '✅',
@@ -79,6 +86,22 @@ function buildPartnerMessage(status, { amount, country, source, card_last4 }) {
         title: `Выплата ${amt} отправлена`,
         body: `Деньги переведены на вашу карту${card_last4 ? ` •• ${card_last4}` : ''}.\n\n`
             + `Спасибо за партнёрство 🤝`,
+      };
+    case 'partner_application_approved':
+      return {
+        emoji: '🎉',
+        title: 'Заявка на партнёрство одобрена',
+        body: `Поздравляем! Теперь вы партнёр Visadel Agency.\n\n`
+            + `Открой Профиль → <b>Партнёрский кабинет</b> чтобы получить свою реф-ссылку, vanity-код, и заполнить реквизиты для выплат.\n\n`
+            + `<i>До 20% с каждого заказа реферала. Hold 30 дней.</i>`,
+      };
+    case 'partner_application_rejected':
+      return {
+        emoji: '😔',
+        title: 'Заявка на партнёрство отклонена',
+        body: `К сожалению, мы не смогли одобрить заявку.\n\n`
+            + (reject_reason ? `<b>Причина:</b> ${reject_reason}\n\n` : '')
+            + `Через 7 дней можно подать новую заявку.`,
       };
     default:
       return null;
@@ -169,7 +192,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body ?? {};
-  const { status, country, visa_type, application_id, amount, source, card_last4 } = body;
+  const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason } = body;
   // user — только себе; admin / service — кому угодно
   const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
@@ -191,7 +214,7 @@ export default async function handler(req, res) {
 
   const isPartnerEvent = PARTNER_STATUSES.has(status);
   const msg = isPartnerEvent
-    ? buildPartnerMessage(status, { amount, country, source, card_last4 })
+    ? buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason })
     : STATUS_MESSAGES[status];
   if (!msg) {
     console.error('[notify-status] unknown status:', status);
