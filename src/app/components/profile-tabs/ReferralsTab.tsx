@@ -269,11 +269,11 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
               Премиум-партнёр
             </span>
           </div>
-          <h3 className="text-[20px] font-semibold leading-tight">
-            Получайте % с каждой оплаченной брони
+          <h3 className="text-[22px] font-semibold leading-tight tabular-nums">
+            до {BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа
           </h3>
           <p className="text-sm text-white/70 mt-2 leading-relaxed">
-            Начисляются за <span className="font-medium text-white">визы и
+            Начисляются за <span className="font-medium text-white">визы,
             брони отелей и авиабилетов</span>.
           </p>
           <button
