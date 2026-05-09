@@ -245,15 +245,17 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         } catch { /* ignore */ }
         return { changed_by_id: null, changed_by_name: null };
       })();
-      supabase.from('booking_status_log').insert({
+      // Ждём INSERT (await вместо .then), иначе при перерисовке UI
+      // BookingStatusHistory может re-fetch'нуть БД до того как запись
+      // успеет попасть туда. Race condition → история «отстаёт».
+      const { error: logErr } = await supabase.from('booking_status_log').insert({
         entity_type: table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking',
         entity_id: id,
         from_status: prevStatus,
         to_status: status,
         ...adminInfo,
-      }).then(r => {
-        if (r.error) console.warn('[bookings] status_log insert failed:', r.error.message);
       });
+      if (logErr) console.warn('[bookings] status_log insert failed:', logErr.message);
     }
 
     // При переходе в любой «paid» статус — начислить партнёрскую комиссию
@@ -878,9 +880,14 @@ function StatusSelector({
 // История изменений статусов брони — timeline-блок как в визовой модалке.
 // Читает booking_status_log (миграция 025). Если миграция не применена —
 // silent fail (показываем «Статус ещё не менялся»).
-function BookingStatusHistory({ table, id }: {
+//
+// refreshKey — внешний trigger для перезагрузки. parent передаёт текущий
+// b.status, и при изменении (когда updateStatus сохранил новый статус и
+// вставил запись в booking_status_log), useEffect ре-фетчнет историю.
+function BookingStatusHistory({ table, id, refreshKey }: {
   table: 'hotel_bookings' | 'flight_bookings';
   id: string;
+  refreshKey?: string | number;
 }) {
   const [logs, setLogs] = useState<Array<{
     id: string; from_status: string | null; to_status: string;
@@ -891,16 +898,21 @@ function BookingStatusHistory({ table, id }: {
     let cancelled = false;
     (async () => {
       const entityType = table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking';
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('booking_status_log')
         .select('id, from_status, to_status, changed_by_name, changed_at')
         .eq('entity_type', entityType)
         .eq('entity_id', id)
         .order('changed_at', { ascending: true });
+      if (error) {
+        console.warn('[booking_status_log] fetch failed:', error.message);
+        if (!cancelled) setLogs([]);
+        return;
+      }
       if (!cancelled) setLogs((data ?? []) as typeof logs);
     })();
     return () => { cancelled = true; };
-  }, [table, id]);
+  }, [table, id, refreshKey]);
 
   return (
     <div className="bg-gray-50 rounded-xl p-4">
@@ -1111,8 +1123,11 @@ function BookingDetailModal({
             {/* Статус заявки + повторная отправка + сохранить */}
             <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
 
-            {/* История изменений статусов — как у визы */}
-            <BookingStatusHistory table={table} id={b.id} />
+            {/* История изменений статусов — как у визы.
+                refreshKey=b.status: при смене статуса parent делает
+                setSelectedHotel({ ...s, status }) → b.status меняется →
+                useEffect re-fetch'ит историю и показывает новую запись. */}
+            <BookingStatusHistory table={table} id={b.id} refreshKey={b.status} />
           </div>
         )}
 
