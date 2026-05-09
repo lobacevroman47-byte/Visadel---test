@@ -340,9 +340,26 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
         if (raw) {
           const parsed: Draft[] = JSON.parse(raw);
           const now = Date.now();
+          // Защитный фильтр: если для visa+urgent уже есть отправленная заявка
+          // (любой статус, кроме 'draft'), черновик пропадает автоматически.
+          // Закрывает дыру: до фикса Step7Payment удалял только одиночный
+          // localStorage-ключ, но запись в visa_drafts оставалась навсегда.
+          const submittedKeys = new Set(
+            apps
+              .filter(a => a.status !== 'draft')
+              .map(a => `draft_${a.visa_id}_${a.urgent ? 'urgent' : 'normal'}`)
+          );
           const valid = parsed
             .filter(d => now - new Date(d.savedAt).getTime() < 30 * 24 * 60 * 60 * 1000)
+            .filter(d => !submittedKeys.has(d.id))
             .map(d => ({ ...d, draftKey: d.id }));
+          // Если что-то отфильтровали — переписать localStorage чтобы не
+          // показывать «пустые» черновики и в офлайне.
+          if (valid.length !== parsed.length) {
+            try {
+              localStorage.setItem('visa_drafts', JSON.stringify(valid));
+            } catch {}
+          }
           setDrafts(valid);
         }
       } catch {}

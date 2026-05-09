@@ -10,7 +10,7 @@
 
 ### 1. Ротировать карту оплаты
 
-Карта `5536 9140 3834 6908` светилась в `supabase/app_settings_payments.sql` и
+Карта `5536 9140 3834 6908` светилась в `supabase/010_app_settings_payments.sql` и
 во всём git history. Считай её скомпрометированной.
 
 - [ ] Зайти в банк → перевыпустить карту с новым номером
@@ -97,41 +97,44 @@ ORDER BY tablename, cmd;
 004_rls_telegram_id.sql
 005_audit_log_and_usd_rate.sql
 006_lock_audit_logs_tamper.sql
+007_hotel_bookings.sql
+008_flight_bookings.sql
+009_bookings_add_payment.sql
+010_app_settings_payments.sql
+011_bookings_select_policies.sql
+012_bookings_confirmation_url.sql
+013_additional_services_countries.sql
+014_booking_core_overrides.sql
+015_additional_services_partner_commission.sql
+016_enable_realtime.sql
 ```
 
-Затем (без префикса, порядок неважен — independent ALTER-ы):
+Все миграции теперь занумерованы — раскатываются одной командой
+`supabase db push` либо последовательным копированием в SQL Editor.
 
-```
-additional_services_countries.sql
-additional_services_partner_commission.sql
-app_settings_payments.sql
-booking_core_overrides.sql
-bookings_add_payment.sql
-bookings_confirmation_url.sql
-bookings_select_policies.sql
-flight_bookings.sql
-hotel_bookings.sql
-```
+### C. Realtime publication (накатывается миграцией 016)
 
-> **TODO Phase 1:** перенумеровать unnumbered файлы в `007_*` … `015_*`,
-> чтобы порядок был детерминирован и можно было раскатывать одной командой.
+Sprint 5 добавил подписки на изменения в админке. Раньше публикация
+включалась руками в Dashboard — теперь это делает миграция
+`016_enable_realtime.sql`. Идемпотентна: безопасно гонять повторно.
 
-### C. Включить Realtime publication
-
-Sprint 5 добавил подписки на изменения в админке. Без этого realtime —
-silent no-op (никто не падает, но фишка не работает).
-
-Supabase Dashboard → Database → Replication → Publication `supabase_realtime`:
+Покрытые таблицы:
 - ✅ `additional_services`
 - ✅ `app_settings`
 - ✅ `visa_products`
 - ✅ `applications` (для админ Dashboard real-time)
+- ✅ `flight_bookings` (real-time для броней авиа)
+- ✅ `hotel_bookings` (real-time для броней отелей)
 
-> **TODO Phase 1:** перенести в миграцию `015_enable_realtime.sql`:
-> ```sql
-> ALTER PUBLICATION supabase_realtime ADD TABLE
->   additional_services, app_settings, visa_products, applications;
-> ```
+Если миграция отработала, проверить можно так:
+
+```sql
+SELECT tablename FROM pg_publication_tables
+WHERE pubname = 'supabase_realtime'
+ORDER BY tablename;
+```
+
+Должны увидеть все 6 таблиц.
 
 ### D. Создать Storage bucket
 
