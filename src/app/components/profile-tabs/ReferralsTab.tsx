@@ -13,12 +13,13 @@ import { BONUS_CONFIG } from '../../lib/bonus-config';
 
 interface ReferralTabProps {
   onOpenPartnerApplication?: () => void;
+  onOpenPartnerDashboard?: () => void;
 }
 
 const BOT_USERNAME = 'Visadel_test_bot';
 const MINI_APP_SHORT_NAME = 'app';
 
-export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabProps) {
+export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDashboard }: ReferralTabProps) {
   const { appUser } = useTelegram();
   const referralCode = appUser?.referral_code ?? '';
   const isPartner = appUser?.is_influencer ?? false;
@@ -332,8 +333,15 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           </h3>
           <p className="text-sm text-amber-800/80 mt-1.5 leading-relaxed">
             Получаете повышенный % с каждого оплаченного заказа ваших рефералов.
-            Подробная статистика по доходу будет доступна в партнёрском кабинете.
           </p>
+          {onOpenPartnerDashboard && (
+            <button
+              onClick={onOpenPartnerDashboard}
+              className="w-full mt-4 bg-amber-900 text-white py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 hover:bg-amber-800 active:scale-[0.98] transition"
+            >
+              Открыть партнёрский кабинет <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
         </div>
       )}
 

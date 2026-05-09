@@ -15,6 +15,9 @@ export interface AppUser {
   phone?: string;
   email?: string;
   bonus_balance: number;
+  // ₽ к выплате партнёру (только для is_influencer=true). Растёт после
+  // 30-дневного hold-а одобренных комиссий, уменьшается при выплатах.
+  partner_balance?: number;
   is_influencer: boolean;
   referral_code: string;
   referred_by?: string;
