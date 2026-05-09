@@ -114,6 +114,11 @@ export default function ProfileTab({ onBonusChange }: ProfileTabProps = {}) {
         ? supabase.from('bonus_logs')
             .select('id,type,amount,description,created_at')
             .eq('telegram_id', tgId)
+            // Партнёрские операции (partner_pending/approved/paid/cancelled) живут
+            // в отдельном кошельке partner_balance и показываются в Партнёрском
+            // кабинете. В профильную «Историю начислений» (про bonus_balance) их
+            // мешать не нужно — это другая природа (заработок, не скидка).
+            .not('type', 'like', 'partner_%')
             .order('created_at', { ascending: false })
             .limit(30)
         : Promise.resolve({ data: [] }),
