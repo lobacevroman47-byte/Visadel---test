@@ -554,6 +554,7 @@ export function Partners() {
           partner={selectedPartner}
           onClose={() => setSelectedPartner(null)}
           onPayout={() => { setPayoutTarget(selectedPartner); setSelectedPartner(null); }}
+          onDone={() => { setSelectedPartner(null); void refresh(); }}
         />
       )}
 
@@ -810,9 +811,12 @@ const PartnerDetailModal: React.FC<{
   partner: PartnerFullRow;
   onClose: () => void;
   onPayout: () => void;
-}> = ({ partner, onClose, onPayout }) => {
+  onDone: () => void;
+}> = ({ partner, onClose, onPayout, onDone }) => {
   const [recentLogs, setRecentLogs] = useState<BonusLogEntry[] | null>(null);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [earlyConfirm, setEarlyConfirm] = useState<{ amount: number; daysLeft: number; pendingIds: { id: string; amount: number; dedupe_key: string | null; created_at: string }[] } | null>(null);
+  const [earlyProcessing, setEarlyProcessing] = useState(false);
 
   // Подгружаем последние 10 partner_* событий для контекста «за что начисляли/выплачивали»
   useEffect(() => {
@@ -829,6 +833,133 @@ const PartnerDetailModal: React.FC<{
     })();
     return () => { cancelled = true; };
   }, [partner.telegram_id]);
+
+  // Готовим контекст для досрочной выплаты: находим pending без approved.
+  const handleStartEarly = async () => {
+    setEarlyProcessing(true);
+    try {
+      const HOLD_DAYS = 30;
+      const [pendingRes, approvedRes] = await Promise.all([
+        supabase.from('bonus_logs')
+          .select('id, amount, dedupe_key, created_at')
+          .eq('telegram_id', partner.telegram_id)
+          .eq('type', 'partner_pending'),
+        supabase.from('bonus_logs')
+          .select('dedupe_key')
+          .eq('telegram_id', partner.telegram_id)
+          .eq('type', 'partner_approved'),
+      ]);
+      const pending = (pendingRes.data ?? []) as Array<{ id: string; amount: number; dedupe_key: string | null; created_at: string }>;
+      const approvedKeys = new Set(
+        ((approvedRes.data ?? []) as Array<{ dedupe_key: string | null }>)
+          .map(l => (l.dedupe_key ?? '').replace(/^partner_[a-z]+:/, ''))
+      );
+      const toApprove = pending.filter(p => {
+        const canonical = (p.dedupe_key ?? '').replace(/^partner_[a-z]+:/, '');
+        return canonical && !approvedKeys.has(canonical);
+      });
+      if (toApprove.length === 0) {
+        alert('Нет pending записей без approval. Возможно cron уже всё обработал — используй обычную «Выплатить».');
+        return;
+      }
+      const totalAmount = toApprove.reduce((s, l) => s + l.amount, 0);
+      const oldest = toApprove.reduce((o, p) =>
+        o === null || new Date(p.created_at) < new Date(o.created_at) ? p : o
+      , null as typeof pending[number] | null)!;
+      const daysOld = Math.floor((Date.now() - new Date(oldest.created_at).getTime()) / (1000 * 60 * 60 * 24));
+      const daysLeft = Math.max(0, HOLD_DAYS - daysOld);
+      setEarlyConfirm({ amount: totalAmount, daysLeft, pendingIds: toApprove });
+    } finally {
+      setEarlyProcessing(false);
+    }
+  };
+
+  const handleConfirmEarly = async () => {
+    if (!earlyConfirm) return;
+    setEarlyProcessing(true);
+    try {
+      // 1. Approve каждый pending — создаём partner_approved + bumps balance
+      for (const p of earlyConfirm.pendingIds) {
+        const canonical = (p.dedupe_key ?? '').replace(/^partner_[a-z]+:/, '');
+        const { data: insRows, error: insErr } = await supabase
+          .from('bonus_logs')
+          .upsert({
+            telegram_id: partner.telegram_id,
+            type: 'partner_approved',
+            amount: p.amount,
+            description: `Approved (досрочно): +${p.amount}₽ партнёру`,
+            dedupe_key: canonical,
+          }, { onConflict: 'telegram_id,type,dedupe_key', ignoreDuplicates: true })
+          .select('id');
+        if (insErr) throw new Error(`approve insert: ${insErr.message}`);
+        const wasNew = Array.isArray(insRows) && insRows.length > 0;
+        if (wasNew) {
+          const { error: rpcErr } = await supabase.rpc('inc_partner_balance', {
+            p_telegram_id: partner.telegram_id,
+            p_delta: p.amount,
+          });
+          if (rpcErr) throw new Error(`balance inc: ${rpcErr.message}`);
+        }
+      }
+
+      // 2. Создаём payout row
+      const { data: payoutRow, error: payoutErr } = await supabase
+        .from('partner_payouts')
+        .insert({
+          telegram_id: partner.telegram_id,
+          amount_rub: earlyConfirm.amount,
+          status: 'processed',
+          card_last4: partner.card_number_last4 ?? null,
+          note: `Досрочная выплата (до конца hold ${earlyConfirm.daysLeft}д)`,
+          processed_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
+      if (payoutErr) throw new Error(`partner_payouts: ${payoutErr.message}`);
+      const payoutId = (payoutRow as { id: string }).id;
+
+      // 3. Записываем partner_paid log
+      const last4 = partner.card_number_last4;
+      const { data: paidIns } = await supabase.from('bonus_logs').upsert({
+        telegram_id: partner.telegram_id,
+        type: 'partner_paid',
+        amount: -earlyConfirm.amount,
+        description: `−${earlyConfirm.amount}₽ выплата досрочно${last4 ? ` на карту •• ${last4}` : ''}`,
+        dedupe_key: `partner_paid_${payoutId}`,
+      }, { onConflict: 'telegram_id,type,dedupe_key', ignoreDuplicates: true })
+        .select('id');
+      const wasNewPaid = Array.isArray(paidIns) && paidIns.length > 0;
+
+      // 4. Декрементим balance
+      if (wasNewPaid) {
+        const { error: rpcErr } = await supabase.rpc('inc_partner_balance', {
+          p_telegram_id: partner.telegram_id,
+          p_delta: -earlyConfirm.amount,
+        });
+        if (rpcErr) throw new Error(`balance dec: ${rpcErr.message}`);
+      }
+
+      // 5. Push-уведомление партнёру
+      apiFetch('/api/notify-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: partner.telegram_id,
+          status: 'partner_payout_processed',
+          amount: earlyConfirm.amount,
+          card_last4: partner.card_number_last4 ?? null,
+          application_id: `partner_notify_payout_${partner.telegram_id}_${Date.now()}`,
+        }),
+      }).catch(e => console.warn('partner notify (early payout):', e));
+
+      setEarlyConfirm(null);
+      onDone();
+    } catch (e) {
+      alert(`Ошибка досрочной выплаты: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setEarlyProcessing(false);
+    }
+  };
 
   const partnerName = (partner.entity_type === 'legal' ? partner.organization_name : partner.full_name)
     || [partner.first_name, partner.last_name].filter(Boolean).join(' ').trim()
@@ -868,8 +999,10 @@ const PartnerDetailModal: React.FC<{
 
   const ready = partner.partner_balance > 0;
   const hasStatus = !!partner.entity_type;
+  const hasHold = partner.pending_hold > 0;
   const canPayOut = ready && hasStatus;
-  const blocked = ready && !hasStatus;
+  const canPayEarly = hasHold && hasStatus;
+  const blocked = (ready || hasHold) && !hasStatus;
 
   return (
     <div className="fixed inset-0 bg-black/50 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
@@ -1080,21 +1213,32 @@ const PartnerDetailModal: React.FC<{
         </Section>
 
         {/* Footer with actions */}
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white">
+        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white flex-wrap">
           <button
             onClick={onClose}
             className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
           >
             Закрыть
           </button>
-          {canPayOut ? (
+          {canPayOut && (
             <button
               onClick={onPayout}
               className="px-4 py-2.5 vd-grad text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition"
             >
               <Wallet className="w-4 h-4" /> Выплатить {partner.partner_balance.toLocaleString('ru-RU')}₽
             </button>
-          ) : blocked ? (
+          )}
+          {canPayEarly && (
+            <button
+              onClick={handleStartEarly}
+              disabled={earlyProcessing}
+              className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60"
+            >
+              {earlyProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+              Выплатить досрочно {partner.pending_hold.toLocaleString('ru-RU')}₽
+            </button>
+          )}
+          {blocked && (
             <button
               disabled
               className="px-4 py-2.5 bg-gray-200 text-gray-500 rounded-lg text-sm font-semibold flex items-center gap-1.5 cursor-not-allowed"
@@ -1102,12 +1246,83 @@ const PartnerDetailModal: React.FC<{
             >
               ⛔ Выплата заблокирована
             </button>
-          ) : null}
+          )}
         </div>
       </div>
+
+      {/* Confirm досрочной выплаты — отдельная nested модалка */}
+      {earlyConfirm && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => !earlyProcessing && setEarlyConfirm(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                <Clock className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-base font-bold text-[#0F2A36]">Досрочная выплата</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  До конца hold-периода ещё{' '}
+                  <b className="text-amber-700">
+                    {earlyConfirm.daysLeft === 0
+                      ? 'меньше суток'
+                      : `${earlyConfirm.daysLeft} ${pluralize(earlyConfirm.daysLeft, ['день', 'дня', 'дней'])}`
+                    }
+                  </b>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 text-sm text-amber-900 leading-relaxed">
+              <p className="mb-2">
+                Будет проведена досрочная выплата{' '}
+                <b className="text-base">{earlyConfirm.amount.toLocaleString('ru-RU')}₽</b>{' '}
+                из hold-периода.
+              </p>
+              <p className="text-xs">
+                ⚠️ Hold-период защищает от refund клиента. Если в течение оставшихся{' '}
+                {earlyConfirm.daysLeft} дней клиент отменит заказ, эту выплату нельзя будет автоматически вернуть.
+              </p>
+            </div>
+
+            <p className="text-sm text-gray-700 mb-4">Точно вывести досрочно?</p>
+
+            <div className="flex items-center justify-end gap-2">
+              <button
+                onClick={() => setEarlyConfirm(null)}
+                disabled={earlyProcessing}
+                className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleConfirmEarly}
+                disabled={earlyProcessing}
+                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60"
+              >
+                {earlyProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Да, вывести досрочно
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+function pluralize(n: number, forms: [string, string, string]): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return forms[0];
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return forms[1];
+  return forms[2];
+}
 
 // ── Subcomponents для PartnerDetailModal ────────────────────────────────────
 
