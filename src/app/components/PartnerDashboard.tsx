@@ -15,6 +15,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Wallet, Clock, Check, CreditCard, FileText, Loader2,
   Save, AlertCircle, Crown, X, Copy, Link as LinkIcon, Sparkles,
+  Phone, Building2, Banknote, Hash,
 } from 'lucide-react';
 import { useTelegram } from '../App';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -150,6 +151,32 @@ function parseCommissionBreakdown(description: string | null | undefined): Commi
   return parts;
 }
 
+// Форматтеры реквизитов для отображения в форме
+function formatCardNumber(digits: string): string {
+  const d = digits.replace(/\D/g, '').slice(0, 19);
+  return d.replace(/(\d{4})(?=\d)/g, '$1 ');
+}
+function formatPhone(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  // +7 (XXX) XXX-XX-XX — типовой РФ формат
+  let out = '+7';
+  if (d.length > 1) out += ' (' + d.slice(1, 4);
+  if (d.length >= 4) out += ') ';
+  if (d.length >= 5) out += d.slice(4, 7);
+  if (d.length >= 8) out += '-' + d.slice(7, 9);
+  if (d.length >= 10) out += '-' + d.slice(9, 11);
+  return out;
+}
+function normalizePhone(raw: string): string {
+  // Храним в БД как +7XXXXXXXXXX (11 цифр с +7 префиксом)
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  // Если ввели начиная с 8 — заменяем на 7
+  const normalized = d.startsWith('8') ? '7' + d.slice(1) : (d.startsWith('7') ? d : '7' + d);
+  return '+' + normalized.slice(0, 11);
+}
+
 // Period selector
 type Period = '1d' | '1w' | '1m' | '1y';
 const PERIOD_LABELS: Record<Period, string> = {
@@ -181,17 +208,28 @@ interface PayoutEntry {
   created_at: string;
 }
 
+type EntityType = 'self_employed' | 'ip' | 'legal' | '';
+
 interface PartnerSettings {
   full_name: string;
   inn: string;
-  card_number_last4: string;
+  card_number: string;        // полный номер карты (для card-to-card)
+  card_number_last4: string;  // last4 — авто-производное для быстрого отображения
   card_bank: string;
-  entity_type: 'individual' | 'self_employed' | 'ip' | '';
+  phone_for_sbp: string;      // телефон СБП
+  bank_account: string;       // расчётный счёт (для ИП/юрлица)
+  bank_bic: string;           // БИК
+  organization_name: string;  // название организации (для юрлица)
+  kpp: string;                // КПП (для юрлица)
+  entity_type: EntityType;
   agreement_accepted_at: string | null;
 }
 
 const DEFAULT_SETTINGS: PartnerSettings = {
-  full_name: '', inn: '', card_number_last4: '', card_bank: '', entity_type: '',
+  full_name: '', inn: '', card_number: '', card_number_last4: '', card_bank: '',
+  phone_for_sbp: '', bank_account: '', bank_bic: '',
+  organization_name: '', kpp: '',
+  entity_type: 'self_employed', // по умолчанию самозанятый — единственный путь без налогового агентства
   agreement_accepted_at: null,
 };
 
@@ -251,9 +289,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           setSettings({
             full_name: s.full_name ?? '',
             inn: s.inn ?? '',
+            card_number: s.card_number ?? '',
             card_number_last4: s.card_number_last4 ?? '',
             card_bank: s.card_bank ?? '',
-            entity_type: (s.entity_type as PartnerSettings['entity_type']) ?? '',
+            phone_for_sbp: s.phone_for_sbp ?? '',
+            bank_account: s.bank_account ?? '',
+            bank_bic: s.bank_bic ?? '',
+            organization_name: s.organization_name ?? '',
+            kpp: s.kpp ?? '',
+            entity_type: (s.entity_type as EntityType) ?? 'self_employed',
             agreement_accepted_at: s.agreement_accepted_at ?? null,
           });
         }
@@ -389,12 +433,20 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
     if (!telegramId || !isSupabaseConfigured()) return;
     setSavingSettings(true); setSettingsSaved(false);
     try {
+      const cardDigits = settings.card_number.replace(/\D/g, '');
+      const last4 = cardDigits.length >= 4 ? cardDigits.slice(-4) : '';
       const payload = {
         telegram_id: telegramId,
         full_name: settings.full_name.trim() || null,
         inn: settings.inn.trim() || null,
-        card_number_last4: settings.card_number_last4.trim() || null,
+        card_number: cardDigits || null,
+        card_number_last4: last4 || null,
         card_bank: settings.card_bank.trim() || null,
+        phone_for_sbp: settings.phone_for_sbp.trim() || null,
+        bank_account: settings.bank_account.trim() || null,
+        bank_bic: settings.bank_bic.trim() || null,
+        organization_name: settings.organization_name.trim() || null,
+        kpp: settings.kpp.trim() || null,
         entity_type: settings.entity_type || null,
       };
       const { error } = await supabase.from('partner_settings').upsert(payload, { onConflict: 'telegram_id' });
@@ -647,47 +699,120 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           </div>
 
           <div className="space-y-3">
-            <Input label="ФИО полностью" placeholder="Иванов Иван Иванович"
-              value={settings.full_name}
-              onChange={v => setSettings(s => ({ ...s, full_name: v }))}
-              icon={<FileText className="w-3.5 h-3.5 text-gray-400" />} />
-
-            <div className="grid grid-cols-2 gap-2">
-              <Input label="Карта (последние 4)" placeholder="6411"
-                value={settings.card_number_last4}
-                onChange={v => setSettings(s => ({ ...s, card_number_last4: v.replace(/\D/g, '').slice(0, 4) }))}
-                icon={<CreditCard className="w-3.5 h-3.5 text-gray-400" />}
-                inputMode="numeric" />
-              <Input label="Банк" placeholder="Тинькофф"
-                value={settings.card_bank}
-                onChange={v => setSettings(s => ({ ...s, card_bank: v }))} />
-            </div>
-
-            <Input label="ИНН (для самозанятых)" placeholder="770000000000"
-              value={settings.inn}
-              onChange={v => setSettings(s => ({ ...s, inn: v.replace(/\D/g, '').slice(0, 12) }))}
-              inputMode="numeric" />
-
+            {/* Статус — первый, потому что определяет какие поля показывать ниже */}
             <div>
               <label className="block text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-1.5">
                 Налоговый статус
               </label>
               <select
                 value={settings.entity_type}
-                onChange={e => setSettings(s => ({ ...s, entity_type: e.target.value as PartnerSettings['entity_type'] }))}
+                onChange={e => setSettings(s => ({ ...s, entity_type: e.target.value as EntityType }))}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm bg-white focus:outline-none focus:border-[#3B5BFF]"
               >
-                <option value="">— не указан —</option>
-                <option value="individual">Физлицо (без статуса)</option>
                 <option value="self_employed">Самозанятый</option>
                 <option value="ip">ИП</option>
+                <option value="legal">Юрлицо (ООО)</option>
               </select>
               {settings.entity_type === 'self_employed' && (
                 <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
-                  💡 Чек самозанятого после выплаты пришлёшь нам через приложение «Мой налог» — это твоя обязанность по 422-ФЗ.
+                  💡 После каждой выплаты пришли чек из «Мой налог» — это твоя обязанность по 422-ФЗ.
+                </p>
+              )}
+              {settings.entity_type === 'ip' && (
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                  💡 Выплата на расчётный счёт. Налог платишь сам по своей системе (УСН/ОСНО/патент).
+                </p>
+              )}
+              {settings.entity_type === 'legal' && (
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-relaxed">
+                  💡 Выплата на расчётный счёт организации по договору-оферте.
                 </p>
               )}
             </div>
+
+            {/* ── Имя/название ─────────────────────────────────────────── */}
+            {settings.entity_type === 'legal' ? (
+              <Input label="Название организации" placeholder='ООО "Ромашка"'
+                value={settings.organization_name}
+                onChange={v => setSettings(s => ({ ...s, organization_name: v }))}
+                icon={<Building2 className="w-3.5 h-3.5 text-gray-400" />} />
+            ) : (
+              <Input label="ФИО полностью" placeholder="Иванов Иван Иванович"
+                value={settings.full_name}
+                onChange={v => setSettings(s => ({ ...s, full_name: v }))}
+                icon={<FileText className="w-3.5 h-3.5 text-gray-400" />} />
+            )}
+
+            {/* ── ИНН (всем) ────────────────────────────────────────── */}
+            <Input
+              label={settings.entity_type === 'legal' ? 'ИНН организации (10 цифр)' : 'ИНН (12 цифр)'}
+              placeholder={settings.entity_type === 'legal' ? '7700000000' : '770000000000'}
+              value={settings.inn}
+              onChange={v => setSettings(s => ({ ...s, inn: v.replace(/\D/g, '').slice(0, settings.entity_type === 'legal' ? 10 : 12) }))}
+              icon={<Hash className="w-3.5 h-3.5 text-gray-400" />}
+              inputMode="numeric" />
+
+            {/* ── КПП (только юрлицо) ─────────────────────────────── */}
+            {settings.entity_type === 'legal' && (
+              <Input label="КПП (9 цифр)" placeholder="770001001"
+                value={settings.kpp}
+                onChange={v => setSettings(s => ({ ...s, kpp: v.replace(/\D/g, '').slice(0, 9) }))}
+                icon={<Hash className="w-3.5 h-3.5 text-gray-400" />}
+                inputMode="numeric" />
+            )}
+
+            {/* ── Куда платить ─────────────────────────────────────── */}
+            {settings.entity_type === 'self_employed' && (
+              <>
+                <div className="pt-2">
+                  <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    Куда платить — карта или СБП
+                  </p>
+                </div>
+                <Input label="Номер карты"
+                  placeholder="1234 5678 9012 3456"
+                  value={formatCardNumber(settings.card_number)}
+                  onChange={v => setSettings(s => ({ ...s, card_number: v.replace(/\D/g, '').slice(0, 19) }))}
+                  icon={<CreditCard className="w-3.5 h-3.5 text-gray-400" />}
+                  inputMode="numeric" />
+                <Input label="или Телефон для СБП"
+                  placeholder="+7 999 123 45 67"
+                  value={formatPhone(settings.phone_for_sbp)}
+                  onChange={v => setSettings(s => ({ ...s, phone_for_sbp: normalizePhone(v) }))}
+                  icon={<Phone className="w-3.5 h-3.5 text-gray-400" />}
+                  inputMode="numeric" />
+                <Input label="Банк" placeholder="Тинькофф"
+                  value={settings.card_bank}
+                  onChange={v => setSettings(s => ({ ...s, card_bank: v }))}
+                  icon={<Banknote className="w-3.5 h-3.5 text-gray-400" />} />
+              </>
+            )}
+
+            {(settings.entity_type === 'ip' || settings.entity_type === 'legal') && (
+              <>
+                <div className="pt-2">
+                  <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">
+                    Реквизиты расчётного счёта
+                  </p>
+                </div>
+                <Input label="Расчётный счёт (20 цифр)"
+                  placeholder="40802810100001234567"
+                  value={settings.bank_account}
+                  onChange={v => setSettings(s => ({ ...s, bank_account: v.replace(/\D/g, '').slice(0, 20) }))}
+                  icon={<Hash className="w-3.5 h-3.5 text-gray-400" />}
+                  inputMode="numeric" />
+                <Input label="БИК (9 цифр)"
+                  placeholder="044525225"
+                  value={settings.bank_bic}
+                  onChange={v => setSettings(s => ({ ...s, bank_bic: v.replace(/\D/g, '').slice(0, 9) }))}
+                  icon={<Hash className="w-3.5 h-3.5 text-gray-400" />}
+                  inputMode="numeric" />
+                <Input label="Банк" placeholder="Сбербанк"
+                  value={settings.card_bank}
+                  onChange={v => setSettings(s => ({ ...s, card_bank: v }))}
+                  icon={<Banknote className="w-3.5 h-3.5 text-gray-400" />} />
+              </>
+            )}
           </div>
 
           <button onClick={handleSaveSettings} disabled={savingSettings}
