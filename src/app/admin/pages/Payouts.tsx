@@ -181,9 +181,10 @@ export function Payouts() {
   const totalAvailable = useMemo(() => partners.reduce((s, p) => s + p.partner_balance, 0), [partners]);
   const totalPending = useMemo(() => partners.reduce((s, p) => s + p.pending_hold, 0), [partners]);
 
-  const handleExportCsv = () => {
+  // Скачать историю выплат
+  const handleExportHistoryCsv = () => {
     const rows: string[][] = [
-      ['Дата', 'Партнёр', 'telegram_id', 'Сумма ₽', 'Карта', 'Статус', 'Заметка'],
+      ['Дата', 'Партнёр', 'telegram_id', 'Сумма ₽', 'Карта', 'Статус'],
     ];
     for (const p of history) {
       rows.push([
@@ -193,17 +194,57 @@ export function Payouts() {
         String(p.amount_rub),
         p.card_last4 ?? '',
         STATUS_LABEL[p.status]?.label ?? p.status,
-        p.note ?? '',
       ]);
     }
+    downloadCsv(rows, `partner_payouts_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  // Скачать реквизиты всех партнёров — для bulk-выплат через банк-клиент или
+  // отправки бухгалтеру.
+  const handleExportRequisitesCsv = () => {
+    const rows: string[][] = [
+      ['Telegram ID', 'username', 'Имя в TG', 'Статус', 'ФИО / Название', 'ИНН', 'КПП',
+       'Карта', 'Банк', 'СБП телефон', 'Расчётный счёт', 'БИК',
+       'Баланс к выплате', 'В hold', 'Всего заработано'],
+    ];
+    for (const p of partners) {
+      const tgName = [p.first_name, p.last_name].filter(Boolean).join(' ').trim();
+      const fioOrOrg = p.entity_type === 'legal' ? (p.organization_name ?? '') : (p.full_name ?? '');
+      const statusLabel = p.entity_type === 'self_employed' ? 'Самозанятый'
+        : p.entity_type === 'ip' ? 'ИП'
+        : p.entity_type === 'legal' ? 'Юрлицо'
+        : 'Не указан';
+      rows.push([
+        String(p.telegram_id),
+        p.username ?? '',
+        tgName,
+        statusLabel,
+        fioOrOrg,
+        p.inn ?? '',
+        p.kpp ?? '',
+        p.card_number ?? '',
+        p.card_bank ?? '',
+        p.phone_for_sbp ?? '',
+        p.bank_account ?? '',
+        p.bank_bic ?? '',
+        String(p.partner_balance),
+        String(p.pending_hold),
+        String(p.total_approved_lifetime),
+      ]);
+    }
+    downloadCsv(rows, `partners_requisites_${new Date().toISOString().slice(0, 10)}.csv`);
+  };
+
+  const downloadCsv = (rows: string[][], filename: string) => {
     const csv = '﻿' + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `partner_payouts_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+    URL.revokeObjectURL(a.href);
   };
 
   return (
@@ -228,12 +269,20 @@ export function Payouts() {
             <RefreshCw size={14} /> Обновить
           </button>
           <button
-            onClick={handleExportCsv}
+            onClick={handleExportRequisitesCsv}
+            disabled={partners.length === 0}
+            className="px-3 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg transition flex items-center gap-1.5 text-sm disabled:opacity-50"
+            title="Экспорт реквизитов всех партнёров — для bulk-выплат через банк-клиент или бухгалтерии"
+          >
+            <FileDown size={14} /> Реквизиты
+          </button>
+          <button
+            onClick={handleExportHistoryCsv}
             disabled={history.length === 0}
             className="px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-lg transition flex items-center gap-1.5 text-sm disabled:opacity-50"
-            title="Экспорт CSV"
+            title="Экспорт истории выплат"
           >
-            <FileDown size={14} /> CSV
+            <FileDown size={14} /> История
           </button>
         </div>
       </div>
@@ -268,6 +317,22 @@ export function Payouts() {
               const ready = p.partner_balance > 0;
               const hasValidStatus = p.entity_type === 'self_employed' || p.entity_type === 'ip' || p.entity_type === 'legal';
               const blocked = ready && !hasValidStatus; // деньги есть, но статус не указан
+              const statusLabel = p.entity_type === 'self_employed' ? 'Самозанятый'
+                : p.entity_type === 'ip' ? 'ИП'
+                : p.entity_type === 'legal' ? 'Юрлицо'
+                : null;
+              const statusColor = p.entity_type === 'self_employed' ? 'bg-blue-100 text-blue-700'
+                : p.entity_type === 'ip' ? 'bg-purple-100 text-purple-700'
+                : p.entity_type === 'legal' ? 'bg-indigo-100 text-indigo-700'
+                : 'bg-gray-100 text-gray-500';
+              // Контакт для inline-отображения: то на что перевод (карта / СБП / р/с)
+              const contactLine = p.entity_type === 'self_employed'
+                ? (p.card_number ? `Карта ${p.card_number.replace(/(\d{4})(?=\d)/g, '$1 ')}` :
+                   p.phone_for_sbp ? `СБП ${p.phone_for_sbp}` :
+                   p.card_number_last4 ? `Карта •• ${p.card_number_last4}` : null)
+                : (p.entity_type === 'ip' || p.entity_type === 'legal')
+                ? (p.bank_account ? `Р/с ${p.bank_account}` : null)
+                : null;
               return (
                 <button
                   key={p.telegram_id}
@@ -285,11 +350,20 @@ export function Payouts() {
                   className={`w-full px-4 py-3 flex items-center justify-between gap-3 hover:bg-blue-50/30 active:bg-blue-50/60 transition text-left ${ready ? '' : 'opacity-60'}`}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[#0F2A36] truncate">{name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-[#0F2A36] truncate">{name}</p>
+                      {statusLabel && (
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-gray-500 mt-0.5 tabular-nums truncate">
                       ID {p.telegram_id}{p.username ? ` · @${p.username}` : ''}
-                      {p.card_number_last4 ? ` · карта •• ${p.card_number_last4}` : ''}
                     </p>
+                    {contactLine && (
+                      <p className="text-xs text-gray-600 mt-0.5 truncate font-mono">{contactLine}</p>
+                    )}
                     {p.pending_hold > 0 && (
                       <p className="text-[11px] text-amber-700 mt-1 flex items-center gap-1">
                         <Clock className="w-3 h-3" />
@@ -372,8 +446,6 @@ const PayoutModal: React.FC<{
   onDone: () => void;
 }> = ({ partner, onClose, onDone }) => {
   const [amount, setAmount] = useState(String(partner.partner_balance));
-  const [cardLast4, setCardLast4] = useState(partner.card_number_last4 ?? '');
-  const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -391,14 +463,17 @@ const PayoutModal: React.FC<{
     try {
       // 1. Insert partner_payouts row → возвращаем ID, чтобы использовать его
       //    как dedupe_key в bonus_logs (защита от двойного списания при ретрае).
+      // card_last4 — snapshot из partner_settings.card_number_last4 если есть,
+      // чтобы в истории выплат было видно «на какую карту». Заметку убрали —
+      // на каждом payout не нужна (вся справочная инфа в реквизитах партнёра).
       const { data: payoutRow, error: payoutErr } = await supabase
         .from('partner_payouts')
         .insert({
           telegram_id: partner.telegram_id,
           amount_rub: numericAmount,
           status: 'processed',
-          card_last4: cardLast4.trim() || null,
-          note: note.trim() || null,
+          card_last4: partner.card_number_last4 ?? null,
+          note: null,
           processed_at: new Date().toISOString(),
         })
         .select('id')
@@ -408,6 +483,7 @@ const PayoutModal: React.FC<{
 
       // 2. Audit log с dedupe_key=partner_paid_<payoutId>. Идёт ПЕРЕД балансом —
       //    если ретрай, unique constraint вернёт 0 строк → знаем что уже списали.
+      const last4 = partner.card_number_last4;
       const { data: logInserted, error: logErr } = await supabase
         .from('bonus_logs')
         .upsert(
@@ -415,7 +491,7 @@ const PayoutModal: React.FC<{
             telegram_id: partner.telegram_id,
             type: 'partner_paid',
             amount: -numericAmount,
-            description: `−${numericAmount}₽ выплата на карту${cardLast4 ? ` •• ${cardLast4}` : ''}${note ? ` (${note})` : ''}`,
+            description: `−${numericAmount}₽ выплата${last4 ? ` на карту •• ${last4}` : ''}`,
             dedupe_key: `partner_paid_${payoutId}`,
           },
           { onConflict: 'telegram_id,type,dedupe_key', ignoreDuplicates: true },
@@ -442,7 +518,7 @@ const PayoutModal: React.FC<{
           telegram_id: partner.telegram_id,
           status: 'partner_payout_processed',
           amount: numericAmount,
-          card_last4: cardLast4.trim() || null,
+          card_last4: partner.card_number_last4 ?? null,
           application_id: `partner_notify_payout_${partner.telegram_id}_${Date.now()}`,
         }),
       }).catch(e => console.warn('partner notify (payout) error:', e));
@@ -563,29 +639,6 @@ const PayoutModal: React.FC<{
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Последние 4 цифры карты (опц.)</label>
-            <input
-              type="text"
-              maxLength={4}
-              placeholder="6411"
-              value={cardLast4}
-              onChange={e => setCardLast4(e.target.value.replace(/\D/g, ''))}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#3B5BFF] tabular-nums"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-medium text-gray-700 mb-1.5">Заметка (опц.)</label>
-            <textarea
-              rows={2}
-              placeholder="Например: октябрьская выплата, чек №12345"
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:border-[#3B5BFF] resize-none"
-            />
-          </div>
-
           {error && (
             <div className="bg-rose-50 border border-rose-200 rounded-lg px-3 py-2 text-xs text-rose-700 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -595,14 +648,8 @@ const PayoutModal: React.FC<{
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-xs text-amber-800 leading-relaxed">
             <strong>⚠️ Это просто учёт в системе.</strong>{' '}
-            Перевод денег партнёру делаешь сам —{' '}
-            {partner.entity_type === 'self_employed' && (
-              <>на карту {partner.card_number_last4 ? `•• ${partner.card_number_last4}` : ''}{partner.phone_for_sbp ? ` или СБП на ${partner.phone_for_sbp}` : ''}</>
-            )}
-            {(partner.entity_type === 'ip' || partner.entity_type === 'legal') && (
-              <>на расчётный счёт {partner.bank_account ?? '????'} (БИК {partner.bank_bic ?? '???'})</>
-            )}
-            . После нажатия «Подтвердить» баланс партнёра уменьшится на {numericAmount.toLocaleString('ru-RU')}₽.
+            Перевод денег партнёру делаешь сам по реквизитам выше.
+            После нажатия «Подтвердить» баланс партнёра уменьшится на {numericAmount.toLocaleString('ru-RU')}₽.
           </div>
         </div>
 
