@@ -14,6 +14,7 @@ import {
   Gift,
   Calendar,
   Crown,
+  Inbox,
   X
 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
@@ -189,6 +190,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="Партнёры"
           active={activeSection === 'partners' || activeSection === 'payouts'}
           onClick={() => onSectionChange('partners')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<Inbox size={20} />}
+          label="Заявки на партнёрство"
+          active={activeSection === 'partner-applications'}
+          onClick={() => onSectionChange('partner-applications')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem

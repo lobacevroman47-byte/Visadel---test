@@ -113,6 +113,21 @@ export default async function handler(req, res) {
       (d.telegram_login ? `📱 ${String(d.telegram_login).startsWith('@') ? d.telegram_login : '@' + d.telegram_login}\n` : '') +
       (d.phone ? `☎️ ${d.phone}\n` : '') +
       `\nЗайди в админку → раздел Брони → подтверди оплату.`;
+  } else if (resolvedEvent === 'partner_application') {
+    const tgUser = body.telegram_username
+      ? `@${String(body.telegram_username).replace('@', '')}`
+      : customer_telegram;
+    text =
+      `🎯 <b>Новая заявка на партнёрство</b>\n` +
+      `<b>${body.full_name ?? '—'}</b>\n\n` +
+      `📱 ${tgUser}\n` +
+      `📧 ${body.email ?? '—'}\n` +
+      (body.phone ? `☎️ ${body.phone}\n` : '') +
+      `\n🔗 <a href="${body.platform_url ?? '#'}">${body.platform_url ?? '—'}</a>\n` +
+      (body.audience_theme ? `📊 Тема: ${body.audience_theme}\n` : '') +
+      (body.subscribers_count ? `👥 Подписчики: ${Number(body.subscribers_count).toLocaleString('ru-RU')}\n` : '') +
+      (body.comment ? `\n💬 ${String(body.comment).slice(0, 300)}\n` : '') +
+      `\nЗайди в админку → Заявки на партнёрство → одобри или отклони.`;
   } else if (resolvedEvent === 'flight_booking') {
     const d = details ?? {};
     const nameLine = customer_name ? `<b>${customer_name}</b>` : '<i>Имя не указано</i>';

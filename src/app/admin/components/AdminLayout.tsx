@@ -15,6 +15,7 @@ import { Reviews } from '../pages/Reviews';
 import { BonusLogs } from '../pages/BonusLogs';
 import { Bookings } from '../pages/Bookings';
 import { Partners } from '../pages/Partners';
+import { PartnerApplications } from '../pages/PartnerApplications';
 import { AuditLog } from '../pages/AuditLog';
 import { useAdmin } from '../contexts/AdminContext';
 import { Menu, ArrowLeft } from 'lucide-react';
@@ -173,6 +174,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
       case 'payouts':
         return hasPermission(['owner', 'admin']) ? (
           <Partners />
+        ) : (
+          <PermissionDenied />
+        );
+      case 'partner-applications':
+        return hasPermission(['owner', 'admin']) ? (
+          <PartnerApplications />
         ) : (
           <PermissionDenied />
         );
