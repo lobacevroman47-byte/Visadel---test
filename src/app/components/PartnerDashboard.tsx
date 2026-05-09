@@ -11,7 +11,7 @@
 //
 // Data flow: всё через supabase anon-key (миграции 017+018+019 открыли).
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Wallet, Clock, Check, CreditCard, FileText, Loader2,
   Save, AlertCircle, Crown, X, Copy, Link as LinkIcon, Sparkles,
@@ -53,12 +53,49 @@ function countryFlag(country?: string | null): string {
   return COUNTRY_FLAGS[country] ?? '🌍';
 }
 
-// Выпарсить страну из description: «Партнёрская комиссия 15% × 2490₽ за визу Шри-Ланки»
-function parseCountryFromDescription(d: string): string | null {
-  // Ищем "за визу <Страна>" или "за бронь <отеля> в <Страна>"
-  const visa = d.match(/за визу\s+([А-ЯЁA-Z][^.,)]*)/i);
-  if (visa) return visa[1].trim().replace(/[.,;]+$/, '');
-  return null;
+// Парсим dedupe_key → { service, sourceId }. service из 'partner_<service>_<id>'.
+type ServiceType = 'visa' | 'hotel_bookings' | 'flight_bookings';
+function parseDedupe(key: string | null | undefined): { service: ServiceType; sourceId: string } | null {
+  if (!key) return null;
+  const m = key.match(/^partner_(visa|hotel_bookings|flight_bookings)_(.+)$/);
+  if (!m) return null;
+  return { service: m[1] as ServiceType, sourceId: m[2] };
+}
+
+// Enrichment — данные заявки/брони, привязанные к bonus_log.id для отображения в строке.
+interface Enrichment {
+  service: ServiceType;
+  country?: string;
+  visa_type?: string;
+  city?: string;
+  from_city?: string;
+  to_city?: string;
+  price?: number;
+  pct?: number;
+  customer_first_name?: string;
+  customer_last_name?: string;
+  customer_username?: string | null;
+  customer_telegram_id?: number;
+}
+
+function serviceLabel(service: ServiceType): string {
+  if (service === 'visa') return 'Виза';
+  if (service === 'hotel_bookings') return 'Бронь отеля';
+  return 'Авиабилет';
+}
+
+// Заголовок строки: "Виза Шри-Ланка", "Бронь отеля Бали", "Авиабилет Москва → Бали".
+function buildEarningTitle(e: Enrichment | undefined, fallbackService?: ServiceType): string {
+  if (!e) return fallbackService ? serviceLabel(fallbackService) : 'Партнёрское начисление';
+  const base = serviceLabel(e.service);
+  if (e.service === 'visa') return e.country ? `${base} ${e.country}` : base;
+  if (e.service === 'hotel_bookings') {
+    const place = e.country || e.city;
+    return place ? `${base} ${place}` : base;
+  }
+  // flight_bookings
+  if (e.from_city && e.to_city) return `${base} ${e.from_city} → ${e.to_city}`;
+  return base;
 }
 
 // Period selector
@@ -120,6 +157,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
   const referralCode = appUser?.referral_code ?? '';
 
   const [logs, setLogs] = useState<BonusLogEntry[]>([]);
+  const [enrichments, setEnrichments] = useState<Map<string, Enrichment>>(new Map());
   const [payouts, setPayouts] = useState<PayoutEntry[]>([]);
   const [settings, setSettings] = useState<PartnerSettings>(DEFAULT_SETTINGS);
   const [vanity, setVanity] = useState(appUser?.vanity_code ?? '');
@@ -173,6 +211,123 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
     })();
     return () => { cancelled = true; };
   }, [telegramId]);
+
+  // Обогащение начислений данными из applications/hotel_bookings/flight_bookings.
+  // После загрузки logs батч-фетчим связанные сущности и строим Map<log.id, Enrichment>.
+  useEffect(() => {
+    if (!isSupabaseConfigured() || logs.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const visaPairs: { logId: string; sourceId: string }[] = [];
+      const hotelPairs: { logId: string; sourceId: string }[] = [];
+      const flightPairs: { logId: string; sourceId: string }[] = [];
+      for (const log of logs) {
+        const parsed = parseDedupe(log.dedupe_key);
+        if (!parsed) continue;
+        const target = parsed.service === 'visa' ? visaPairs
+                     : parsed.service === 'hotel_bookings' ? hotelPairs
+                     : flightPairs;
+        target.push({ logId: log.id, sourceId: parsed.sourceId });
+      }
+
+      const map = new Map<string, Enrichment>();
+
+      // Визы
+      if (visaPairs.length) {
+        const { data } = await supabase
+          .from('applications')
+          .select('id, country, visa_type, price, user_telegram_id')
+          .in('id', visaPairs.map(x => x.sourceId));
+        const rows = (data ?? []) as Array<{ id: string; country: string; visa_type: string; price: number; user_telegram_id: number }>;
+        for (const row of rows) {
+          const pair = visaPairs.find(x => x.sourceId === row.id);
+          if (!pair) continue;
+          map.set(pair.logId, {
+            service: 'visa',
+            country: row.country,
+            visa_type: row.visa_type,
+            price: row.price,
+            customer_telegram_id: row.user_telegram_id,
+          });
+        }
+      }
+
+      // Отели
+      if (hotelPairs.length) {
+        const { data } = await supabase
+          .from('hotel_bookings')
+          .select('id, country, city, price, partner_commission_pct, first_name, last_name, username')
+          .in('id', hotelPairs.map(x => x.sourceId));
+        const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
+        for (const row of rows) {
+          const pair = hotelPairs.find(x => x.sourceId === row.id);
+          if (!pair) continue;
+          map.set(pair.logId, {
+            service: 'hotel_bookings',
+            country: row.country as string | undefined,
+            city: row.city as string | undefined,
+            price: row.price as number | undefined,
+            pct: row.partner_commission_pct as number | undefined,
+            customer_first_name: row.first_name as string | undefined,
+            customer_last_name: row.last_name as string | undefined,
+            customer_username: (row.username as string | null) ?? null,
+          });
+        }
+      }
+
+      // Авиа
+      if (flightPairs.length) {
+        const { data } = await supabase
+          .from('flight_bookings')
+          .select('id, from_city, to_city, price, partner_commission_pct, first_name, last_name, username')
+          .in('id', flightPairs.map(x => x.sourceId));
+        const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
+        for (const row of rows) {
+          const pair = flightPairs.find(x => x.sourceId === row.id);
+          if (!pair) continue;
+          map.set(pair.logId, {
+            service: 'flight_bookings',
+            from_city: row.from_city as string | undefined,
+            to_city: row.to_city as string | undefined,
+            price: row.price as number | undefined,
+            pct: row.partner_commission_pct as number | undefined,
+            customer_first_name: row.first_name as string | undefined,
+            customer_last_name: row.last_name as string | undefined,
+            customer_username: (row.username as string | null) ?? null,
+          });
+        }
+      }
+
+      // Догрузим имена клиентов для виз (по telegram_id)
+      const visaCustomerIds = Array.from(map.values())
+        .filter(e => e.service === 'visa' && e.customer_telegram_id)
+        .map(e => e.customer_telegram_id!) ;
+      if (visaCustomerIds.length) {
+        const { data: users } = await supabase
+          .from('users')
+          .select('telegram_id, first_name, last_name, username')
+          .in('telegram_id', visaCustomerIds);
+        const userMap = new Map<number, { first_name?: string; last_name?: string; username?: string | null }>();
+        for (const u of (users ?? []) as Array<{ telegram_id: number; first_name?: string; last_name?: string; username?: string | null }>) {
+          userMap.set(u.telegram_id, u);
+        }
+        for (const [logId, e] of map.entries()) {
+          if (e.service !== 'visa' || !e.customer_telegram_id) continue;
+          const u = userMap.get(e.customer_telegram_id);
+          if (!u) continue;
+          map.set(logId, {
+            ...e,
+            customer_first_name: u.first_name,
+            customer_last_name: u.last_name,
+            customer_username: u.username ?? null,
+          });
+        }
+      }
+
+      if (!cancelled) setEnrichments(map);
+    })();
+    return () => { cancelled = true; };
+  }, [logs]);
 
   // Статистика
   const pendingHold = useMemo(
@@ -358,7 +513,12 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           ) : (
             <div className="divide-y divide-gray-100">
               {earnings.map(l => (
-                <EarningRow key={l.id} log={l} onClick={() => setSelectedLog(l)} />
+                <EarningRow
+                  key={l.id}
+                  log={l}
+                  enrichment={enrichments.get(l.id)}
+                  onClick={() => setSelectedLog(l)}
+                />
               ))}
             </div>
           )}
@@ -530,7 +690,13 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       </div>
 
       {/* Earning detail modal */}
-      {selectedLog && <EarningDetailModal log={selectedLog} onClose={() => setSelectedLog(null)} />}
+      {selectedLog && (
+        <EarningDetailModal
+          log={selectedLog}
+          enrichment={enrichments.get(selectedLog.id)}
+          onClose={() => setSelectedLog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -557,46 +723,27 @@ function StatCard({
   );
 }
 
-function EarningRow({ log, onClick }: { log: BonusLogEntry; onClick: () => void }) {
+function EarningRow({
+  log, enrichment, onClick,
+}: {
+  log: BonusLogEntry;
+  enrichment: Enrichment | undefined;
+  onClick: () => void;
+}) {
   const isPending = log.type === 'partner_pending';
-  const created = new Date(log.created_at);
-  const dateStr = created.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-  const country = parseCountryFromDescription(log.description ?? '');
-  const flag = countryFlag(country);
-
-  const daysLeft = isPending
-    ? Math.max(0, HOLD_DAYS - Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)))
-    : 0;
+  const parsed = parseDedupe(log.dedupe_key);
+  const fallbackService = parsed?.service;
+  const title = buildEarningTitle(enrichment, fallbackService);
+  const flag = countryFlag(enrichment?.country);
 
   return (
     <button
       onClick={onClick}
       className="w-full flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-gray-50/50 active:bg-gray-100/50 -mx-2 px-2 rounded-lg transition text-left"
     >
-      <div className="flex items-start gap-2.5 min-w-0 flex-1">
-        <span className="text-2xl mt-0.5 leading-none shrink-0" aria-hidden>{flag}</span>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium text-[#0F2A36] truncate">
-            {country ?? 'Партнёрское начисление'}
-          </p>
-          <p className="text-xs text-gray-400 truncate mt-0.5">
-            {log.description?.replace(/^.*?за\s+(виз[уаы]|бронь)\s+/i, '').trim() || dateStr}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5">
-            <span className="text-xs text-gray-400">{dateStr}</span>
-            {isPending ? (
-              <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
-                {daysLeft === 0 ? 'почти готово' : `${daysLeft}д до approve`}
-              </span>
-            ) : (
-              <span className="text-[11px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <Check className="w-2.5 h-2.5" />
-                К выплате
-              </span>
-            )}
-          </div>
-        </div>
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <span className="text-xl leading-none shrink-0" aria-hidden>{flag}</span>
+        <p className="text-sm font-medium text-[#0F2A36] truncate">{title}</p>
       </div>
       <p className={`text-sm font-bold tabular-nums shrink-0 ml-3 ${isPending ? 'text-amber-600' : 'text-emerald-600'}`}>
         +{log.amount.toLocaleString('ru-RU')}₽
@@ -606,98 +753,26 @@ function EarningRow({ log, onClick }: { log: BonusLogEntry; onClick: () => void 
 }
 
 function EarningDetailModal({
-  log, onClose,
-}: { log: BonusLogEntry; onClose: () => void }) {
-  // Парсим dedupe_key: partner_visa_<uuid> | partner_hotel_bookings_<uuid> | partner_flight_bookings_<uuid>
-  const sourceMatch = (log.dedupe_key ?? '').match(/^partner_(visa|hotel_bookings|flight_bookings)_(.+)$/);
-  const sourceType = sourceMatch?.[1] ?? null;
-  const sourceId = sourceMatch?.[2] ?? null;
-
-  const [details, setDetails] = useState<{
-    customer_name?: string;
-    customer_username?: string | null;
-    country?: string;
-    visa_type?: string;
-    city?: string;
-    from_city?: string;
-    to_city?: string;
-    booking_date?: string;
-    price?: number;
-    pct?: number;
-    status?: string;
-  } | null>(null);
-  const [detailLoading, setDetailLoading] = useState(true);
-
-  const dataLoadedRef = useRef(false);
-  useEffect(() => {
-    if (dataLoadedRef.current || !sourceType || !sourceId) return;
-    dataLoadedRef.current = true;
-    (async () => {
-      try {
-        if (sourceType === 'visa') {
-          const { data: app } = await supabase
-            .from('applications')
-            .select('country, visa_type, price, status, user_telegram_id')
-            .eq('id', sourceId)
-            .maybeSingle();
-          if (app) {
-            const a = app as { country: string; visa_type: string; price: number; status: string; user_telegram_id: number };
-            // Получим имя клиента
-            const { data: user } = await supabase
-              .from('users')
-              .select('first_name, last_name, username')
-              .eq('telegram_id', a.user_telegram_id)
-              .maybeSingle();
-            const u = user as { first_name?: string; last_name?: string; username?: string | null } | null;
-            const initials = [u?.first_name, u?.last_name?.[0] ? `${u.last_name[0]}.` : ''].filter(Boolean).join(' ');
-            setDetails({
-              customer_name: initials || 'Аноним',
-              customer_username: u?.username ?? null,
-              country: a.country,
-              visa_type: a.visa_type,
-              price: a.price,
-              status: a.status,
-            });
-          }
-        } else if (sourceType === 'hotel_bookings' || sourceType === 'flight_bookings') {
-          const { data: b } = await supabase
-            .from(sourceType)
-            .select('*')
-            .eq('id', sourceId)
-            .maybeSingle();
-          if (b) {
-            const row = b as Record<string, unknown>;
-            setDetails({
-              customer_name: [row.first_name, (row.last_name as string)?.[0] ? `${(row.last_name as string)[0]}.` : '']
-                .filter(Boolean).join(' ') || 'Аноним',
-              customer_username: (row.username as string | null) ?? null,
-              country: row.country as string | undefined,
-              city: row.city as string | undefined,
-              from_city: row.from_city as string | undefined,
-              to_city: row.to_city as string | undefined,
-              booking_date: row.booking_date as string | undefined,
-              price: row.price as number | undefined,
-              pct: row.partner_commission_pct as number | undefined,
-              status: row.status as string | undefined,
-            });
-          }
-        }
-      } finally {
-        setDetailLoading(false);
-      }
-    })();
-  }, [sourceType, sourceId]);
+  log, enrichment, onClose,
+}: { log: BonusLogEntry; enrichment: Enrichment | undefined; onClose: () => void }) {
+  // Используем enrichment как источник данных. Если его ещё нет (батч-фетч в parent
+  // не успел) — модалка отрисуется с базовой инфой (сумма, статус, дата) без подгрузки.
+  const parsed = parseDedupe(log.dedupe_key);
+  const sourceType = parsed?.service ?? null;
+  const sourceId = parsed?.sourceId ?? null;
 
   const isPending = log.type === 'partner_pending';
   const created = new Date(log.created_at);
   const willApproveAt = new Date(created.getTime() + HOLD_DAYS * 24 * 60 * 60 * 1000);
   const daysLeft = Math.max(0, HOLD_DAYS - Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)));
 
-  const flag = countryFlag(details?.country);
-  const sourceLabel = sourceType === 'visa' ? 'Виза'
-                    : sourceType === 'hotel_bookings' ? 'Бронь отеля'
-                    : sourceType === 'flight_bookings' ? 'Бронь авиабилета'
-                    : 'Начисление';
+  const flag = countryFlag(enrichment?.country);
+  const customerName = enrichment
+    ? [enrichment.customer_first_name, enrichment.customer_last_name?.[0] ? `${enrichment.customer_last_name[0]}.` : '']
+        .filter(Boolean).join(' ') || null
+    : null;
+  const sourceLabel = sourceType ? serviceLabel(sourceType) : 'Начисление';
+  const titleLine = enrichment ? buildEarningTitle(enrichment, sourceType ?? undefined).replace(new RegExp(`^${serviceLabel(enrichment.service)}\\s*`), '') : null;
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
@@ -708,13 +783,9 @@ function EarningDetailModal({
             <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
             <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5 flex items-center gap-2">
               <span className="text-xl">{flag}</span>
-              {details?.country ?? 'Партнёрское начисление'}
+              {titleLine || 'Партнёрское начисление'}
             </p>
-            {details?.visa_type && <p className="text-xs text-gray-500 mt-0.5">{details.visa_type}</p>}
-            {details?.city && <p className="text-xs text-gray-500 mt-0.5">📍 {details.city}</p>}
-            {details?.from_city && details?.to_city && (
-              <p className="text-xs text-gray-500 mt-0.5">✈️ {details.from_city} → {details.to_city}</p>
-            )}
+            {enrichment?.visa_type && <p className="text-xs text-gray-500 mt-0.5">{enrichment.visa_type}</p>}
           </div>
           <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть">
             <X className="w-5 h-5 text-gray-500" />
@@ -727,58 +798,50 @@ function EarningDetailModal({
           <p className={`text-[36px] font-bold tabular-nums leading-none mt-1 ${isPending ? 'text-amber-700' : 'text-emerald-700'}`}>
             +{log.amount.toLocaleString('ru-RU')}₽
           </p>
-          {details?.price && (
+          {enrichment?.price !== undefined && (
             <p className="text-xs text-gray-500 mt-2">
-              {Math.round((log.amount / details.price) * 100)}% от стоимости заказа{' '}
-              {details.price.toLocaleString('ru-RU')}₽
+              {Math.round((log.amount / enrichment.price) * 100)}% от стоимости заказа{' '}
+              {enrichment.price.toLocaleString('ru-RU')}₽
             </p>
           )}
         </div>
 
         {/* Details */}
         <div className="px-5 py-4 space-y-3">
-          {detailLoading ? (
-            <div className="flex items-center justify-center py-4 text-sm text-gray-400">
-              <Loader2 className="w-4 h-4 animate-spin mr-2" /> Загружаем детали…
-            </div>
-          ) : (
-            <>
-              {details?.customer_name && (
-                <DetailRow label="Клиент" value={
-                  <>
-                    {details.customer_name}
-                    {details.customer_username && (
-                      <span className="text-[#3B5BFF] ml-1">@{details.customer_username}</span>
-                    )}
-                  </>
-                } />
-              )}
-              {details?.price !== undefined && (
-                <DetailRow label="Стоимость заказа" value={`${details.price.toLocaleString('ru-RU')}₽`} />
-              )}
-              <DetailRow
-                label="Статус"
-                value={isPending
-                  ? <span className="text-amber-700">В hold-периоде</span>
-                  : <span className="text-emerald-700">Доступно к выплате</span>}
-              />
-              <DetailRow
-                label="Дата начисления"
-                value={created.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
-              />
-              {isPending && (
-                <DetailRow
-                  label="Approved будет"
-                  value={`${willApproveAt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} (через ${daysLeft}д)`}
-                />
-              )}
-              {sourceId && (
-                <DetailRow
-                  label="ID заявки"
-                  value={<code className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">{sourceId.slice(0, 8)}…</code>}
-                />
-              )}
-            </>
+          {customerName && (
+            <DetailRow label="Клиент" value={
+              <>
+                {customerName}
+                {enrichment?.customer_username && (
+                  <span className="text-[#3B5BFF] ml-1">@{enrichment.customer_username}</span>
+                )}
+              </>
+            } />
+          )}
+          {enrichment?.price !== undefined && (
+            <DetailRow label="Стоимость заказа" value={`${enrichment.price.toLocaleString('ru-RU')}₽`} />
+          )}
+          <DetailRow
+            label="Статус"
+            value={isPending
+              ? <span className="text-amber-700">В hold-периоде</span>
+              : <span className="text-emerald-700">Доступно к выплате</span>}
+          />
+          <DetailRow
+            label="Дата начисления"
+            value={created.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })}
+          />
+          {isPending && (
+            <DetailRow
+              label="Approved будет"
+              value={`${willApproveAt.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} (через ${daysLeft}д)`}
+            />
+          )}
+          {sourceId && (
+            <DetailRow
+              label="ID заявки"
+              value={<code className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded">{sourceId.slice(0, 8)}…</code>}
+            />
           )}
         </div>
 
