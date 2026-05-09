@@ -1191,29 +1191,29 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               {/* Клиент */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-gray-500">ФИО / имя</p>
-                  <p className="text-sm font-medium">{application.clientName || '—'}</p>
+                  <p className="text-xs text-[#0F2A36]/60">ФИО / имя</p>
+                  <p className="text-sm font-semibold text-[#0F2A36]">{application.clientName || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Telegram</p>
+                  <p className="text-xs text-[#0F2A36]/60">Telegram</p>
                   {tgUsername ? (
                     <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
-                      className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                      className="text-sm font-semibold text-[#3B5BFF] hover:underline inline-flex items-center gap-1">
                       @{tgUsername} <ExternalLink className="w-3 h-3" />
                     </a>
-                  ) : <p className="text-sm">—</p>}
+                  ) : <p className="text-sm font-semibold text-[#0F2A36]">—</p>}
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Телефон</p>
-                  <p className="text-sm">{application.phone || '—'}</p>
+                  <p className="text-xs text-[#0F2A36]/60">Телефон</p>
+                  <p className="text-sm font-semibold text-[#0F2A36]">{application.phone || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Email</p>
-                  <p className="text-sm">{application.email || '—'}</p>
+                  <p className="text-xs text-[#0F2A36]/60">Email</p>
+                  <p className="text-sm font-semibold text-[#0F2A36] break-all">{application.email || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Дата подачи</p>
-                  <p className="text-sm">{new Date(application.date).toLocaleDateString('ru-RU')}</p>
+                  <p className="text-xs text-[#0F2A36]/60">Дата подачи</p>
+                  <p className="text-sm font-semibold text-[#0F2A36]">{new Date(application.date).toLocaleDateString('ru-RU')}</p>
                 </div>
               </div>
 
