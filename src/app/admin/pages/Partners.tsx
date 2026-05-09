@@ -17,6 +17,7 @@ import {
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Button, Modal } from '../../components/ui/brand';
 
 const BOT_USERNAME = 'Visadel_test_bot'; // в /app?startapp=<code>
 
@@ -672,20 +673,32 @@ const PayoutModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">Выплата партнёру</p>
-            <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5">{partnerName}</p>
-            <p className="text-xs text-gray-500 mt-0.5">ID {partner.telegram_id}{partner.username ? ` · @${partner.username}` : ''}</p>
-          </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
+    <Modal
+      open
+      onClose={onClose}
+      icon="💸"
+      label="Выплата партнёру"
+      title={partnerName}
+      subtitle={`ID ${partner.telegram_id}${partner.username ? ` · @${partner.username}` : ''}`}
+      size="sm"
+      footer={(
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="md" onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handleSubmit}
+            disabled={!isValid || saving}
+            loading={saving}
+            leftIcon={!saving ? <Check className="w-4 h-4" /> : undefined}
+          >
+            Подтвердить выплату
+          </Button>
         </div>
-
+      )}
+    >
         {/* Balance summary */}
         <div className="px-5 py-4 bg-gray-50 border-b border-gray-100 grid grid-cols-2 gap-3">
           <div>
@@ -785,25 +798,7 @@ const PayoutModal: React.FC<{
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-end gap-2 sticky bottom-0 bg-white">
-          <button
-            onClick={onClose}
-            className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={!isValid || saving}
-            className="px-4 py-2.5 vd-grad text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50 active:scale-95 transition"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-            Подтвердить выплату
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -1008,13 +1003,9 @@ const PartnerDetailModal: React.FC<{
   const blocked = (ready || hasHold) && !hasStatus;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-40 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div
-        className="bg-white w-full sm:max-w-2xl rounded-t-2xl sm:rounded-2xl max-h-[92vh] overflow-y-auto"
-        onClick={e => e.stopPropagation()}
-      >
+    <Modal open onClose={onClose} size="lg">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 sticky top-0 bg-white z-10">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 bg-white z-10">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-base font-bold text-[#0F2A36] truncate">{partnerName}</p>
@@ -1035,9 +1026,6 @@ const PartnerDetailModal: React.FC<{
               )}
             </p>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition shrink-0" aria-label="Закрыть">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
         </div>
 
         {/* Stats grid */}
@@ -1251,18 +1239,11 @@ const PartnerDetailModal: React.FC<{
             </button>
           )}
         </div>
-      </div>
 
       {/* Confirm досрочной выплаты — отдельная nested модалка */}
       {earlyConfirm && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-          onClick={() => !earlyProcessing && setEarlyConfirm(null)}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full p-6"
-            onClick={e => e.stopPropagation()}
-          >
+        <Modal open onClose={() => !earlyProcessing && setEarlyConfirm(null)} size="sm">
+          <div className="p-6">
             <div className="flex items-start gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
                 <Clock className="w-5 h-5 text-amber-600" />
@@ -1296,26 +1277,25 @@ const PartnerDetailModal: React.FC<{
             <p className="text-sm text-gray-700 mb-4">Точно вывести досрочно?</p>
 
             <div className="flex items-center justify-end gap-2">
-              <button
-                onClick={() => setEarlyConfirm(null)}
-                disabled={earlyProcessing}
-                className="px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
-              >
+              <Button variant="ghost" size="md" onClick={() => setEarlyConfirm(null)} disabled={earlyProcessing}>
                 Отмена
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="primary"
+                size="md"
                 onClick={handleConfirmEarly}
                 disabled={earlyProcessing}
-                className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition disabled:opacity-60"
+                className="!bg-amber-500 hover:!bg-amber-600 !text-white shadow-none"
+                loading={earlyProcessing}
+                leftIcon={!earlyProcessing ? <Check className="w-4 h-4" /> : undefined}
               >
-                {earlyProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Да, вывести досрочно
-              </button>
+              </Button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
-    </div>
+    </Modal>
   );
 };
 
