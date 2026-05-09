@@ -1082,42 +1082,96 @@ function BookingActions({
   );
 }
 
+// Универсальный компонент status-message strip (как у визы внизу карточки).
+// Зелёная для in_progress («в работе»), голубая для new/pending_confirmation
+// («ожидаем подтверждение оплаты»), не показывается для confirmed/cancelled.
+function BookingStatusMessage({ status, kind }: { status: string; kind: 'hotel' | 'flight' }) {
+  const what = kind === 'hotel' ? 'бронь отеля' : 'бронь авиабилета';
+  if (status === 'in_progress') {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
+        <Clock className="w-4 h-4 text-green-600 mt-0.5 shrink-0" />
+        <p className="text-sm text-green-800">Заявка в работе — мы свяжемся с тобой когда {what} будет готова</p>
+      </div>
+    );
+  }
+  if (status === 'new' || status === 'pending_confirmation') {
+    return (
+      <div className="bg-[#EAF1FF] border border-[#5C7BFF]/20 rounded-lg p-3 flex items-start gap-2">
+        <Clock className="w-4 h-4 text-[#3B5BFF] mt-0.5 shrink-0" />
+        <p className="text-sm text-[#0F2A36]">Ожидаем подтверждение оплаты. Скоро возьмём заявку в работу</p>
+      </div>
+    );
+  }
+  if (status === 'confirmed') {
+    return (
+      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 flex items-start gap-2">
+        <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+        <p className="text-sm text-emerald-800">Готово — подтверждение брони доступно ниже</p>
+      </div>
+    );
+  }
+  return null;
+}
+
+// Карточка брони — зеркалит layout визовой ApplicationCard:
+//   1. Header (заголовок страны/маршрута + visa_type-стиль подзаголовок + бейдж справа)
+//   2. Status timeline
+//   3. Info-строки (К оплате, Дата, Заезд → Выезд, Гости)
+//   4. Status-message strip (зелёная/голубая полоса с пояснением)
+//   5. Actions (download confirmation / leave review)
 function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCardCommon & {
   onUpdate: (patch: Partial<HotelBookingRow>) => void;
 }) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
   const childrenAges = Array.isArray(b.children_ages) ? b.children_ages : [];
+  const place = [b.country, b.city].filter(Boolean).join(', ') || 'Бронь отеля';
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
-          <Hotel className="w-5 h-5" />
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-[#0F2A36] leading-tight">{place}</h3>
+          <p className="text-sm text-[#0F2A36]/60 mt-0.5">Бронь отеля</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-bold text-[#0F2A36]">Бронь отеля</p>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${cfg.color}`}>
-              {cfg.label}
-            </span>
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
+          {cfg.label}
+        </span>
+      </div>
+
+      {/* Status timeline */}
+      <BookingProgress status={b.status} />
+
+      {/* Info-строки в стиле визовой карточки */}
+      <div className="space-y-1.5 text-sm">
+        {b.price != null && (
+          <div className="flex justify-between text-[#0F2A36]/70">
+            <span>К оплате:</span>
+            <span className="font-bold text-[#0F2A36]">{b.price.toLocaleString('ru-RU')} ₽</span>
           </div>
-          <p className="text-xs text-[#0F2A36]/70">
-            {b.country ?? '—'}, {b.city ?? '—'}
-          </p>
-          <p className="text-xs text-[#0F2A36]/60 mt-0.5">
-            {b.check_in ? fmtBookingDate(b.check_in) : '—'} → {b.check_out ? fmtBookingDate(b.check_out) : '—'} · {b.guests ?? 1} гост.
-            {childrenAges.length > 0 && ` + ${childrenAges.length} реб.`}
-          </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> {fmtBookingDateTime(b.created_at)}
-            </span>
-            {b.price != null && (
-              <span className="text-[12px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>
-            )}
-          </div>
+        )}
+        <div className="flex justify-between text-[#0F2A36]/70">
+          <span>Заезд → Выезд:</span>
+          <span className="font-medium text-[#0F2A36]">
+            {b.check_in ? fmtBookingDate(b.check_in) : '—'} → {b.check_out ? fmtBookingDate(b.check_out) : '—'}
+          </span>
+        </div>
+        <div className="flex justify-between text-[#0F2A36]/70">
+          <span>Гостей:</span>
+          <span className="font-medium text-[#0F2A36]">
+            {b.guests ?? 1}{childrenAges.length > 0 && ` + ${childrenAges.length} реб.`}
+          </span>
+        </div>
+        <div className="flex justify-between text-[#0F2A36]/70">
+          <span>Дата заявки:</span>
+          <span>{fmtBookingDateTime(b.created_at)}</span>
         </div>
       </div>
-      <BookingProgress status={b.status} />
+
+      {/* Status-message strip (как у визы) */}
+      <BookingStatusMessage status={b.status} kind="hotel" />
+
+      {/* Actions: download confirmation, leave review */}
       <BookingActions table="hotel_bookings" booking={b} kindLabel="Бронь отеля" {...common} />
     </div>
   );
@@ -1127,36 +1181,47 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
   onUpdate: (patch: Partial<FlightBookingRow>) => void;
 }) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
+  const route = (b.from_city && b.to_city) ? `${b.from_city} → ${b.to_city}` : 'Бронь авиабилета';
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-      <div className="flex items-start gap-3">
-        <div className="w-11 h-11 rounded-xl vd-grad-soft border border-blue-100 flex items-center justify-center text-[#3B5BFF] shrink-0">
-          <Plane className="w-5 h-5" />
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <h3 className="text-base font-bold text-[#0F2A36] leading-tight">{route}</h3>
+          <p className="text-sm text-[#0F2A36]/60 mt-0.5">Бронь авиабилета</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <p className="text-sm font-bold text-[#0F2A36]">Бронь авиабилета</p>
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold ${cfg.color}`}>
-              {cfg.label}
-            </span>
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold shrink-0 ${cfg.color}`}>
+          {cfg.label}
+        </span>
+      </div>
+
+      {/* Status timeline */}
+      <BookingProgress status={b.status} />
+
+      {/* Info-строки */}
+      <div className="space-y-1.5 text-sm">
+        {b.price != null && (
+          <div className="flex justify-between text-[#0F2A36]/70">
+            <span>К оплате:</span>
+            <span className="font-bold text-[#0F2A36]">{b.price.toLocaleString('ru-RU')} ₽</span>
           </div>
-          <p className="text-xs text-[#0F2A36]/70">
-            {b.from_city ?? '—'} → {b.to_city ?? '—'}
-          </p>
-          <p className="text-xs text-[#0F2A36]/60 mt-0.5">
+        )}
+        <div className="flex justify-between text-[#0F2A36]/70">
+          <span>Дата вылета:</span>
+          <span className="font-medium text-[#0F2A36]">
             {b.booking_date ? fmtBookingDate(b.booking_date) : '—'}
-          </p>
-          <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Clock className="w-3 h-3" /> {fmtBookingDateTime(b.created_at)}
-            </span>
-            {b.price != null && (
-              <span className="text-[12px] font-bold text-[#3B5BFF]">{b.price.toLocaleString('ru-RU')} ₽</span>
-            )}
-          </div>
+          </span>
+        </div>
+        <div className="flex justify-between text-[#0F2A36]/70">
+          <span>Дата заявки:</span>
+          <span>{fmtBookingDateTime(b.created_at)}</span>
         </div>
       </div>
-      <BookingProgress status={b.status} />
+
+      {/* Status-message strip */}
+      <BookingStatusMessage status={b.status} kind="flight" />
+
+      {/* Actions */}
       <BookingActions table="flight_bookings" booking={b} kindLabel="Бронь авиабилета" {...common} />
     </div>
   );
