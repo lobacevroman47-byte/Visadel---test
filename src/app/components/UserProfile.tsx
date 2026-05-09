@@ -40,23 +40,51 @@ export default function UserProfile({
 
   return (
     <div className="min-h-screen bg-[#F5F7FA] pb-20">
-      {/* Brand header — matches Home.tsx */}
+      {/* Combined sticky header — brand row + tab bar (banking-app pattern,
+          чтобы тaбы и логотип всегда стояли вместе при скролле, без проблем
+          с расчётом offset как было раньше при двух отдельных sticky). */}
       <div className="bg-white sticky top-0 z-20 border-b border-gray-100">
-        <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between">
-          <button
-            onClick={onBack}
-            className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
-            aria-label="Назад"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="flex items-center gap-1.5">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-              <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
+        <div className="max-w-2xl mx-auto">
+          {/* Brand row */}
+          <div className="px-5 pt-3 pb-3 flex items-center justify-between">
+            <button
+              onClick={onBack}
+              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+              aria-label="Назад"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <div className="flex items-center gap-1.5">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M3 12 L9 18 L21 6" stroke="#5C7BFF" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
+            </div>
+            <span className="w-9" />
           </div>
-          <span className="w-9" />
+          {/* Tab bar — pill tabs, в той же sticky-области */}
+          <div className="px-3 pb-2 overflow-x-auto border-t border-gray-100">
+            <div className="flex gap-1.5 min-w-max pt-2">
+              {TABS.map(tab => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
+                      isActive
+                        ? 'vd-grad text-white shadow-md vd-shadow-cta'
+                        : 'text-[#5C7BFF]/70 hover:bg-[#EAF1FF]'
+                    }`}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -104,32 +132,6 @@ export default function UserProfile({
               </p>
             </div>
           )}
-        </div>
-
-        {/* Tab bar — sticky, brand-styled pill tabs */}
-        <div className="bg-white sticky top-[57px] z-10 border-b border-gray-100">
-          <div className="px-3 py-2 overflow-x-auto">
-            <div className="flex gap-1.5 min-w-max">
-              {TABS.map(tab => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all active:scale-95 ${
-                      isActive
-                        ? 'vd-grad text-white shadow-md vd-shadow-cta'
-                        : 'text-[#5C7BFF]/70 hover:bg-[#EAF1FF]'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
-                    <span>{tab.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
         </div>
 
         {/* Content */}
