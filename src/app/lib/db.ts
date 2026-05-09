@@ -1343,12 +1343,15 @@ export interface ExtraFormField {
 }
 
 // Override for a built-in (core) field of the booking form: rename label,
-// hide it, or change its required flag. If a key is absent — the form's
-// hardcoded default is used.
+// hide it, change required flag, or change display order. If a key is
+// absent — the form's hardcoded default is used.
 export interface CoreFieldOverride {
   label?: string;
   required?: boolean;
   visible?: boolean;
+  /** Override display order. Lower = ealier. Если не задан — используется
+   *  исходный индекс поля в type.coreFields. */
+  sort_order?: number;
 }
 export type CoreFieldOverrides = Record<string, CoreFieldOverride>;
 
