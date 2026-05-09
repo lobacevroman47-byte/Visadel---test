@@ -604,7 +604,8 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             {partnerBalance.toLocaleString('ru-RU')}<span className="text-2xl">₽</span>
           </p>
           <p className="text-sm text-white/80 mt-3 leading-relaxed">
-            Перевод вручную на карту 2 раза в месяц. Без минимальной суммы для вывода.
+            Перевод вручную на карту 2 раза в месяц.<br />
+            Без минимальной суммы для вывода.
           </p>
         </div>
 
@@ -948,7 +949,8 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             <p>
               Когда твой реферал оплачивает заказ — комиссия попадает в hold-период
               на <b>30 дней</b> (защита от refund). После — становится доступной к выплате.
-              Founder переводит ₽ на твою карту вручную 2 раза в месяц. Без минимальной суммы для вывода.
+              Founder переводит ₽ на твою карту вручную 2 раза в месяц.<br />
+              Без минимальной суммы для вывода.
             </p>
           </div>
         </div>
