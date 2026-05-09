@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Star, RefreshCw, MessageSquare, Plus } from 'lucide-react';
+import { Star, RefreshCw, MessageSquare, Plus, Check } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { Modal, Button as BrandButton } from '../ui/brand';
 
 interface Review {
   id: string;
@@ -89,36 +90,20 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-white rounded-t-3xl w-full max-w-lg shadow-2xl animate-in slide-in-from-bottom duration-200 pb-safe">
-
-        {/* Handle */}
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-gray-200 rounded-full" />
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
-          <h3 className="font-semibold text-gray-800">Оставить отзыв</h3>
-          <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-full bg-gray-100 text-gray-400">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <Modal open onClose={onClose} icon="⭐" label="Отзыв" title="Оставить отзыв" size="md">
         {done ? (
           <div className="flex flex-col items-center py-12 gap-3 px-5">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <Check className="w-8 h-8 text-green-500" />
+            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center">
+              <Check className="w-8 h-8 text-emerald-500" />
             </div>
-            <p className="font-semibold text-gray-800 text-center">Спасибо за отзыв!</p>
-            <p className="text-sm text-gray-400 text-center">Он появится после проверки администратором</p>
+            <p className="font-semibold text-[#0F2A36] text-center">Спасибо за отзыв!</p>
+            <p className="text-sm text-[#0F2A36]/60 text-center">Он появится после проверки администратором</p>
           </div>
         ) : (
           <div className="px-5 py-4 space-y-4">
             {/* Rating */}
             <div>
-              <p className="text-xs text-gray-400 font-medium text-center mb-2">Ваша оценка</p>
+              <p className="text-xs text-[#0F2A36]/60 font-medium text-center mb-2">Ваша оценка</p>
               <StarPicker value={rating} onChange={setRating} />
             </div>
 
@@ -129,7 +114,7 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
                 value={country}
                 onChange={e => setCountry(e.target.value)}
                 placeholder="Например: Индия, Вьетнам..."
-                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm focus:outline-nonefocus:border-yellow-400"
+                className="w-full rounded-xl border border-[#E1E5EC] px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF]"
               />
             </div>
 
@@ -141,7 +126,7 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
                 onChange={e => setText(e.target.value)}
                 rows={4}
                 placeholder="Расскажите о своём опыте работы с нами..."
-                className="w-full rounded-2xl border border-gray-200 px-4 py-2.5 text-sm placeholder-gray-300 focus:outline-nonefocus:border-yellow-400 resize-none"
+                className="w-full rounded-xl border border-[#E1E5EC] px-4 py-2.5 text-sm placeholder-[#0F2A36]/40 focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] resize-none"
               />
             </div>
 
@@ -149,27 +134,28 @@ function SubmitReviewForm({ onClose, onSent }: { onClose: () => void; onSent: ()
             <div className="flex items-center gap-2 bg-gray-50 rounded-2xl px-4 py-2.5">
               <span className="text-lg">{getAvatar(firstName || fullName)}</span>
               <div>
-                <p className="text-sm font-medium text-gray-700">{fullName}</p>
-                <p className="text-xs text-gray-400">Отзыв будет опубликован от вашего имени</p>
+                <p className="text-sm font-medium text-[#0F2A36]">{fullName}</p>
+                <p className="text-xs text-[#0F2A36]/60">Отзыв будет опубликован от вашего имени</p>
               </div>
             </div>
 
-            <button
+            <BrandButton
+              variant="primary"
+              size="lg"
+              fullWidth
               onClick={handleSubmit}
               disabled={!text.trim() || saving}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-yellow-400 to-orange-500 text-white font-semibold text-sm shadow-md hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              loading={saving}
             >
-              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : null}
               {saving ? 'Отправляем...' : 'Отправить отзыв'}
-            </button>
+            </BrandButton>
 
-            <p className="text-xs text-gray-300 text-center pb-1">
+            <p className="text-xs text-[#0F2A36]/45 text-center pb-1">
               Отзыв появится в приложении после проверки администратором
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 

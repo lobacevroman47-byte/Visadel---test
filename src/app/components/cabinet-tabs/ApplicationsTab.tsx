@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Clock, CreditCard, FileCheck, CheckCircle, FileText, Download, Star, Trash2, Play, MessageSquare } from 'lucide-react';
+import { Modal, Button as BrandButton } from '../ui/brand';
 
 interface Application {
   id: string;
@@ -386,13 +387,22 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
 
       {/* Review Modal */}
       {showReviewModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full">
-            <h3 className="text-xl text-gray-900 mb-4">Оставить отзыв</h3>
-            
+        <Modal
+          open
+          onClose={() => {
+            setShowReviewModal(false);
+            setReviewRating(0);
+            setReviewComment('');
+          }}
+          icon="⭐"
+          label="Отзыв"
+          title="Оставить отзыв"
+          size="sm"
+        >
+          <div className="p-6">
             <div className="mb-4">
-              <label className="block text-gray-700 mb-2">
-                Оценка <span className="text-red-500">*</span>
+              <label className="block text-[#0F2A36] mb-2">
+                Оценка <span className="text-rose-500">*</span>
               </label>
               <div className="flex gap-2">
                 {[1, 2, 3, 4, 5].map((rating) => (
@@ -414,7 +424,7 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
             </div>
 
             <div className="mb-4">
-              <label className="block text-gray-700 mb-2">
+              <label className="block text-[#0F2A36] mb-2">
                 Комментарий (опционально)
               </label>
               <textarea
@@ -425,32 +435,31 @@ export default function ApplicationsTab({ onContinueDraft }: ApplicationsTabProp
               />
             </div>
 
-            <div className="bg-blue-50 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-900">
+            <div className="bg-[#EAF1FF] rounded-lg p-3 mb-4">
+              <p className="text-sm text-[#0F2A36]">
                 🎁 За отзыв вы получите <strong>200₽</strong> на бонусный счет
               </p>
             </div>
 
             <div className="flex gap-3">
-              <button
+              <BrandButton
+                variant="secondary"
+                size="lg"
+                fullWidth
                 onClick={() => {
                   setShowReviewModal(false);
                   setReviewRating(0);
                   setReviewComment('');
                 }}
-                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
               >
                 Отмена
-              </button>
-              <button
-                onClick={submitReview}
-                className="flex-1 px-4 py-3 bg-[#3B5BFF] text-white rounded-lg hover:bg-[#4F2FE6] transition-colors"
-              >
+              </BrandButton>
+              <BrandButton variant="primary" size="lg" fullWidth onClick={submitReview}>
                 Отправить отзыв
-              </button>
+              </BrandButton>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Info Card */}

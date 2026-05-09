@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { CheckCircle, Upload, ThumbsUp, MessageCircle, Eye, X } from 'lucide-react';
+import { CheckCircle, Upload, ThumbsUp, MessageCircle, Eye } from 'lucide-react';
+import { Modal, Button as BrandButton } from '../ui/brand';
 
 interface Task {
   id: string;
@@ -203,26 +204,23 @@ export default function TasksTab() {
 
       {/* Task Submission Modal */}
       {selectedTask && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg text-gray-900">{selectedTask.title}</h3>
-              <button
-                onClick={() => {
-                  setSelectedTask(null);
-                  setScreenshot(null);
-                  setScreenshotPreview(null);
-                }}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
+        <Modal
+          open
+          onClose={() => {
+            setSelectedTask(null);
+            setScreenshot(null);
+            setScreenshotPreview(null);
+          }}
+          icon="🎯"
+          label="Задание"
+          title={selectedTask.title}
+          size="sm"
+        >
+          <div className="p-6">
+            <p className="text-sm text-[#0F2A36]/65 mb-4">{selectedTask.description}</p>
 
-            <p className="text-sm text-gray-600 mb-4">{selectedTask.description}</p>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-              <p className="text-sm text-blue-900">
+            <div className="bg-[#EAF1FF] border border-[#5C7BFF]/30 rounded-lg p-3 mb-4">
+              <p className="text-sm text-[#0F2A36]">
                 Выполните задание и загрузите скриншот для подтверждения
               </p>
             </div>
@@ -235,10 +233,10 @@ export default function TasksTab() {
                   onChange={handleScreenshotUpload}
                   className="hidden"
                 />
-                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
-                  <Upload className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                  <p className="text-gray-700 mb-1">Загрузите скриншот</p>
-                  <p className="text-sm text-gray-500">JPG, PNG</p>
+                <div className="border-2 border-dashed border-[#E1E5EC] rounded-xl p-8 text-center cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition-colors">
+                  <Upload className="w-12 h-12 text-[#0F2A36]/45 mx-auto mb-3" />
+                  <p className="text-[#0F2A36] mb-1">Загрузите скриншот</p>
+                  <p className="text-sm text-[#0F2A36]/60">JPG, PNG</p>
                 </div>
               </label>
             ) : (
@@ -253,22 +251,24 @@ export default function TasksTab() {
                     setScreenshot(null);
                     setScreenshotPreview(null);
                   }}
-                  className="text-sm text-red-600 hover:text-red-700"
+                  className="text-sm text-rose-600 hover:text-rose-700"
                 >
                   Удалить и загрузить другой
                 </button>
               </div>
             )}
 
-            <button
+            <BrandButton
+              variant="primary"
+              size="lg"
+              fullWidth
               onClick={handleSubmitTask}
               disabled={!screenshot}
-              className="w-full bg-blue-500 text-white py-3 rounded-xl hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
             >
               Отправить на проверку (+{selectedTask.reward}₽)
-            </button>
+            </BrandButton>
           </div>
-        </div>
+        </Modal>
       )}
 
       {/* Info */}

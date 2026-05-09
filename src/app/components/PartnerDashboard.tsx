@@ -14,13 +14,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ChevronLeft, Wallet, Clock, Check, CreditCard, FileText, Loader2,
-  Save, AlertCircle, Crown, X, Copy, Link as LinkIcon, Sparkles,
+  Save, AlertCircle, Crown, Copy, Link as LinkIcon, Sparkles,
   Phone, Building2, Banknote, Hash,
 } from 'lucide-react';
 import { useTelegram } from '../App';
 import { useDialog } from './shared/BrandDialog';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { HeaderActions } from './HeaderActions';
+import { Button as BrandButton, Modal } from './ui/brand';
 
 interface PartnerDashboardProps {
   onBack: () => void;
@@ -941,11 +942,18 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             )}
           </div>
 
-          <button onClick={handleSaveSettings} disabled={savingSettings}
-            className="w-full mt-5 vd-grad text-white py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition vd-shadow-cta disabled:opacity-50">
-            {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          <BrandButton
+            variant="primary"
+            size="lg"
+            fullWidth
+            className="mt-5"
+            onClick={handleSaveSettings}
+            disabled={savingSettings}
+            loading={savingSettings}
+            leftIcon={!savingSettings ? <Save className="w-4 h-4" /> : undefined}
+          >
             Сохранить реквизиты
-          </button>
+          </BrandButton>
         </div>
 
         {/* Info */}
@@ -1072,10 +1080,9 @@ function EarningDetailModal({
     : null;
 
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+    <Modal open onClose={onClose} size="sm">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3 bg-white">
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
             <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5 flex items-center gap-2">
@@ -1084,9 +1091,6 @@ function EarningDetailModal({
             </p>
             {subtitleLine && <p className="text-xs text-gray-500 mt-0.5">{subtitleLine}</p>}
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition" aria-label="Закрыть">
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
         </div>
 
         {/* Big amount */}
@@ -1156,8 +1160,7 @@ function EarningDetailModal({
             комиссия будет аннулирована. После 30 дней — деньги ваши.
           </div>
         )}
-      </div>
-    </div>
+    </Modal>
   );
 }
 
