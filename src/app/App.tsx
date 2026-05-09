@@ -40,6 +40,13 @@ interface TelegramContext {
   // Backend дополнительно валидирует через initData → telegram_id и admin_users / env.
   adminRole: AdminRole | null;
   openAdmin: (() => void) | undefined;
+  // Универсальная навигация для shared-header'а в кабинетах (Профиль, Админка,
+  // Партнёрский). Показываются как кружочки-кнопки справа от логотипа.
+  // Каждая optional: undefined → кнопка скрывается.
+  openProfile: (() => void) | undefined;
+  openPartner: (() => void) | undefined;
+  // Имя текущего экрана — чтобы header скрывал кнопку текущей страницы
+  currentScreenName?: 'profile' | 'admin' | 'partner_dashboard' | null;
 }
 
 const TelegramCtx = createContext<TelegramContext>({
@@ -49,6 +56,9 @@ const TelegramCtx = createContext<TelegramContext>({
   refreshUser: async () => {},
   adminRole: null,
   openAdmin: undefined,
+  openProfile: undefined,
+  openPartner: undefined,
+  currentScreenName: null,
 });
 
 export function useTelegram() {
@@ -282,6 +292,13 @@ function App() {
     setPrefilledAddons(undefined);
   };
 
+  const isPartner = appUser?.is_influencer === true || !!adminRole;
+  const screenName: 'profile' | 'admin' | 'partner_dashboard' | null =
+    currentScreen === 'profile' ? 'profile'
+    : currentScreen === 'admin' ? 'admin'
+    : currentScreen === 'partner_dashboard' ? 'partner_dashboard'
+    : null;
+
   return (
     <TelegramCtx.Provider value={{
       tgUser,
@@ -290,6 +307,9 @@ function App() {
       refreshUser,
       adminRole,
       openAdmin: adminRole ? () => setCurrentScreen('admin') : undefined,
+      openProfile: () => { setInitialProfileTab(undefined); setCurrentScreen('profile'); },
+      openPartner: isPartner ? () => setCurrentScreen('partner_dashboard') : undefined,
+      currentScreenName: screenName,
     }}>
       <AppCatalogProvider>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
