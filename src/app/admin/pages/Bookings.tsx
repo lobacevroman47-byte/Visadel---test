@@ -151,8 +151,8 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     setLoading(true);
     try {
       const [h, f] = await Promise.all([
-        supabase.from('hotel_bookings').select('*').order('created_at', { ascending: false }),
-        supabase.from('flight_bookings').select('*').order('created_at', { ascending: false }),
+        supabase.from('hotel_bookings').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
+        supabase.from('flight_bookings').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
       ]);
       if (h.data) setHotels(h.data as HotelBooking[]);
       if (f.data) setFlights(f.data as FlightBooking[]);
@@ -163,8 +163,10 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  // Удаление брони — с подтверждением. Дополнительно вычищает связанные
-  // записи в booking_status_log, чтобы не остались orphan'ы.
+  // Soft-delete брони — UPDATE deleted_at = now() вместо DELETE.
+  // Запись остаётся в БД и может быть восстановлена через SQL:
+  //   UPDATE hotel_bookings SET deleted_at = NULL WHERE id = '<uuid>';
+  // booking_status_log не трогаем — история остаётся.
   const handleDeleteBooking = async (
     table: 'hotel_bookings' | 'flight_bookings',
     id: string,
@@ -172,33 +174,21 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
   ) => {
     const ok = await dialog.confirm(
       `Удалить бронь${name ? ` ${name}` : ''}?`,
-      'Запись удалится из БД безвозвратно. История изменений статусов тоже сотрётся.',
+      'Бронь будет скрыта из админки. Данные остаются в БД и могут быть восстановлены при необходимости.',
       { confirmLabel: 'Удалить', cancelLabel: 'Отмена' },
     );
     if (!ok) return;
-
     if (!isSupabaseConfigured()) return;
 
-    // 1) sweep status-log (best-effort — если миграции 025 нет, просто
-    //    игнорируем, как и в остальном коде с booking_status_log)
-    try {
-      const entityType = table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking';
-      await supabase.from('booking_status_log')
-        .delete()
-        .eq('entity_type', entityType)
-        .eq('entity_id', id);
-    } catch (e) {
-      console.warn('[booking-delete] status_log cleanup failed:', e);
-    }
-
-    // 2) delete the booking row itself
-    const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase
+      .from(table)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
     if (error) {
       await dialog.error('Не удалось удалить', error.message);
       return;
     }
 
-    // 3) optimistic UI: убираем из state'а
     if (table === 'hotel_bookings') {
       setHotels(prev => prev.filter(b => b.id !== id));
       if (selectedHotel?.id === id) setSelectedHotel(null);

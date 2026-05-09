@@ -1513,32 +1513,29 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
 
   const { applications, loading, refetch } = useAdminApplications();
 
-  // Удаление заявки — с подтверждением. Дополнительно вычищает связанный
-  // status_log (best-effort) чтобы не оставались orphan'ы.
+  // Soft-delete заявки — UPDATE deleted_at = now() вместо DELETE.
+  // Запись остаётся в БД и может быть восстановлена через SQL:
+  //   UPDATE applications SET deleted_at = NULL WHERE id = '<uuid>';
+  // status_log не трогаем — он остаётся как полная история (по
+  // application_id всё ещё JOIN'ится).
   const handleDeleteApplication = async (app: Application) => {
     const ok = await dialog.confirm(
       `Удалить заявку${app.clientName ? ` ${app.clientName}` : ''}?`,
-      'Запись удалится из БД безвозвратно. История изменений статусов тоже сотрётся.',
+      'Заявка будет скрыта из админки. Данные остаются в БД и могут быть восстановлены при необходимости.',
       { confirmLabel: 'Удалить', cancelLabel: 'Отмена' },
     );
     if (!ok) return;
     if (!isSupabaseConfigured()) return;
 
-    // 1) sweep status-log (best-effort)
-    try {
-      await supabase.from('status_log').delete().eq('application_id', app.id);
-    } catch (e) {
-      console.warn('[application-delete] status_log cleanup failed:', e);
-    }
-
-    // 2) delete the application row
-    const { error } = await supabase.from('applications').delete().eq('id', app.id);
+    const { error } = await supabase
+      .from('applications')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', app.id);
     if (error) {
       await dialog.error('Не удалось удалить', error.message);
       return;
     }
 
-    // 3) close modal if it was open on this app, then refetch list
     if (selectedApp?.id === app.id) setSelectedApp(null);
     void refetch();
   };
