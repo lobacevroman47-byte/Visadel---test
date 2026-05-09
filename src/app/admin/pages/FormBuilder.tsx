@@ -11,7 +11,7 @@ import {
   seedFormFieldsFromCode,
   getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField, type CoreFieldOverrides,
   type VisaFormField, type VisaPhotoRequirement, type FormFieldType, type VisaProduct,
-  getAdditionalServices, upsertAdditionalService, type AdditionalService,
+  getAdditionalServices, upsertAdditionalService, deleteAdditionalService, type AdditionalService,
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
@@ -555,6 +555,7 @@ const BOOKING_TYPES: BookingType[] = [
 ];
 
 const BookingsConstructor: React.FC = () => {
+  const dialog = useDialog();
   const [services, setServices] = useState<AdditionalService[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -573,6 +574,44 @@ const BookingsConstructor: React.FC = () => {
   const handleToggle = async (s: AdditionalService) => {
     await upsertAdditionalService({ ...s, enabled: !s.enabled });
     setServices(prev => prev.map(x => x.id === s.id ? { ...x, enabled: !s.enabled } : x));
+  };
+
+  // «Удалить» booking type — на самом деле сбрасываем кастомизации
+  // (т.к. сам тип hotel-booking/flight-booking захардкоден в BOOKING_TYPES
+  // и удалить его невозможно). Удаляем запись additional_services и
+  // чистим extras/overrides в app_settings → тип возвращается к
+  // дефолтным цене/имени/полям анкеты.
+  const handleResetType = async (bt: BookingType) => {
+    const ok = await dialog.confirm(
+      `Сбросить «${bt.fallbackName}» к умолчанию?`,
+      'Все кастомные изменения (цена, поля анкеты, доп. поля) удалятся. Сам тип брони не пропадёт — вернётся к стандартным настройкам.',
+      { confirmLabel: 'Сбросить', cancelLabel: 'Отмена' },
+    );
+    if (!ok) return;
+
+    // 1) Удаляем запись из additional_services (если есть)
+    const existing = services.find(s => s.id === bt.serviceId);
+    if (existing) {
+      try {
+        await deleteAdditionalService(bt.serviceId);
+      } catch (e) {
+        console.warn('[booking-type-reset] delete additional_service failed:', e);
+      }
+    }
+
+    // 2) Чистим extras + overrides в app_settings
+    if (settings) {
+      const { id: _id, updated_at: _ts, ...rest } = settings;
+      void _id; void _ts;
+      const cleared = { ...rest, [bt.extraFieldsKey]: [], [bt.overridesKey]: {} };
+      try {
+        await saveAppSettings(cleared);
+      } catch (e) {
+        console.warn('[booking-type-reset] saveAppSettings failed:', e);
+      }
+    }
+
+    await load();
   };
 
   // Возвращаем actual row для хотел/флайт, либо «псевдо»-объект с дефолтами
@@ -697,6 +736,14 @@ const BookingsConstructor: React.FC = () => {
                   title="Редактировать"
                 >
                   <Edit2 size={15} />
+                </button>
+                <button
+                  onClick={() => void handleResetType(bt)}
+                  className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition active:scale-95"
+                  title="Сбросить к умолчанию (удалить кастомизации)"
+                  aria-label="Сбросить к умолчанию"
+                >
+                  <Trash2 size={15} />
                 </button>
               </div>
             </div>
