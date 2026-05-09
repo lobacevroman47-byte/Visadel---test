@@ -101,6 +101,26 @@ export async function resolveReferralCode(input: string): Promise<string | null>
   return (data as { referral_code?: string } | null)?.referral_code ?? null;
 }
 
+/**
+ * Отметка что юзер «остался» в мини-аппе (сделал какое-то действие после
+ * первого открытия). Используется для метрики «Регистраций» в реф-программе:
+ * без этого поля все open'ы по реф-ссылке считались бы регистрациями, даже
+ * если юзер открыл и сразу закрыл.
+ *
+ * Идемпотентно: ставит engaged_at = now() ТОЛЬКО если оно ещё null.
+ * Если миграция 023 не применена — silent fail (column не существует),
+ * запросы по engaged_at просто получат null для всех юзеров.
+ */
+export async function markUserEngaged(telegramId: number): Promise<void> {
+  if (!telegramId || !isSupabaseConfigured()) return;
+  // engaged_at IS NULL guard — не перезаписываем если уже стоит
+  await supabase
+    .from('users')
+    .update({ engaged_at: new Date().toISOString() })
+    .eq('telegram_id', telegramId)
+    .is('engaged_at', null);
+}
+
 const LS_KEY = 'vd_user';
 const LS_APPS = 'vd_applications';
 const LS_TASKS = 'vd_tasks';
@@ -741,12 +761,23 @@ export async function getReferralCount(referralCode: string): Promise<number> {
 }
 
 // ─── Referral stats ────────────────────────────────────────────────────────
+// Воронка реф-программы (одинаковая для обычных юзеров и партнёров,
+// различаются только бонусы и страница где показывается):
+//   clicks → engaged → ordered
+//
+// Логика разделения:
+//   • clicks      — любое открытие мини-аппа по реф-ссылке (referral_clicks)
+//   • engaged     — юзер «остался» (открыл не только Home, сделал действие)
+//   • ordered     — оформил визу или бронь отеля/авиа (paid status)
+//
+// «Просто открыл и закрыл» считается только в clicks. В engaged попадают
+// те, кто реально начал взаимодействовать с мини-аппом (миграция 023).
 export interface ReferralStats {
   clicks: number;             // переходов по ссылке (из referral_clicks)
-  registered: number;         // людей зарегистрировалось через ссылку
-  paidReferrals: number;      // из них ОПЛАТИЛИ хотя бы одну заявку — официальный счётчик
-  totalEarnings: number;      // суммарно заработано ₽ (из bonus_logs type='referral')
-  referrals: ReferralRow[];   // подробный список зарегистрированных
+  registered: number;         // engaged юзеры (users.engaged_at IS NOT NULL)
+  paidReferrals: number;      // из них оформили виза/бронь — «Оформили заказ»
+  totalEarnings: number;      // суммарно заработано ₽ (bonus_logs type='referral')
+  referrals: ReferralRow[];   // подробный список рефералов
 }
 
 export interface ReferralRow {
@@ -764,10 +795,10 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
 
   // Run independent queries in parallel
   const [usersRes, clicksCount, logsRes] = await Promise.all([
-    // 1. Users who registered with my code
+    // 1. Users who registered with my code (с engaged_at для фильтрации)
     supabase
       .from('users')
-      .select('telegram_id, first_name, last_name, username, created_at')
+      .select('telegram_id, first_name, last_name, username, created_at, engaged_at')
       .eq('referred_by', referralCode)
       .order('created_at', { ascending: false }),
     // 2. Clicks count — via server-side API (bypasses RLS)
@@ -785,23 +816,33 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
 
   const invited = (usersRes.data ?? []) as Array<{
     telegram_id: number; first_name: string; last_name: string | null;
-    username: string | null; created_at: string;
+    username: string | null; created_at: string; engaged_at: string | null;
   }>;
   const logs = (logsRes.data ?? []) as Array<{ amount: number; description?: string }>;
   const totalEarnings = logs.reduce((s, l) => s + (l.amount ?? 0), 0);
+
+  // Engaged = юзер сделал хотя бы одно действие после открытия (миграция 023).
+  // Без миграции engaged_at = undefined для всех → 0 регистраций. На клиенте
+  // у нас есть fallback в ReferralsTab/PartnerDashboard: если миграция ещё
+  // не применена, показываем total invited (см. UI).
+  const engagedCount = invited.filter(u => u.engaged_at).length;
 
   if (invited.length === 0) {
     return { ...empty, clicks: clicksCount as number };
   }
 
-  // 4. Which invited users have paid applications (status in_progress or ready)
+  // 4. «Оформили заказ» — реферал оплатил визу ИЛИ бронь отеля/авиа.
+  //    Объединяем 3 таблицы в один Set уникальных telegram_id.
   const ids = invited.map(u => u.telegram_id);
-  const { data: paidApps } = await supabase
-    .from('applications')
-    .select('user_telegram_id')
-    .in('user_telegram_id', ids)
-    .in('status', ['in_progress', 'ready']);
-  const paidSet = new Set((paidApps ?? []).map((a: { user_telegram_id: number }) => a.user_telegram_id));
+  const [paidVisa, paidHotel, paidFlight] = await Promise.all([
+    supabase.from('applications').select('user_telegram_id').in('user_telegram_id', ids).in('status', ['in_progress', 'ready', 'completed']),
+    supabase.from('hotel_bookings').select('telegram_id').in('telegram_id', ids).in('status', ['in_progress', 'confirmed']),
+    supabase.from('flight_bookings').select('telegram_id').in('telegram_id', ids).in('status', ['in_progress', 'confirmed']),
+  ]);
+  const orderedSet = new Set<number>();
+  for (const r of (paidVisa.data ?? []) as Array<{ user_telegram_id: number }>) orderedSet.add(r.user_telegram_id);
+  for (const r of (paidHotel.data ?? []) as Array<{ telegram_id: number }>) orderedSet.add(r.telegram_id);
+  for (const r of (paidFlight.data ?? []) as Array<{ telegram_id: number }>) orderedSet.add(r.telegram_id);
 
   const referrals: ReferralRow[] = invited.map(u => {
     const logForUser = logs.find(l => l.description?.includes(String(u.telegram_id)));
@@ -810,15 +851,19 @@ export async function getReferralStats(referralCode: string, myTelegramId: numbe
       name: `${u.first_name}${u.last_name ? ' ' + u.last_name : ''}`,
       username: u.username,
       joined_at: u.created_at,
-      has_paid: paidSet.has(u.telegram_id),
+      has_paid: orderedSet.has(u.telegram_id),
       earned_bonus: logForUser?.amount ?? 0,
     };
   });
 
+  // Если engaged_at колонка ещё не применена (все nullы), показываем total invited
+  // как «registered» — это лучше чем 0.
+  const registeredFinal = engagedCount > 0 ? engagedCount : invited.length;
+
   return {
     clicks: clicksCount as number,
-    registered: invited.length,
-    paidReferrals: paidSet.size,
+    registered: registeredFinal,
+    paidReferrals: orderedSet.size,
     totalEarnings,
     referrals,
   };
