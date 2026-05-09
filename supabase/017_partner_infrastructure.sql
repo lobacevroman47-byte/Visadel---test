@@ -11,6 +11,28 @@
 -- Идемпотентно: ADD COLUMN IF NOT EXISTS, CREATE TABLE IF NOT EXISTS.
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- 0. Гарантируем что helper-функции существуют (на случай если 004/001 не
+--    были применены к этой БД). CREATE OR REPLACE — идемпотентно.
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.current_tg_id()
+RETURNS BIGINT
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT NULLIF(current_setting('request.jwt.claim.tg_id', true), '')::bigint
+$$;
+
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$$;
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- 1. users — партнёрский баланс (отдельно от bonus_balance)
 -- ═══════════════════════════════════════════════════════════════════════════
 ALTER TABLE public.users
