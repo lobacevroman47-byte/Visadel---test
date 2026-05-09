@@ -217,10 +217,43 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       }
     }
 
+    // Сохраняем prev статус для записи в booking_status_log
+    const prevBooking = table === 'hotel_bookings'
+      ? hotels.find(h => h.id === id)
+      : flights.find(f => f.id === id);
+    const prevStatus = prevBooking?.status ?? null;
+
     const { error } = await supabase.from(table).update({ status }).eq('id', id);
     if (error) {
       await dialog.error('Не удалось обновить статус', error.message);
       return;
+    }
+
+    // Лог изменения статуса в booking_status_log (миграция 025).
+    // Если миграция ещё не применена — silent fail.
+    if (prevStatus !== status) {
+      const adminInfo = (() => {
+        try {
+          const tg = (window as { Telegram?: { WebApp?: { initDataUnsafe?: { user?: { id: number; first_name?: string; username?: string } } } } }).Telegram?.WebApp;
+          const u = tg?.initDataUnsafe?.user;
+          if (u) {
+            return {
+              changed_by_id: u.id,
+              changed_by_name: u.username ? `@${u.username}` : (u.first_name ?? null),
+            };
+          }
+        } catch { /* ignore */ }
+        return { changed_by_id: null, changed_by_name: null };
+      })();
+      supabase.from('booking_status_log').insert({
+        entity_type: table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking',
+        entity_id: id,
+        from_status: prevStatus,
+        to_status: status,
+        ...adminInfo,
+      }).then(r => {
+        if (r.error) console.warn('[bookings] status_log insert failed:', r.error.message);
+      });
     }
 
     // При переходе в любой «paid» статус — начислить партнёрскую комиссию
@@ -809,9 +842,7 @@ function StatusSelector({
         ))}
       </select>
 
-      {/* «Отправить уведомление повторно» — зелёная кнопка, как у визы.
-          Появляется только если status уже в активной фазе (push был
-          отправлен раньше) и нет dirty изменений. */}
+      {/* Зелёная кнопка повторной отправки — full-width как у визы. */}
       {onResend && canResend && !dirty && (
         <button
           type="button"
@@ -824,23 +855,90 @@ function StatusSelector({
         </button>
       )}
 
-      <div className="flex items-center gap-3 mt-3">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!dirty || saving}
-          className="px-5 py-2.5 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 active:scale-95 transition"
-        >
-          {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-          {saving ? 'Сохраняем…' : 'Сохранить изменения'}
-        </button>
-        {savedAt && !saving && !dirty && (
-          <span className="text-xs text-emerald-600">✓ сохранено</span>
-        )}
-        {dirty && !saving && (
-          <span className="text-xs text-amber-600">есть несохранённые изменения</span>
-        )}
+      {/* Синяя «Сохранить изменения» — full-width как у визы. */}
+      <button
+        type="button"
+        onClick={handleSave}
+        disabled={!dirty || saving}
+        className="w-full mt-3 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"
+      >
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+        {saving ? 'Сохраняем…' : 'Сохранить изменения'}
+      </button>
+      {savedAt && !saving && !dirty && (
+        <p className="text-xs text-emerald-600 text-center mt-2">✓ сохранено</p>
+      )}
+      {dirty && !saving && (
+        <p className="text-xs text-amber-600 text-center mt-2">есть несохранённые изменения</p>
+      )}
+    </div>
+  );
+}
+
+// История изменений статусов брони — timeline-блок как в визовой модалке.
+// Читает booking_status_log (миграция 025). Если миграция не применена —
+// silent fail (показываем «Статус ещё не менялся»).
+function BookingStatusHistory({ table, id }: {
+  table: 'hotel_bookings' | 'flight_bookings';
+  id: string;
+}) {
+  const [logs, setLogs] = useState<Array<{
+    id: string; from_status: string | null; to_status: string;
+    changed_by_name: string | null; changed_at: string;
+  }> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const entityType = table === 'hotel_bookings' ? 'hotel_booking' : 'flight_booking';
+      const { data } = await supabase
+        .from('booking_status_log')
+        .select('id, from_status, to_status, changed_by_name, changed_at')
+        .eq('entity_type', entityType)
+        .eq('entity_id', id)
+        .order('changed_at', { ascending: true });
+      if (!cancelled) setLogs((data ?? []) as typeof logs);
+    })();
+    return () => { cancelled = true; };
+  }, [table, id]);
+
+  return (
+    <div className="bg-gray-50 rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <Clock className="w-4 h-4 text-[#3B5BFF]" />
+        <p className="text-sm font-semibold text-[#0F2A36]">История изменений</p>
       </div>
+      {logs === null ? (
+        <p className="text-xs text-gray-400">Загружаем…</p>
+      ) : logs.length === 0 ? (
+        <p className="text-xs text-gray-400 italic">Статус ещё не менялся</p>
+      ) : (
+        <div className="space-y-3">
+          {logs.map((l, i) => (
+            <div key={l.id} className="flex gap-3">
+              <div className="flex flex-col items-center pt-1">
+                <div className={`w-2 h-2 rounded-full ${i === 0 ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+                {i < logs.length - 1 && <div className="w-px flex-1 bg-gray-200 mt-1" />}
+              </div>
+              <div className="flex-1 pb-2">
+                <p className="text-xs text-gray-500">
+                  {new Date(l.changed_at).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                </p>
+                <p className="text-sm text-[#0F2A36] mt-0.5">
+                  {l.from_status ? statusLabel(l.from_status) : 'Заявка создана'}
+                  {' → '}
+                  <span className="font-bold">{statusLabel(l.to_status)}</span>
+                </p>
+                {l.changed_by_name && (
+                  <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
+                    <Clock className="w-2.5 h-2.5" /> Администратор {l.changed_by_name}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1000,11 +1098,21 @@ function BookingDetailModal({
               </p>
             </div>
 
-            {/* Финансы — без курса USD (бронь всегда в рублях, конвертация
-                не нужна). Налог можно при желании добавить позже, пока скрыт. */}
+            {/* Подтверждение брони — теперь на «Основное» рядом со статусом
+                (раньше был на «Файлы», но это был лишний клик). */}
+            <ConfirmationUploader
+              url={b.confirmation_url}
+              status={b.status}
+              table={table}
+              id={b.id}
+              onUploaded={onConfirmationUploaded}
+            />
 
-            {/* Статус заявки + повторная отправка */}
+            {/* Статус заявки + повторная отправка + сохранить */}
             <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
+
+            {/* История изменений статусов — как у визы */}
+            <BookingStatusHistory table={table} id={b.id} />
           </div>
         )}
 
@@ -1039,7 +1147,9 @@ function BookingDetailModal({
           </div>
         )}
 
-        {/* ── Tab: Файлы (passport + confirmation) ── */}
+        {/* ── Tab: Файлы — только клиентские файлы (passport, payment screenshot).
+            Подтверждение брони (от админа) перенесено в «Основное», ближе
+            к статусу — это рабочий поток админа, не клиентский файл. ── */}
         {activeTab === 'files' && (
           <div className="space-y-4">
             <div>
@@ -1055,13 +1165,19 @@ function BookingDetailModal({
                 <p className="text-sm text-gray-400">Не загружен</p>
               )}
             </div>
-            <ConfirmationUploader
-              url={b.confirmation_url}
-              status={b.status}
-              table={table}
-              id={b.id}
-              onUploaded={onConfirmationUploaded}
-            />
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Скриншот оплаты</p>
+              {b.payment_screenshot_url ? (
+                <a href={b.payment_screenshot_url} target="_blank" rel="noreferrer"
+                  className="bg-gray-50 hover:bg-gray-100 transition rounded-xl p-3 flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                  <span className="text-sm text-blue-600 font-medium flex-1">Открыть скриншот</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </a>
+              ) : (
+                <p className="text-sm text-gray-400">Не приложен</p>
+              )}
+            </div>
           </div>
         )}
 
