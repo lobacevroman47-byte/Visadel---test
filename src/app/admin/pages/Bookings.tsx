@@ -1081,29 +1081,29 @@ function BookingDetailModal({
             {/* Контактная сетка как у визы */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-gray-500">ФИО / имя</p>
-                <p className="text-sm font-medium">{[b.first_name, b.last_name].filter(Boolean).join(' ') || '—'}</p>
+                <p className="text-xs text-[#0F2A36]/60">ФИО / имя</p>
+                <p className="text-sm font-semibold text-[#0F2A36]">{[b.first_name, b.last_name].filter(Boolean).join(' ') || '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Telegram</p>
+                <p className="text-xs text-[#0F2A36]/60">Telegram</p>
                 {tgUsername ? (
                   <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
-                    className="text-sm text-blue-600 hover:underline">
-                    @{tgUsername}
+                    className="text-sm font-semibold text-[#3B5BFF] hover:underline inline-flex items-center gap-1">
+                    @{tgUsername} <ExternalLink className="w-3 h-3" />
                   </a>
-                ) : <p className="text-sm font-medium">—</p>}
+                ) : <p className="text-sm font-semibold text-[#0F2A36]">—</p>}
               </div>
               <div>
-                <p className="text-xs text-gray-500">Телефон</p>
-                <p className="text-sm font-medium">{b.phone || '—'}</p>
+                <p className="text-xs text-[#0F2A36]/60">Телефон</p>
+                <p className="text-sm font-semibold text-[#0F2A36]">{b.phone || '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Email</p>
-                <p className="text-sm font-medium break-all">{b.email || '—'}</p>
+                <p className="text-xs text-[#0F2A36]/60">Email</p>
+                <p className="text-sm font-semibold text-[#0F2A36] break-all">{b.email || '—'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500">Дата подачи</p>
-                <p className="text-sm font-medium">{new Date(b.created_at).toLocaleDateString('ru-RU')}</p>
+                <p className="text-xs text-[#0F2A36]/60">Дата подачи</p>
+                <p className="text-sm font-semibold text-[#0F2A36]">{new Date(b.created_at).toLocaleDateString('ru-RU')}</p>
               </div>
             </div>
 
