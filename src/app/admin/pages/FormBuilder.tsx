@@ -16,6 +16,7 @@ import {
 import { countriesVisaData } from '../data/countriesData';
 import { countryPhotoRequirements } from '../data/photoRequirements';
 import { AdditionalServices } from './AdditionalServices';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 // ── Top-level tab nav: Анкеты виз / Доп. услуги / Брони
 type TopTab = 'visas' | 'addons' | 'bookings';
@@ -85,6 +86,7 @@ const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
 
 // Существующий конструктор анкет виз — теперь вкладка внутри обёртки FormBuilder.
 const VisaFormSection: React.FC = () => {
+  const dialog = useDialog();
   const [products, setProducts] = useState<VisaProduct[]>([]);
   const [allFields, setAllFields] = useState<VisaFormField[]>([]);
   const [allPhotos, setAllPhotos] = useState<VisaPhotoRequirement[]>([]);
@@ -164,13 +166,15 @@ const VisaFormSection: React.FC = () => {
   };
 
   const handleDeleteField = async (f: VisaFormField) => {
-    if (!confirm(`Удалить поле «${f.label}»?\n\nЭто пропадёт из анкеты на странице визы.`)) return;
+    const ok = await dialog.confirm(`Удалить поле «${f.label}»?`, 'Это пропадёт из анкеты на странице визы.', { confirmLabel: 'Удалить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     await deleteFormField(f.id);
     setAllFields(prev => prev.filter(x => x.id !== f.id));
   };
 
   const handleDeletePhoto = async (p: VisaPhotoRequirement) => {
-    if (!confirm(`Удалить фото-требование «${p.label}»?`)) return;
+    const ok = await dialog.confirm(`Удалить фото-требование «${p.label}»?`, undefined, { confirmLabel: 'Удалить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     await deletePhotoRequirement(p.id);
     setAllPhotos(prev => prev.filter(x => x.id !== p.id));
   };
@@ -712,6 +716,7 @@ const BookingProductEditor: React.FC<{
   onClose: () => void;
   onSaved: () => Promise<void>;
 }> = ({ type, row, settings, onClose, onSaved }) => {
+  const dialog = useDialog();
   // Локальный draft объединяет данные обеих таблиц; save сбрасывает в обе
   const [draftRow, setDraftRow] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
     row
@@ -776,7 +781,7 @@ const BookingProductEditor: React.FC<{
       });
       await onSaved();
     } catch (e) {
-      alert(`Ошибка сохранения: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Ошибка сохранения', e instanceof Error ? e.message : String(e));
     } finally { setSaving(false); }
   };
 
@@ -1064,6 +1069,7 @@ const FieldFormModal: React.FC<{
   onClose: () => void;
   onSaved: (f: Omit<VisaFormField, 'created_at' | 'updated_at'>) => Promise<void>;
 }> = ({ country, field, visasOfCountry, onClose, onSaved }) => {
+  const dialog = useDialog();
   const [form, setForm] = useState<Omit<VisaFormField, 'created_at' | 'updated_at'>>(
     field ?? {
       id: '', country, visa_id: null,
@@ -1081,7 +1087,7 @@ const FieldFormModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.field_key.trim() || !form.label.trim()) {
-      alert('Заполни ключ поля и название');
+      await dialog.warning('Заполни ключ поля и название');
       return;
     }
     const id = field?.id || `${form.visa_id ?? country}__${form.field_key}-${Date.now()}`;
@@ -1218,6 +1224,7 @@ const PhotoFormModal: React.FC<{
   onClose: () => void;
   onSaved: (p: Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>) => Promise<void>;
 }> = ({ country, photo, visasOfCountry, onClose, onSaved }) => {
+  const dialog = useDialog();
   const [form, setForm] = useState<Omit<VisaPhotoRequirement, 'created_at' | 'updated_at'>>(
     photo ?? {
       id: '', country, visa_id: null,
@@ -1232,7 +1239,7 @@ const PhotoFormModal: React.FC<{
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.field_key.trim() || !form.label.trim()) { alert('Заполни ключ и название'); return; }
+    if (!form.field_key.trim() || !form.label.trim()) { await dialog.warning('Заполни ключ и название'); return; }
     const id = photo?.id || `${form.visa_id ?? country}__${form.field_key}-${Date.now()}`;
     setSaving(true);
     try { await onSaved({ ...form, id }); }

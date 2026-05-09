@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 interface ApplicationRow {
   id: string;
@@ -202,13 +203,15 @@ const ApplicationDetailModal: React.FC<{
   onClose: () => void;
   onDone: () => void;
 }> = ({ app, onClose, onDone }) => {
+  const dialog = useDialog();
   const [processing, setProcessing] = useState(false);
   const [rejectMode, setRejectMode] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleApprove = async () => {
-    if (!confirm(`Одобрить заявку ${app.full_name}? Юзер сразу получит статус «Партнёр» и доступ к Партнёрскому кабинету.`)) return;
+    const ok = await dialog.confirm(`Одобрить заявку ${app.full_name}?`, 'Юзер сразу получит статус «Партнёр» и доступ к Партнёрскому кабинету.', { confirmLabel: 'Одобрить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     setProcessing(true);
     setError(null);
     try {

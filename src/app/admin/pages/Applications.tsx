@@ -15,6 +15,7 @@ import { payReferralBonus } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import { auditLog } from '../lib/audit';
 import { useAdmin } from '../contexts/AdminContext';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
@@ -989,6 +990,7 @@ const StatusHistory: React.FC<{
 // ── Application Modal ─────────────────────────────────────────────────────────
 const ApplicationModal: React.FC<{ application: Application; onClose: () => void }> = ({ application, onClose }) => {
   const { currentUser } = useAdmin();
+  const dialog = useDialog();
   const [status, setStatus] = useState(application.status);
   // Hold finance inputs as strings so user can fully clear the field while editing.
   // Parse to number on save and for the live tax preview.
@@ -1112,22 +1114,22 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         try {
           const notifyResult = await sendNotify(status);
           if (notifyResult === 'sent') {
-            alert(visaUrl ? 'Виза загружена! Уведомление отправлено в Telegram.' : 'Статус обновлён. Уведомление отправлено в Telegram.');
+            await dialog.success(visaUrl ? 'Виза загружена' : 'Статус обновлён', 'Уведомление отправлено в Telegram.');
           } else {
             // skipped by dedup (duplicate within 1 min) — changes saved, no double send
-            alert('Изменения сохранены. Уведомление уже было недавно отправлено.');
+            await dialog.success('Изменения сохранены', 'Уведомление уже было недавно отправлено.');
           }
         } catch (notifyErr) {
-          alert(`Изменения сохранены, но уведомление не отправлено:\n${String(notifyErr)}`);
+          await dialog.warning('Изменения сохранены', `Уведомление не отправлено: ${String(notifyErr)}`);
         }
       } else if (status !== 'draft' && !application.telegramId) {
-        alert('Изменения сохранены. Telegram ID не найден — уведомление не отправлено.');
+        await dialog.warning('Изменения сохранены', 'Telegram ID не найден — уведомление не отправлено.');
       } else {
-        alert('Изменения сохранены');
+        await dialog.success('Изменения сохранены');
       }
       onClose();
     } catch {
-      alert('Ошибка сохранения');
+      await dialog.error('Ошибка сохранения');
     } finally {
       setSaving(false);
       saveGuard.current = false;
@@ -1348,9 +1350,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                     setNotifying(true);
                     try {
                       await sendNotify();
-                      alert('Уведомление отправлено!');
+                      await dialog.success('Уведомление отправлено');
                     } catch (e) {
-                      alert(`Ошибка: ${String(e)}`);
+                      await dialog.error('Ошибка', String(e));
                     } finally {
                       setNotifying(false);
                     }

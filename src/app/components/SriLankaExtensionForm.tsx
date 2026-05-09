@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronLeft, Upload, CheckCircle2, CreditCard, User } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
+import { useDialog } from './shared/BrandDialog';
 
 interface SriLankaExtensionFormProps {
   visa: VisaOption;
@@ -20,6 +21,7 @@ interface ExtensionFormData {
 }
 
 export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriLankaExtensionFormProps) {
+  const dialog = useDialog();
   const [currentStep, setCurrentStep] = useState<'form' | 'payment'>('form');
   const [formData, setFormData] = useState<ExtensionFormData>({
     homeAddress: '',
@@ -62,18 +64,18 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleGoToPayment = () => {
+  const handleGoToPayment = async () => {
     if (!validateForm()) {
-      alert('Пожалуйста, заполните все обязательные поля');
+      await dialog.warning('Заполните все обязательные поля');
       return;
     }
     setCurrentStep('payment');
     window.scrollTo(0, 0);
   };
 
-  const handlePaymentComplete = () => {
+  const handlePaymentComplete = async () => {
     if (!paymentScreenshot) {
-      alert('Пожалуйста, загрузите скриншот оплаты');
+      await dialog.warning('Загрузите скриншот оплаты');
       return;
     }
 
@@ -92,14 +94,14 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
     applications.push(newApplication);
     localStorage.setItem('applications', JSON.stringify(applications));
 
-    alert('Спасибо! Ваша заявка на продление визы отправлена. Мы свяжемся с вами в ближайшее время.');
+    await dialog.success('Спасибо!', 'Ваша заявка на продление визы отправлена. Мы свяжемся с вами в ближайшее время.');
     onComplete();
   };
 
-  const handleFileUpload = (field: 'passportPhoto' | 'facePhoto', file: File | null) => {
+  const handleFileUpload = async (field: 'passportPhoto' | 'facePhoto', file: File | null) => {
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert('Размер файла не должен превышать 5MB');
+        await dialog.warning('Размер файла не должен превышать 5MB');
         return;
       }
       setFormData(prev => ({ ...prev, [field]: file }));
@@ -178,11 +180,11 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete }: SriL
                   <input
                     type="file"
                     accept=".jpg,.jpeg,.png"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
                         if (file.size > 5 * 1024 * 1024) {
-                          alert('Размер файла не должен превышать 5MB');
+                          await dialog.warning('Размер файла не должен превышать 5MB');
                           return;
                         }
                         setPaymentScreenshot(file);

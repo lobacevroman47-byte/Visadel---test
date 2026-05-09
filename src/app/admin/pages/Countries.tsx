@@ -13,6 +13,7 @@ import {
 } from '../../lib/db';
 import { countriesVisaData } from '../data/countriesData';
 import { AdditionalServices } from './AdditionalServices';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 // ── Top-level tab nav: Визы / Доп. услуги / Брони
 type TopTab = 'visas' | 'addons' | 'bookings';
@@ -59,6 +60,7 @@ export const Countries: React.FC = () => {
 };
 
 const VisasSection: React.FC = () => {
+  const dialog = useDialog();
   const [products, setProducts] = useState<VisaProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -95,21 +97,22 @@ const VisasSection: React.FC = () => {
   }, [filtered]);
 
   const handleSeed = async () => {
-    if (!confirm('Загрузить визы из хардкода в БД? Существующие записи не будут перезаписаны.')) return;
+    const ok = await dialog.confirm('Загрузить визы из хардкода в БД?', 'Существующие записи не будут перезаписаны.', { confirmLabel: 'Загрузить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     setSeeding(true);
     try {
       console.log('[seed] starting, countriesVisaData length:', countriesVisaData?.length);
       const r = await seedVisaProductsFromCode(false, { countriesVisaData });
       console.log('[seed] result:', r);
       if (r.error) {
-        alert(`Ошибка импорта:\n${r.error}\n\nВозможные причины:\n— Таблица visa_products не создана в Supabase\n— RLS блокирует запись\n\nЗапусти SQL из инструкции и попробуй снова.`);
+        await dialog.error('Ошибка импорта', `${r.error}\n\nВозможные причины:\n— Таблица visa_products не создана в Supabase\n— RLS блокирует запись\n\nЗапусти SQL из инструкции и попробуй снова.`);
       } else {
-        alert(`✅ Импортировано: ${r.inserted}\nУже было в БД: ${r.skipped}`);
+        await dialog.success('Импорт завершён', `Импортировано: ${r.inserted}\nУже было в БД: ${r.skipped}`);
       }
       await load();
     } catch (e) {
       console.error('[seed] exception:', e);
-      alert(`Не удалось импортировать:\n${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Не удалось импортировать', e instanceof Error ? e.message : String(e));
     } finally { setSeeding(false); }
   };
 
@@ -119,7 +122,8 @@ const VisasSection: React.FC = () => {
   };
 
   const handleDelete = async (p: VisaProduct) => {
-    if (!confirm(`Удалить «${p.name}» (${p.country})? Это нельзя отменить.`)) return;
+    const ok = await dialog.confirm(`Удалить «${p.name}»?`, `Страна: ${p.country}. Это действие нельзя отменить.`, { confirmLabel: 'Удалить', cancelLabel: 'Отмена' });
+    if (!ok) return;
     await deleteVisaProduct(p.id);
     setProducts(prev => prev.filter(x => x.id !== p.id));
   };
@@ -310,6 +314,7 @@ const ProductFormModal: React.FC<{
   onClose: () => void;
   onSaved: (p: Omit<VisaProduct, 'created_at' | 'updated_at'>) => Promise<void>;
 }> = ({ product, onClose, onSaved }) => {
+  const dialog = useDialog();
   const [form, setForm] = useState<Omit<VisaProduct, 'created_at' | 'updated_at'>>(
     product ?? {
       id: '', country: '', flag: '🌍', name: '',
@@ -326,7 +331,7 @@ const ProductFormModal: React.FC<{
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.id || !form.country || !form.name || form.price <= 0) {
-      alert('Заполни ID, Страну, Название и Цену');
+      await dialog.warning('Заполни ID, Страну, Название и Цену');
       return;
     }
     setSaving(true);

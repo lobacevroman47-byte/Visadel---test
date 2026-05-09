@@ -8,6 +8,7 @@ import { saveApplication, uploadFile, getAppSettings } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Step7Props {
   formData: FormData;
@@ -22,6 +23,7 @@ interface Step7Props {
 }
 
 export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete, onGoToProfile }: Step7Props) {
+  const dialog = useDialog();
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [useBonuses, setUseBonuses] = useState(false);
   const [bonusAmount, setBonusAmount] = useState(0);
@@ -95,7 +97,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
 
   const handlePaymentComplete = async () => {
     if (!paymentScreenshot) {
-      alert('Загрузите скриншот оплаты');
+      await dialog.warning('Загрузите скриншот оплаты');
       return;
     }
 
@@ -133,7 +135,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       // Check that we have at least the required photos uploaded — if user came from draft
       // and photos got stripped, ask them to re-upload
       if (!photoUrls.facePhoto && !photoUrls.passportPhoto) {
-        alert('Фотографии не были сохранены в черновике. Пожалуйста, вернитесь на шаг "Загрузка фото" и загрузите их заново.');
+        await dialog.warning('Фотографии не были сохранены', 'Вернитесь на шаг «Загрузка фото» и загрузите их заново.');
         setSubmitting(false);
         return;
       }
@@ -425,10 +427,10 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
               <p className="text-xs text-gray-400">JPG, PNG · макс. 5MB</p>
             </div>
             <input type="file" accept=".jpg,.jpeg,.png" className="hidden"
-              onChange={(e) => {
+              onChange={async (e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
-                if (file.size > 5 * 1024 * 1024) { alert('Максимальный размер 5MB'); return; }
+                if (file.size > 5 * 1024 * 1024) { await dialog.warning('Максимальный размер 5MB'); return; }
                 setPaymentScreenshot(file);
               }}
             />

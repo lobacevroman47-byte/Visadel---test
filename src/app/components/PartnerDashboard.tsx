@@ -18,6 +18,7 @@ import {
   Phone, Building2, Banknote, Hash,
 } from 'lucide-react';
 import { useTelegram } from '../App';
+import { useDialog } from './shared/BrandDialog';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { HeaderActions } from './HeaderActions';
 
@@ -249,6 +250,7 @@ const PAYOUT_STATUS: Record<string, { label: string; cls: string }> = {
 
 export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
   const { appUser, refreshUser } = useTelegram();
+  const dialog = useDialog();
   const telegramId = appUser?.telegram_id ?? 0;
   const partnerBalance = appUser?.partner_balance ?? 0;
   const referralCode = appUser?.referral_code ?? '';
@@ -503,8 +505,8 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       await navigator.clipboard.writeText(link);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 1500);
-    } catch { alert('Скопируйте: ' + link); }
-  }, [link]);
+    } catch { await dialog.info('Скопируйте вручную', link); }
+  }, [link, dialog]);
 
   const handleSaveSettings = async () => {
     if (!telegramId || !isSupabaseConfigured()) return;
@@ -532,7 +534,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       setTimeout(() => setSettingsSaved(false), 2500);
     } catch (e) {
       console.error('save settings:', e);
-      alert('Не удалось сохранить реквизиты.');
+      await dialog.error('Не удалось сохранить реквизиты');
     } finally {
       setSavingSettings(false);
     }

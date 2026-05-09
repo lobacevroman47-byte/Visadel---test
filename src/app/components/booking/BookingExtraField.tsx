@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Upload, Loader2, Check } from 'lucide-react';
 import { uploadFile, type ExtraFormField } from '../../lib/db';
+import { useDialog } from '../shared/BrandDialog';
 
 // Универсальный рендерер дополнительных полей в анкетах броней.
 // Используется HotelBookingForm и FlightBookingForm — типы полей
@@ -96,6 +97,7 @@ export default function BookingExtraField({ field, value, onChange }: Props) {
 }
 
 function ExtraFileUpload({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const dialog = useDialog();
   const [uploading, setUploading] = useState(false);
 
   const handle = async (file: File) => {
@@ -104,9 +106,9 @@ function ExtraFileUpload({ value, onChange }: { value: string; onChange: (url: s
     try {
       const url = await uploadFile(file, 'visas');
       if (url) onChange(url);
-      else alert('Не удалось загрузить файл');
+      else await dialog.error('Не удалось загрузить файл');
     } catch (e) {
-      alert(`Ошибка: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Ошибка', e instanceof Error ? e.message : String(e));
     } finally {
       setUploading(false);
     }

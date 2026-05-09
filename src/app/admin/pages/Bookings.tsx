@@ -6,6 +6,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { uploadFile, getAppSettings } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import { partnerCommission } from '../../lib/bonus-config';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,7 @@ interface BookingsProps {
 }
 
 export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
+  const dialog = useDialog();
   const [tab, setTab] = useState<Tab>(initialTab ?? 'hotels');
   const [hotels, setHotels] = useState<HotelBooking[]>([]);
   const [flights, setFlights] = useState<FlightBooking[]>([]);
@@ -203,7 +205,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       // CHECK violation видим явно вместо тихого молчания — частая причина
       // когда статус не разрешён в БД (например 'pending_confirmation' для
       // hotel_bookings, чей CHECK не включает этот статус).
-      alert(`Не удалось обновить статус: ${error.message}`);
+      await dialog.error('Не удалось обновить статус', error.message);
       return;
     }
 
@@ -569,6 +571,7 @@ function ConfirmationUploader({
   id: string;
   onUploaded: (newUrl: string) => void;
 }) {
+  const dialog = useDialog();
   const [uploading, setUploading] = useState(false);
   const ready = status === 'confirmed';
 
@@ -577,21 +580,20 @@ function ConfirmationUploader({
     setUploading(true);
     try {
       const newUrl = await uploadFile(file, 'visas');
-      if (!newUrl) { alert('Не удалось загрузить файл в хранилище. Проверь Supabase Storage.'); return; }
+      if (!newUrl) { await dialog.error('Не удалось загрузить файл', 'Проверь Supabase Storage.'); return; }
       if (isSupabaseConfigured()) {
         const { error } = await supabase.from(table).update({ confirmation_url: newUrl }).eq('id', id);
         if (error) {
-          alert(
-            `Не удалось сохранить ссылку на файл:\n${error.message}\n\n` +
-            `Похоже что в БД нет колонки confirmation_url. Выполни в Supabase SQL Editor:\n\n` +
-            `ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS confirmation_url text;`
+          await dialog.error(
+            'Не удалось сохранить ссылку на файл',
+            `${error.message}\n\nПохоже что в БД нет колонки confirmation_url. Выполни в Supabase SQL Editor:\n\nALTER TABLE ${table} ADD COLUMN IF NOT EXISTS confirmation_url text;`
           );
           return;
         }
       }
       onUploaded(newUrl);
     } catch (e) {
-      alert(`Ошибка: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Ошибка', e instanceof Error ? e.message : String(e));
     } finally {
       setUploading(false);
     }

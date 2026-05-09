@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Save, Gift, Percent, Loader2, Settings as SettingsIcon, Package, CreditCard, Hotel, Plane, Plus, Trash2, GripVertical } from 'lucide-react';
 import { getAppSettings, saveAppSettings, type AppSettings, type ExtraFormField } from '../../lib/db';
+import { useDialog } from '../../components/shared/BrandDialog';
 
 export const Settings: React.FC = () => {
+  const dialog = useDialog();
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -30,7 +32,7 @@ export const Settings: React.FC = () => {
       await saveAppSettings(rest);
       setSavedAt(new Date());
     } catch (e) {
-      alert(`Не удалось сохранить: ${e instanceof Error ? e.message : String(e)}`);
+      await dialog.error('Не удалось сохранить', e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }

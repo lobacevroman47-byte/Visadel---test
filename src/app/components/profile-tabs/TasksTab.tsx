@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ListTodo, Upload, CheckCircle, Clock, X } from 'lucide-react';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Task {
   id: string;
@@ -77,6 +78,7 @@ const TYPE_ICONS = {
 };
 
 export default function TasksTab() {
+  const dialog = useDialog();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [selectedTask, setSelectedTask] = useState<string | null>(null);
@@ -91,9 +93,9 @@ export default function TasksTab() {
     }
   }, []);
 
-  const handleSubmitTask = (taskId: string) => {
+  const handleSubmitTask = async (taskId: string) => {
     if (!screenshot) {
-      alert('Пожалуйста, загрузите скриншот выполненного задания');
+      await dialog.warning('Загрузите скриншот выполненного задания');
       return;
     }
 
@@ -108,7 +110,7 @@ export default function TasksTab() {
     localStorage.setItem('tasks', JSON.stringify(updatedTasks));
     setScreenshot(null);
     setSelectedTask(null);
-    alert('Задание отправлено на проверку! Бонусы будут начислены после подтверждения администратором.');
+    await dialog.success('Задание отправлено на проверку', 'Бонусы будут начислены после подтверждения администратором.');
   };
 
   const availableTasks = tasks.filter(t => t.status === 'available');

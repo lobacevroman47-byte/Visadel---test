@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ChevronRight, ChevronLeft, Users, RefreshCw } from 'lucide-react';
+import { useDialog } from '../shared/BrandDialog';
 
 interface Step3Props {
   data: string[];
@@ -129,6 +130,7 @@ const OPTIONS = [
 ];
 
 export default function Step3HowHeard({ data, onChange, onNext, onPrev }: Step3Props) {
+  const dialog = useDialog();
   const [selected, setSelected] = useState<string[]>(data);
 
   useEffect(() => { onChange(selected); }, [selected]);
@@ -136,9 +138,9 @@ export default function Step3HowHeard({ data, onChange, onNext, onPrev }: Step3P
   const toggle = (value: string) =>
     setSelected(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]);
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (selected.length === 0) {
-      alert('Пожалуйста, выберите хотя бы один вариант');
+      await dialog.warning('Выберите хотя бы один вариант');
       return;
     }
     onNext();
