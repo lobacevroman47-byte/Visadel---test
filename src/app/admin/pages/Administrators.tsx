@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, X, RefreshCw, Loader2, ShieldCheck, Shield, User } from 'lucide-react';
+import { Plus, Trash2, RefreshCw, Loader2, ShieldCheck, Shield, User } from 'lucide-react';
 import { getAdminUsers, addAdminUser, removeAdminUser, updateAdminRole, type AdminUserRow, type AdminRole } from '../../lib/db';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Button, Input, Card, Modal, EmptyState, Badge } from '../../components/ui/brand';
 
 const ROLE_LABELS: Record<AdminRole, string> = {
   founder: 'Основатель',
@@ -17,8 +18,8 @@ const ROLE_LABELS_PLURAL: Record<AdminRole, string> = {
 
 const ROLE_COLORS: Record<AdminRole, string> = {
   founder: 'bg-purple-100 text-purple-700',
-  admin: 'bg-blue-100 text-blue-700',
-  moderator: 'bg-green-100 text-green-700',
+  admin: 'bg-[#EAF1FF] text-[#3B5BFF]',
+  moderator: 'bg-emerald-100 text-emerald-700',
 };
 
 const ROLE_ICON: Record<AdminRole, React.ReactNode> = {
@@ -33,9 +34,10 @@ const FOUNDER_IDS: string[] = (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
 
 // ── Add Modal ─────────────────────────────────────────────────────────────────
 const AddAdminModal: React.FC<{
+  open: boolean;
   onClose: () => void;
   onAdd: (row: Omit<AdminUserRow, 'id' | 'created_at'>) => Promise<void>;
-}> = ({ onClose, onAdd }) => {
+}> = ({ open, onClose, onAdd }) => {
   const dialog = useDialog();
   const [telegramId, setTelegramId] = useState('');
   const [username, setUsername] = useState('');
@@ -54,54 +56,64 @@ const AddAdminModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl">
-        <div className="p-5 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold">Добавить сотрудника</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition"><X size={20} /></button>
+    <Modal
+      open={open}
+      onClose={onClose}
+      icon="👤"
+      label="Сотрудник"
+      title="Добавить сотрудника"
+      size="md"
+    >
+      <form onSubmit={handleSubmit} className="p-5 space-y-4">
+        <Input
+          type="number"
+          label="Telegram ID *"
+          value={telegramId}
+          onChange={e => setTelegramId(e.target.value)}
+          placeholder="123456789"
+          hint="Узнать ID можно у бота @userinfobot"
+          required
+        />
+        <Input
+          type="text"
+          label="Имя *"
+          value={name}
+          onChange={e => setName(e.target.value)}
+          placeholder="Иван Иванов"
+          required
+        />
+        <Input
+          type="text"
+          label="Username (необязательно)"
+          value={username}
+          onChange={e => setUsername(e.target.value)}
+          placeholder="@username"
+        />
+        <div>
+          <label className="block text-xs text-gray-500 mb-1">Роль</label>
+          <select value={role} onChange={e => setRole(e.target.value as AdminRole)}
+            className="w-full px-3 py-2.5 text-sm bg-white border border-[#E1E5EC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF]">
+            <option value="admin">Администратор — полный доступ</option>
+            <option value="moderator">Модератор — доступ к заявкам</option>
+          </select>
         </div>
-        <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Telegram ID <span className="text-red-500">*</span></label>
-            <input type="number" value={telegramId} onChange={e => setTelegramId(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="123456789" required />
-            <p className="text-xs text-gray-400 mt-1">Узнать ID можно у бота @userinfobot</p>
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Имя <span className="text-red-500">*</span></label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="Иван Иванов" required />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Username (необязательно)</label>
-            <input type="text" value={username} onChange={e => setUsername(e.target.value)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="@username" />
-          </div>
-          <div>
-            <label className="block text-sm text-gray-700 mb-1 font-medium">Роль</label>
-            <select value={role} onChange={e => setRole(e.target.value as AdminRole)}
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400">
-              <option value="admin">Администратор — полный доступ</option>
-              <option value="moderator">Модератор — доступ к заявкам</option>
-            </select>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving}
-              className="flex-1 py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-60 text-white rounded-xl transition flex items-center justify-center gap-2">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              {saving ? 'Сохраняем...' : 'Добавить'}
-            </button>
-            <button type="button" onClick={onClose}
-              className="px-5 py-3 border border-gray-300 rounded-xl hover:bg-gray-50 transition">
-              Отмена
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-3 pt-2">
+          <Button
+            type="submit"
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={saving}
+            leftIcon={!saving ? <Plus className="w-4 h-4" /> : undefined}
+          >
+            {saving ? 'Сохраняем...' : 'Добавить'}
+          </Button>
+          <Button type="button" variant="secondary" size="lg" onClick={onClose}>
+            Отмена
+          </Button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 
@@ -154,103 +166,114 @@ export const Administrators: React.FC = () => {
     <div className="p-8">
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="mb-1">Сотрудники</h1>
-          <p className="text-sm text-gray-500">Управление доступом к админ-панели</p>
+          <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Сотрудники</h1>
+          <p className="text-sm text-[#0F2A36]/60">Управление доступом к админ-панели</p>
         </div>
         <div className="flex items-center gap-2">
-          {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-          <button onClick={load} className="p-2 hover:bg-gray-100 rounded-lg transition" title="Обновить">
-            <RefreshCw size={16} className="text-gray-500" />
-          </button>
-          <button onClick={() => setShowAdd(true)}
-            className="px-4 py-2 bg-[#3B5BFF] hover:bg-[#4F2FE6] text-white rounded-xl transition flex items-center gap-2 text-sm">
-            <Plus size={18} /> Добавить
-          </button>
+          {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0F2A36]/45" />}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={load}
+            title="Обновить"
+            leftIcon={<RefreshCw size={16} />}
+          >
+            <span className="sr-only">Обновить</span>
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={() => setShowAdd(true)}
+            leftIcon={<Plus size={16} />}
+          >
+            Добавить
+          </Button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         {(['founder', 'admin', 'moderator'] as AdminRole[]).map(role => (
-          <div key={role} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+          <Card key={role} variant="flat" padding="md" radius="xl" className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${ROLE_COLORS[role]}`}>
               {ROLE_ICON[role]}
             </div>
             <div>
-              <p className="text-xs text-gray-500">{ROLE_LABELS_PLURAL[role]}</p>
-              <p className="text-2xl font-semibold text-gray-800">{counts[role]}</p>
+              <p className="text-xs text-[#0F2A36]/60">{ROLE_LABELS_PLURAL[role]}</p>
+              <p className="text-2xl font-semibold text-[#0F2A36]">{counts[role]}</p>
             </div>
-          </div>
+          </Card>
         ))}
       </div>
 
       {/* Founders row (from env var) */}
       {FOUNDER_IDS.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+        <Card variant="flat" padding="none" radius="xl" className="overflow-hidden mb-4">
           <div className="px-5 py-3 bg-purple-50 border-b border-purple-100">
             <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Основатели (защищены)</p>
           </div>
           {FOUNDER_IDS.map(id => (
             <div key={id} className="px-5 py-4 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-800">Telegram ID: {id}</p>
-                <p className="text-xs text-gray-400">Настроен через Vercel ENV</p>
+                <p className="text-sm font-medium text-[#0F2A36]">Telegram ID: {id}</p>
+                <p className="text-xs text-[#0F2A36]/45">Настроен через Vercel ENV</p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium flex items-center gap-1 ${ROLE_COLORS.founder}`}>
+              <Badge variant="neutral" className="bg-purple-100 text-purple-700">
                 {ROLE_ICON.founder} {ROLE_LABELS.founder}
-              </span>
+              </Badge>
             </div>
           ))}
-        </div>
+        </Card>
       )}
 
       {/* Admins table */}
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <Card variant="flat" padding="none" radius="xl" className="overflow-hidden">
         {admins.length === 0 && !loading ? (
-          <div className="py-16 text-center">
-            <p className="text-gray-400 text-sm">Сотрудники не добавлены</p>
-            <p className="text-gray-300 text-xs mt-1">Нажмите «Добавить» чтобы выдать доступ</p>
-          </div>
+          <EmptyState
+            icon={<User className="w-6 h-6 text-[#3B5BFF]" />}
+            title="Сотрудники не добавлены"
+            subtitle="Нажмите «Добавить» чтобы выдать доступ"
+          />
         ) : (
           <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+            <thead className="bg-gray-50 border-b border-[#E1E5EC]">
               <tr>
-                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Имя</th>
-                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Telegram ID</th>
-                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Роль</th>
-                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium">Добавлен</th>
-                <th className="px-5 py-3 text-left text-xs text-gray-500 font-medium"></th>
+                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Имя</th>
+                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Telegram ID</th>
+                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Роль</th>
+                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium">Добавлен</th>
+                <th className="px-5 py-3 text-left text-xs text-[#0F2A36]/60 font-medium"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {admins.map(row => (
                 <tr key={row.telegram_id} className="hover:bg-gray-50">
                   <td className="px-5 py-4">
-                    <p className="text-sm font-medium text-gray-800">{row.name}</p>
+                    <p className="text-sm font-medium text-[#0F2A36]">{row.name}</p>
                     {row.telegram_username && (
-                      <p className="text-xs text-gray-400">@{row.telegram_username}</p>
+                      <p className="text-xs text-[#0F2A36]/45">@{row.telegram_username}</p>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-600">{row.telegram_id}</td>
+                  <td className="px-5 py-4 text-sm text-[#0F2A36]/65">{row.telegram_id}</td>
                   <td className="px-5 py-4">
                     <select
                       value={row.role}
                       onChange={e => handleRoleChange(row, e.target.value as AdminRole)}
                       disabled={FOUNDER_IDS.includes(String(row.telegram_id))}
-                      className="px-3 py-1 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
+                      className="px-3 py-1.5 text-sm bg-white border border-[#E1E5EC] rounded-lg focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] disabled:opacity-50"
                     >
                       <option value="admin">Администратор</option>
                       <option value="moderator">Модератор</option>
                     </select>
                   </td>
-                  <td className="px-5 py-4 text-sm text-gray-400">
+                  <td className="px-5 py-4 text-sm text-[#0F2A36]/45">
                     {row.created_at ? new Date(row.created_at).toLocaleDateString('ru-RU') : '—'}
                   </td>
                   <td className="px-5 py-4">
                     <button
                       onClick={() => handleDelete(row)}
                       disabled={FOUNDER_IDS.includes(String(row.telegram_id))}
-                      className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
+                      className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition disabled:opacity-30 disabled:cursor-not-allowed"
                       title="Удалить"
                     >
                       <Trash2 size={16} />
@@ -261,9 +284,9 @@ export const Administrators: React.FC = () => {
             </tbody>
           </table>
         )}
-      </div>
+      </Card>
 
-      {showAdd && <AddAdminModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
+      <AddAdminModal open={showAdd} onClose={() => setShowAdd(false)} onAdd={handleAdd} />
     </div>
   );
 };
