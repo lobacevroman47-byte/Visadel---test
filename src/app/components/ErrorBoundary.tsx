@@ -1,7 +1,12 @@
 // Глобальный ErrorBoundary — ловит любую ошибку рендера и вместо
-// «белого экрана» показывает понятный экран с кнопкой перезагрузки и
-// очистки локального стейта (часто crash вызывает повреждённый
-// localStorage от прерванного upload или draft).
+// «белого экрана» показывает понятный экран с кнопкой перезагрузки.
+//
+// На ПЕРВОЙ ошибке делаем silent auto-retry через 200ms — часто crash
+// возникает из-за race condition'а: Telegram WebApp API ещё не готов
+// при первом render'е, или async-импорт чанка ещё не завершился.
+// Только если RETRY тоже падает — показываем экран ошибки.
+//
+// Это решает проблему «при первом заходе ошибка, при перезагрузке всё ок».
 
 import { Component, type ReactNode } from 'react';
 
@@ -11,17 +16,38 @@ interface Props {
 
 interface State {
   error: Error | null;
+  retried: boolean;
+  /** При retry-проходе генерим новый key чтобы пересоздать дерево детей. */
+  resetKey: number;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  state: State = { error: null };
+const RETRY_DELAY_MS = 200;
 
-  static getDerivedStateFromError(error: Error): State {
+export class ErrorBoundary extends Component<Props, State> {
+  state: State = { error: null, retried: false, resetKey: 0 };
+  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ErrorBoundary]', error, info);
+    // Полный лог в консоль — видно в Telegram DevTools
+    console.error('[ErrorBoundary] caught error:', error);
+    console.error('[ErrorBoundary] error stack:', error.stack);
+    console.error('[ErrorBoundary] component stack:', info.componentStack);
+
+    // Первая ошибка → silent auto-retry. Вторая → показываем экран ошибки.
+    if (!this.state.retried) {
+      console.warn('[ErrorBoundary] auto-retrying once in', RETRY_DELAY_MS, 'ms');
+      this.retryTimer = setTimeout(() => {
+        this.setState(s => ({ error: null, retried: true, resetKey: s.resetKey + 1 }));
+      }, RETRY_DELAY_MS);
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.retryTimer) clearTimeout(this.retryTimer);
   }
 
   handleReload = () => {
@@ -45,8 +71,23 @@ export class ErrorBoundary extends Component<Props, State> {
   };
 
   render() {
-    if (!this.state.error) return this.props.children;
+    // Пока идёт retry-таймер (error был, но retried=false и timer запущен) —
+    // показываем пустой экран чтобы не мигнуть error-UI на 200ms.
+    if (this.state.error && !this.state.retried) {
+      return (
+        <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
+          {/* Лёгкий спиннер чтобы пользователь не увидел чёрный экран */}
+          <div className="w-8 h-8 border-2 border-[#3B5BFF]/30 border-t-[#3B5BFF] rounded-full animate-spin" />
+        </div>
+      );
+    }
 
+    // Если ошибки нет — рендерим children с resetKey (форсит ремаунт после retry).
+    if (!this.state.error) {
+      return <div key={this.state.resetKey}>{this.props.children}</div>;
+    }
+
+    // Retried = true и снова error → реальная проблема, показываем экран.
     return (
       <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center px-5 py-10">
         <div className="max-w-md w-full bg-white rounded-2xl border border-gray-100 p-6 text-center shadow-sm">
@@ -62,6 +103,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <summary className="cursor-pointer">Технические детали</summary>
             <pre className="overflow-x-auto mt-2 whitespace-pre-wrap break-all">
               {this.state.error.message}
+              {this.state.error.stack && '\n\n' + this.state.error.stack}
             </pre>
           </details>
           <button
