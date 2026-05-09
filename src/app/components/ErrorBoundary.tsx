@@ -1,12 +1,15 @@
 // Глобальный ErrorBoundary — ловит любую ошибку рендера и вместо
 // «белого экрана» показывает понятный экран с кнопкой перезагрузки.
 //
-// На ПЕРВОЙ ошибке делаем silent auto-retry через 200ms — часто crash
-// возникает из-за race condition'а: Telegram WebApp API ещё не готов
-// при первом render'е, или async-импорт чанка ещё не завершился.
-// Только если RETRY тоже падает — показываем экран ошибки.
+// Логика:
+//   1. ChunkLoadError (стейл-кеш после деплоя) → автоматический
+//      hard-reload с пометкой sessionStorage чтобы не зациклиться.
+//   2. Любая другая ошибка → silent retry через 200ms (race condition'ы
+//      типа TG WebApp API не готов).
+//   3. Если retry тоже падает → экран «Что-то пошло не так».
 //
-// Это решает проблему «при первом заходе ошибка, при перезагрузке всё ок».
+// Это решает проблему «при первом заходе или открытии вкладки ошибка,
+// при перезагрузке всё ок».
 
 import { Component, type ReactNode } from 'react';
 
@@ -22,6 +25,24 @@ interface State {
 }
 
 const RETRY_DELAY_MS = 200;
+const RELOAD_GUARD_KEY = 'vd_chunk_reload_guard';
+
+// Распознаём ошибку загрузки динамического чанка. После каждого деплоя
+// Vite генерит файлы с новыми хэшами, и старая HTML-страница в кеше
+// браузера ссылается на удалённые файлы. lazy() в этом случае получает
+// ошибку «Failed to fetch dynamically imported module».
+function isChunkLoadError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || '';
+  const name = err.name || '';
+  return (
+    name === 'ChunkLoadError' ||
+    /loading chunk/i.test(msg) ||
+    /failed to fetch dynamically imported/i.test(msg) ||
+    /importing a module script failed/i.test(msg) ||
+    /load failed/i.test(msg) // Safari + lazy() иногда даёт generic «Load failed»
+  );
+}
 
 export class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, retried: false, resetKey: 0 };
@@ -37,7 +58,21 @@ export class ErrorBoundary extends Component<Props, State> {
     console.error('[ErrorBoundary] error stack:', error.stack);
     console.error('[ErrorBoundary] component stack:', info.componentStack);
 
-    // Первая ошибка → silent auto-retry. Вторая → показываем экран ошибки.
+    // ── ChunkLoadError → hard-reload, но только один раз за сессию,
+    //    чтобы не зациклиться, если файл реально 404-ит. ────────────────
+    if (isChunkLoadError(error)) {
+      const guarded = (() => { try { return sessionStorage.getItem(RELOAD_GUARD_KEY); } catch { return null; } })();
+      if (!guarded) {
+        try { sessionStorage.setItem(RELOAD_GUARD_KEY, '1'); } catch { /* noop */ }
+        console.warn('[ErrorBoundary] chunk load error → reloading once');
+        // Лёгкая задержка чтобы успело залогироваться
+        setTimeout(() => window.location.reload(), 50);
+        return;
+      }
+      console.warn('[ErrorBoundary] chunk load error повторно — показываем экран ошибки');
+    }
+
+    // Первая generic-ошибка → silent retry. Вторая → экран ошибки.
     if (!this.state.retried) {
       console.warn('[ErrorBoundary] auto-retrying once in', RETRY_DELAY_MS, 'ms');
       this.retryTimer = setTimeout(() => {
@@ -51,12 +86,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   handleReload = () => {
+    try { sessionStorage.removeItem(RELOAD_GUARD_KEY); } catch { /* noop */ }
     window.location.reload();
   };
 
   handleHardReset = () => {
     try {
-      // Чистим всё что могло сломаться: drafts, кэш user'а
+      // Чистим всё что могло сломаться: drafts, кэш user'а, reload guard
       const keysToRemove: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
@@ -66,17 +102,17 @@ export class ErrorBoundary extends Component<Props, State> {
         }
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
+      sessionStorage.removeItem(RELOAD_GUARD_KEY);
     } catch { /* noop */ }
     window.location.reload();
   };
 
   render() {
-    // Пока идёт retry-таймер (error был, но retried=false и timer запущен) —
-    // показываем пустой экран чтобы не мигнуть error-UI на 200ms.
+    // Пока идёт retry-таймер ИЛИ chunk-reload — показываем спиннер
+    // чтобы юзер не увидел error-UI на доли секунды.
     if (this.state.error && !this.state.retried) {
       return (
         <div className="min-h-screen bg-[#F5F7FA] flex items-center justify-center">
-          {/* Лёгкий спиннер чтобы пользователь не увидел чёрный экран */}
           <div className="w-8 h-8 border-2 border-[#3B5BFF]/30 border-t-[#3B5BFF] rounded-full animate-spin" />
         </div>
       );

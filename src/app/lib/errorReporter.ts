@@ -9,6 +9,32 @@ import { apiFetch } from './apiFetch';
 const isProd = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'production';
 const seen = new Set<string>();
 let installed = false;
+const RELOAD_GUARD_KEY = 'vd_chunk_reload_guard';
+
+// Распознаём ошибки загрузки динамического чанка (lazy() chunks).
+// Стейл-кеш после деплоя — самая частая причина «ошибки при первом клике».
+function isChunkLoadError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const msg = err.message || '';
+  const name = err.name || '';
+  return (
+    name === 'ChunkLoadError' ||
+    /loading chunk/i.test(msg) ||
+    /failed to fetch dynamically imported/i.test(msg) ||
+    /importing a module script failed/i.test(msg) ||
+    /load failed/i.test(msg)
+  );
+}
+
+function reloadOnChunkError(err: unknown): boolean {
+  if (!isChunkLoadError(err)) return false;
+  const guarded = (() => { try { return sessionStorage.getItem(RELOAD_GUARD_KEY); } catch { return null; } })();
+  if (guarded) return false; // уже один раз перезагружали — не зацикливаемся
+  try { sessionStorage.setItem(RELOAD_GUARD_KEY, '1'); } catch { /* noop */ }
+  console.warn('[error-reporter] chunk load error → window.location.reload()');
+  setTimeout(() => window.location.reload(), 50);
+  return true;
+}
 
 interface Context {
   source?: string;
@@ -55,10 +81,14 @@ export function installGlobalErrorHandlers(): void {
   installed = true;
 
   window.addEventListener('error', (e) => {
-    reportError(e.error ?? new Error(e.message), { source: 'window.error' });
+    const err = e.error ?? new Error(e.message);
+    if (reloadOnChunkError(err)) return;
+    reportError(err, { source: 'window.error' });
   });
 
   window.addEventListener('unhandledrejection', (e) => {
-    reportError(e.reason ?? new Error('Unhandled rejection'), { source: 'unhandledrejection' });
+    const err = e.reason ?? new Error('Unhandled rejection');
+    if (reloadOnChunkError(err)) return;
+    reportError(err, { source: 'unhandledrejection' });
   });
 }
