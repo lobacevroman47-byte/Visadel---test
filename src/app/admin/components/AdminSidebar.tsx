@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Gift,
   Calendar,
+  Wallet,
   X
 } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
@@ -181,6 +182,13 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           label="История бонусов"
           active={activeSection === 'bonus-logs'}
           onClick={() => onSectionChange('bonus-logs')}
+          disabled={!hasPermission(['owner', 'admin'])}
+        />
+        <SidebarItem
+          icon={<Wallet size={20} />}
+          label="Партнёрские выплаты"
+          active={activeSection === 'payouts'}
+          onClick={() => onSectionChange('payouts')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem
