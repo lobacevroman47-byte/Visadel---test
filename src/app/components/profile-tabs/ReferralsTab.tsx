@@ -10,6 +10,7 @@ import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
 import { BONUS_CONFIG } from '../../lib/bonus-config';
 import { useDialog } from '../shared/BrandDialog';
+import { Button } from '../ui/brand';
 // (apiFetch удалён вместе с auto-grant level bonuses)
 
 interface ReferralTabProps {
@@ -172,12 +173,16 @@ export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDa
           Приглашайте друзей — каждый, кто оплатит первую визу,
           приносит вам <span className="font-semibold text-[#0F2A36]">+{BONUS_CONFIG.REFERRER_REGULAR}₽</span>.
         </p>
-        <button
+        <Button
+          variant="primary"
+          size="md"
+          fullWidth
+          className="mt-4"
           onClick={scrollToShare}
-          className="w-full mt-4 vd-grad text-white py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5 active:scale-[0.98] transition vd-shadow-cta"
+          leftIcon={<UserPlus className="w-4 h-4" />}
         >
-          <UserPlus className="w-4 h-4" /> Пригласить друга
-        </button>
+          Пригласить друга
+        </Button>
       </div>
 
       {/* ── 2. Funnel: clicks → registrations → orders ─────────────────── */}
@@ -236,19 +241,22 @@ export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDa
 
         {/* Native share + QR — secondary actions */}
         <div className="grid grid-cols-[1fr,auto] gap-2">
-          <button
+          <Button
+            variant="primary"
+            size="md"
             onClick={nativeShare}
-            className="py-2.5 rounded-xl text-sm font-medium vd-grad text-white active:scale-[0.98] transition flex items-center justify-center gap-1.5 vd-shadow-cta"
+            leftIcon={<Share2 className="w-4 h-4" />}
           >
-            <Share2 className="w-4 h-4" /> Поделиться
-          </button>
-          <button
+            Поделиться
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
             onClick={() => setShowQR(s => !s)}
-            className="px-3 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 active:scale-95 transition flex items-center justify-center text-gray-600"
             title={showQR ? 'Скрыть QR' : 'Показать QR'}
           >
             <QrCode className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
 
         {showQR && (

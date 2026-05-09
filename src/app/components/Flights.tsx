@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Loader2, Plane, ArrowRightLeft, Search, Plus, Minus, ExternalLink, RefreshCw } from 'lucide-react';
 import BrandHeader from './shared/BrandHeader';
+import { Button } from './ui/brand';
 import {
   tp,
   buildAviasalesUrl,
@@ -317,13 +318,17 @@ function SearchStep({
           </div>
         </div>
 
-        <button
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          className="!py-3.5 !rounded-2xl !font-bold tracking-wide"
           disabled={!canSubmit}
           onClick={() => onSubmit(f)}
-          className="w-full py-3.5 rounded-2xl font-bold tracking-wide vd-grad text-white vd-shadow-cta active:scale-[0.98] transition disabled:opacity-50 flex items-center justify-center gap-2"
+          leftIcon={<Search className="w-4 h-4" />}
         >
-          <Search className="w-4 h-4" /> Найти билеты
-        </button>
+          Найти билеты
+        </Button>
 
         <p className="text-[11px] text-[#0F2A36]/45 mt-3 text-center leading-snug">
           Покупка происходит на сайте Aviasales — мы не берём комиссию,
@@ -396,7 +401,11 @@ function ResultsStep({
             Они найдут актуальные тарифы по этим датам в реальном времени — наша база
             обновляется каждые несколько часов, у Aviasales — каждую секунду.
           </p>
-          <button
+          <Button
+            variant="primary"
+            size="md"
+            fullWidth
+            className="mt-4 !py-3 !font-bold"
             onClick={() => {
               const url = buildAviasalesUrl({
                 origin: form.origin!.code,
@@ -409,10 +418,10 @@ function ResultsStep({
               if (tg && typeof tg.openLink === 'function') tg.openLink(url);
               else window.open(url, '_blank', 'noopener,noreferrer');
             }}
-            className="mt-4 w-full py-3 rounded-xl vd-grad text-white font-bold text-sm vd-shadow-cta active:scale-[0.98] transition flex items-center justify-center gap-2"
+            leftIcon={<Plane className="w-4 h-4" />}
           >
-            <Plane className="w-4 h-4" /> Открыть Aviasales
-          </button>
+            Открыть Aviasales
+          </Button>
         </div>
       )}
 
@@ -510,12 +519,16 @@ function ResultsStep({
                 )}
               </div>
 
-              <button
+              <Button
+                variant="primary"
+                size="md"
+                fullWidth
+                className="!py-3 !font-bold"
                 onClick={() => { haptic('medium'); onPick(f); }}
-                className="w-full py-3 rounded-xl font-bold tracking-wide vd-grad text-white vd-shadow-cta active:scale-[0.98] transition text-sm flex items-center justify-center gap-2"
+                leftIcon={<ExternalLink className="w-4 h-4" />}
               >
-                <ExternalLink className="w-4 h-4" /> Купить за {formatRub(f.price)}
-              </button>
+                Купить за {formatRub(f.price)}
+              </Button>
             </div>
           );
         })}
