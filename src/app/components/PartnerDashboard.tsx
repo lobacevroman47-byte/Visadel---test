@@ -27,9 +27,15 @@ interface PartnerDashboardProps {
 const HOLD_DAYS = 30;
 
 // Зарезервированные слова — не дать партнёру vanity, ломающий deeplinks
+// или конфликтующий с системными коммандами / маршрутами мини-аппа.
 const RESERVED_VANITY = new Set([
-  'admin', 'partner', 'referrals', 'applications',
-  'booking_hotel', 'booking_flight', 'partner_dashboard',
+  'admin', 'partner', 'partners', 'referrals', 'applications',
+  'booking', 'booking_hotel', 'booking_flight', 'partner_dashboard',
+  'profile', 'home', 'settings', 'help', 'support', 'visadel',
+  'visa', 'hotel', 'flight', 'bot', 'app', 'login', 'logout', 'auth',
+  'api', 'admin_panel', 'dashboard', 'reviews', 'about', 'contact',
+  'terms', 'privacy', 'official', 'verified', 'staff', 'moderator',
+  'ceo', 'founder', 'owner', 'root', 'user', 'guest', 'test',
 ]);
 
 // Страны → флаги (для отображения в начислениях). Расширяемо.
