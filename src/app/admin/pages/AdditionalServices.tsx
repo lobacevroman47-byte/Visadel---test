@@ -188,15 +188,13 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
                   >
                     <Edit2 size={15} />
                   </button>
-                  {!isBookings && (
-                    <button
-                      onClick={() => handleDelete(s)}
-                      className="w-9 h-9 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 flex items-center justify-center transition active:scale-95"
-                      title="Удалить"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleDelete(s)}
+                    className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition active:scale-95"
+                    title={isBookings ? 'Удалить кастомизацию (вернётся к умолчанию)' : 'Удалить'}
+                  >
+                    <Trash2 size={15} />
+                  </button>
                 </div>
               </div>
             );

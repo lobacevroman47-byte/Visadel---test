@@ -111,11 +111,8 @@ const VisaFormSection: React.FC = () => {
       setProducts(p);
       setAllFields(f);
       setAllPhotos(ph);
-      setSelectedCountry(prev => {
-        if (prev) return prev;
-        const first = Array.from(new Set(p.map(x => x.country)))[0];
-        return first ?? null;
-      });
+      // Не auto-выбираем первую страну — админ должен явно нажать
+      // нужную страну в списке. Сохраняем prev если он уже был выбран.
     } finally { setLoading(false); }
   };
 

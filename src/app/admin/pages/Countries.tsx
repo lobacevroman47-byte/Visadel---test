@@ -69,6 +69,9 @@ const VisasSection: React.FC = () => {
   const [showOnlyEnabled, setShowOnlyEnabled] = useState(false);
   const [editing, setEditing] = useState<VisaProduct | null>(null);
   const [adding, setAdding] = useState(false);
+  // Выбранная страна (как в Конструкторе анкет). По умолчанию ни одна
+  // не выбрана — админ должен явно ткнуть страну в списке.
+  const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -78,14 +81,22 @@ const VisasSection: React.FC = () => {
 
   useEffect(() => { load(); }, []);
 
+  // Список стран для пилюль селектора (из products + по умолчанию).
+  const countries = useMemo(() => {
+    const map = new Map<string, string | null>();
+    for (const p of products) if (!map.has(p.country)) map.set(p.country, p.flag);
+    return Array.from(map.entries()).map(([name, flag]) => ({ name, flag }));
+  }, [products]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter(p => {
       if (showOnlyEnabled && !p.enabled) return false;
+      if (selectedCountry && p.country !== selectedCountry) return false;
       if (q && !`${p.country} ${p.name}`.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [products, search, showOnlyEnabled]);
+  }, [products, search, showOnlyEnabled, selectedCountry]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, VisaProduct[]>();
@@ -160,6 +171,35 @@ const VisasSection: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Country selector — pills like в Конструкторе анкет */}
+      {countries.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedCountry(null)}
+            className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition ${
+              selectedCountry === null ? 'bg-[#3B5BFF] text-white shadow-sm' : 'text-[#0F2A36] hover:bg-gray-100'
+            }`}
+          >
+            <span className="text-base">🌍</span>
+            Все страны
+          </button>
+          {countries.map(c => (
+            <button
+              key={c.name}
+              type="button"
+              onClick={() => setSelectedCountry(c.name)}
+              className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition ${
+                selectedCountry === c.name ? 'bg-[#3B5BFF] text-white shadow-sm' : 'text-[#0F2A36] hover:bg-gray-100'
+              }`}
+            >
+              <span className="text-base">{c.flag ?? '🌍'}</span>
+              {c.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Filters — brand pill style */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-5 flex flex-wrap gap-2 items-center">
