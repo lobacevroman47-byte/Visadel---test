@@ -321,6 +321,9 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
   const [loading, setLoading] = useState(true);
   const [reviewApp, setReviewApp] = useState<Application | null>(null);
   const [submittingReviewId, setSubmittingReviewId] = useState<string | null>(null);
+  // Countdown в секундах — пока 10s «проверки» отзыва бонус не начисляется
+  // и виза не разблокируется (защита от случайных кликов).
+  const [reviewCountdown, setReviewCountdown] = useState<{ id: string; sec: number } | null>(null);
   const [deletingDraftKey, setDeletingDraftKey] = useState<string | null>(null);
 
   // ── Use context so telegramId is always up-to-date (not stale localStorage) ──
@@ -527,6 +530,16 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
   const handleQuickReview = async (app: Application) => {
     if (submittingReviewId) return;
     setSubmittingReviewId(app.id!);
+
+    // 10-секундный countdown до фактического начисления бонуса и
+    // разблокировки визы. Кнопка в течение этих 10s показывает «Проверяем X»
+    // и заблокирована — пользователь видит что отзыв «обрабатывается».
+    setReviewCountdown({ id: app.id!, sec: 10 });
+    for (let i = 10; i >= 1; i--) {
+      setReviewCountdown({ id: app.id!, sec: i });
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    setReviewCountdown(null);
 
     const username = (() => {
       try { return JSON.parse(localStorage.getItem('userData') ?? '{}').username ?? ''; } catch { return ''; }
@@ -807,7 +820,9 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                               {submittingReviewId === app.id
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
                                 : <Star className="w-4 h-4" />}
-                              {appUser?.is_influencer ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
+                              {reviewCountdown?.id === app.id
+                                ? `Проверяем отзыв… ${reviewCountdown.sec}с`
+                                : appUser?.is_influencer ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
                             </button>
                           </div>
                         ) : (
@@ -917,6 +932,7 @@ function BookingActions({
   kindLabel: string;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [countdown, setCountdown] = useState<number | null>(null);
   const reviewed = !!booking.review_bonus_granted;
   // Mirror the visa pattern: deliverable is "ready" only when status='confirmed' AND file is uploaded
   const ready = booking.status === 'confirmed' && !!booking.confirmation_url;
@@ -924,6 +940,14 @@ function BookingActions({
   const handleReview = async () => {
     if (submitting || reviewed || !ready) return;
     setSubmitting(true);
+
+    // 10-секундный countdown до фактического начисления бонуса и разблокировки.
+    // Кнопка показывает «Проверяем X» и заблокирована.
+    for (let i = 10; i >= 1; i--) {
+      setCountdown(i);
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    setCountdown(null);
 
     const eligibleForBonus = !!telegramId && !isPartner;
 
@@ -1043,7 +1067,9 @@ function BookingActions({
             className="w-full py-3 vd-grad text-white shadow-md vd-shadow-cta disabled:opacity-60 rounded-xl active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm font-bold"
           >
             {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-            {isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
+            {countdown != null
+              ? `Проверяем отзыв… ${countdown}с`
+              : isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
           </button>
         </>
       ) : (
