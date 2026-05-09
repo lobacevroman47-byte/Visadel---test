@@ -4,11 +4,13 @@ import {
   Sparkles, ChevronRight, QrCode, Download, UserPlus, Wallet,
   Activity, Clock,
 } from 'lucide-react';
+import { FaTelegramPlane, FaWhatsapp, FaVk, FaInstagram, FaTiktok } from 'react-icons/fa';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useTelegram } from '../../App';
 import { getReferralStats, type ReferralStats } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import {
+  BONUS_CONFIG,
   REFERRAL_LEVELS,
   getCurrentLevel,
   getNextLevel,
@@ -115,6 +117,41 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
     else window.open(tgShareUrl, '_blank');
   };
 
+  // Per-network share. Открывает соответствующий share-dialog либо копирует
+  // shareText в буфер и открывает приложение (Insta/TT не поддерживают URL-share).
+  const shareTo = async (channel: 'telegram' | 'whatsapp' | 'vk' | 'instagram' | 'tiktok' | 'max') => {
+    const tg = (window as { Telegram?: { WebApp?: { openTelegramLink?: (u: string) => void; openLink?: (u: string) => void } } }).Telegram?.WebApp;
+    const open = (url: string) => {
+      if (channel === 'telegram' && tg?.openTelegramLink) tg.openTelegramLink(url);
+      else if (tg?.openLink) tg.openLink(url);
+      else window.open(url, '_blank');
+    };
+    const copyAndOpen = async (url: string) => {
+      try { await navigator.clipboard.writeText(shareText); } catch { /* ignore */ }
+      open(url);
+    };
+    switch (channel) {
+      case 'telegram':
+        open(`https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
+        break;
+      case 'whatsapp':
+        open(`https://wa.me/?text=${encodeURIComponent(shareText)}`);
+        break;
+      case 'vk':
+        open(`https://vk.com/share.php?url=${encodeURIComponent(link)}&title=${encodeURIComponent('Visadel Agency')}&description=${encodeURIComponent(shareText)}`);
+        break;
+      case 'instagram':
+        await copyAndOpen('https://www.instagram.com/');
+        break;
+      case 'tiktok':
+        await copyAndOpen('https://www.tiktok.com/');
+        break;
+      case 'max':
+        await copyAndOpen(`https://max.ru/share?url=${encodeURIComponent(link)}&text=${encodeURIComponent(shareText)}`);
+        break;
+    }
+  };
+
   const downloadQR = () => {
     const canvas = qrCanvasRef.current;
     if (!canvas) return;
@@ -207,12 +244,12 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
         </div>
       </div>
 
-      {/* ── 2. Share section — clean, monochrome ─────────────────────── */}
+      {/* ── 2. Share section — link + per-network buttons + native share ─ */}
       <div ref={shareSectionRef} className="bg-white rounded-2xl border border-gray-100 p-5">
         <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-2">
           Ваша ссылка
         </p>
-        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5 mb-3">
+        <div className="flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2.5 mb-4">
           <span className="flex-1 text-sm text-gray-700 truncate font-mono">
             t.me/{BOT_USERNAME}/{MINI_APP_SHORT_NAME}?startapp={referralCode}
           </span>
@@ -224,28 +261,34 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
             {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
           </button>
         </div>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={copyLink}
-            className="py-2.5 rounded-xl text-sm font-medium border border-gray-200 hover:bg-gray-50 active:scale-[0.98] transition flex items-center justify-center gap-1.5 text-gray-700"
-          >
-            {copied
-              ? <><Check className="w-4 h-4 text-emerald-600" /> Скопировано</>
-              : <><Copy className="w-4 h-4" /> Скопировать</>}
-          </button>
+
+        {/* Per-network share row — original brand logos в premium soft-tinted чипах */}
+        <div className="grid grid-cols-6 gap-2 mb-3">
+          <SocialBtn label="Telegram"  color="#229ED9" onClick={() => shareTo('telegram')}><FaTelegramPlane className="w-5 h-5" style={{ color: '#229ED9' }} /></SocialBtn>
+          <SocialBtn label="WhatsApp"  color="#25D366" onClick={() => shareTo('whatsapp')}><FaWhatsapp className="w-5 h-5" style={{ color: '#25D366' }} /></SocialBtn>
+          <SocialBtn label="VK"        color="#0077FF" onClick={() => shareTo('vk')}><FaVk className="w-5 h-5" style={{ color: '#0077FF' }} /></SocialBtn>
+          <SocialBtn label="Instagram" color="#E1306C" onClick={() => shareTo('instagram')}><FaInstagram className="w-5 h-5" style={{ color: '#E1306C' }} /></SocialBtn>
+          <SocialBtn label="TikTok"    color="#0F0F0F" onClick={() => shareTo('tiktok')}><FaTiktok className="w-5 h-5" style={{ color: '#0F0F0F' }} /></SocialBtn>
+          <SocialBtn label="MAX"       color="#5C7BFF" onClick={() => shareTo('max')}><MaxIcon className="w-6 h-6" /></SocialBtn>
+        </div>
+
+        {/* Native share + QR — secondary actions */}
+        <div className="grid grid-cols-[1fr,auto] gap-2">
           <button
             onClick={nativeShare}
-            className="py-2.5 rounded-xl text-sm font-medium vd-grad text-white active:scale-[0.98] transition flex items-center justify-center gap-1.5"
+            className="py-2.5 rounded-xl text-sm font-medium vd-grad text-white active:scale-[0.98] transition flex items-center justify-center gap-1.5 vd-shadow-cta"
           >
             <Share2 className="w-4 h-4" /> Поделиться
           </button>
+          <button
+            onClick={() => setShowQR(s => !s)}
+            className="px-3 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 active:scale-95 transition flex items-center justify-center text-gray-600"
+            title={showQR ? 'Скрыть QR' : 'Показать QR'}
+          >
+            <QrCode className="w-4 h-4" />
+          </button>
         </div>
-        <button
-          onClick={() => setShowQR(s => !s)}
-          className="w-full mt-3 py-2 text-xs text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1.5 transition"
-        >
-          <QrCode className="w-3.5 h-3.5" /> {showQR ? 'Скрыть QR-код' : 'Показать QR-код'}
-        </button>
+
         {showQR && (
           <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col items-center gap-3">
             <QRCodeCanvas ref={qrCanvasRef} value={link} size={180} level="H" marginSize={2} />
@@ -349,27 +392,31 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           <div className="flex items-center gap-2 mb-2">
             <Crown className="w-4 h-4 text-amber-300" />
             <span className="text-[11px] font-medium text-amber-300 uppercase tracking-wider">
-              Партнёрство
+              Партнёрская программа
             </span>
           </div>
-          <h3 className="text-base font-semibold leading-tight">
-            Станьте партнёром Visadel
+          <h3 className="text-[22px] font-semibold leading-tight tabular-nums">
+            до {BONUS_CONFIG.PARTNER_COMMISSION_MAX_PCT}% с каждого заказа
           </h3>
           <p className="text-sm text-white/70 mt-1.5 leading-relaxed">
-            Получайте повышенные бонусы за визы, брони отелей и авиабилеты приглашённых клиентов.
+            Распространяется на визы, брони отелей и авиабилеты.
+            <span className="text-white/50">
+              {' '}Не входят: готовые билеты, экскурсии, каталог отелей,
+              eSIM и прочие услуги.
+            </span>
           </p>
           <ul className="mt-4 space-y-2 text-sm text-white/90">
             <li className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> До 20% бонусов
+              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Прозрачная статистика по каждому рефу
             </li>
             <li className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Подробная статистика
+              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Вывод 2 раза в месяц
             </li>
             <li className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Выплаты бонусами
+              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Личный менеджер в Telegram
             </li>
             <li className="flex items-center gap-2">
-              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Персональная поддержка
+              <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" /> Готовые посты и баннеры в кабинете
             </li>
           </ul>
           <button
@@ -378,6 +425,9 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
           >
             Стать партнёром <ChevronRight className="w-4 h-4" />
           </button>
+          <p className="text-[11px] text-white/50 text-center mt-2">
+            Заявка 2 минуты · ответ за 24 часа
+          </p>
         </div>
       )}
 
@@ -421,6 +471,48 @@ export default function ReferralsTab({ onOpenPartnerApplication }: ReferralTabPr
 }
 
 // ─── Subcomponents ──────────────────────────────────────────────────────────
+
+function SocialBtn({
+  label, color, onClick, children,
+}: {
+  label: string;
+  color: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  // Refined premium chip: soft brand-color tint background + full-color icon.
+  // Inline style для динамического цвета фона (Tailwind не умеет dynamic arbitrary).
+  return (
+    <button
+      onClick={onClick}
+      className="aspect-square rounded-2xl flex items-center justify-center transition active:scale-95 hover:brightness-95"
+      style={{ backgroundColor: `${color}1A` }}
+      title={label}
+      aria-label={`Поделиться через ${label}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+// Иконка мессенджера MAX — кастомный SVG (нет в react-icons/fa).
+// Используется в Share-блоке наравне с TG/WA/VK/Insta/TikTok.
+function MaxIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 1000 1000" className={className} aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="maxGradA">
+          <stop offset="0" stopColor="#4cf" />
+          <stop offset=".662" stopColor="#53e" />
+          <stop offset="1" stopColor="#93d" />
+        </linearGradient>
+        <linearGradient id="maxC" x1="117.847" x2="1000" y1="760.536" y2="500" gradientUnits="userSpaceOnUse" href="#maxGradA" />
+      </defs>
+      <rect width="1000" height="1000" fill="url(#maxC)" ry="249.681" />
+      <path fill="#fff" fillRule="evenodd" clipRule="evenodd" d="M508.211 878.328c-75.007 0-109.864-10.95-170.453-54.75-38.325 49.275-159.686 87.783-164.979 21.9 0-49.456-10.95-91.248-23.36-136.873-14.782-56.21-31.572-118.807-31.572-209.508 0-216.626 177.754-379.597 388.357-379.597 210.785 0 375.947 171.001 375.947 381.604.707 207.346-166.595 376.118-373.94 377.224m3.103-571.585c-102.564-5.292-182.499 65.7-200.201 177.024-14.6 92.162 11.315 204.398 33.397 210.238 10.585 2.555 37.23-18.98 53.837-35.587a189.8 189.8 0 0 0 92.71 33.032c106.273 5.112 197.08-75.794 204.215-181.95 4.154-106.382-77.67-196.486-183.958-202.574Z" />
+    </svg>
+  );
+}
 
 function SummaryCard({
   icon, label, value, accent, loading,
