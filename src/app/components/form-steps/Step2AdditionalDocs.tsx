@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ChevronRight, ChevronLeft, Check, Hotel, Plane, Zap } from 'lucide-react';
 import { getAppSettings, getAdditionalServices, type CoreFieldOverrides, type ExtraFormField } from '../../lib/db';
 import type { HotelAddonDetails, FlightAddonDetails } from '../ApplicationForm';
+import { Button } from '../ui/brand';
 import DateInput from '../shared/DateInput';
 import BookingExtraField from '../booking/BookingExtraField';
 
@@ -442,20 +443,26 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
       )}
 
       <div className="flex gap-3">
-        <button
+        <Button
+          variant="secondary"
+          size="lg"
+          fullWidth
+          className="!py-3.5"
           onClick={onPrev}
-          className="flex-1 bg-gray-100 text-gray-700 py-3.5 rounded-xl hover:bg-gray-200 transition flex items-center justify-center gap-2 font-semibold"
+          leftIcon={<ChevronLeft className="w-5 h-5" />}
         >
-          <ChevronLeft className="w-5 h-5" />
           Назад
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
+          className="!py-3.5 !font-bold"
           onClick={handleNext}
-          className="flex-1 vd-grad text-white py-3.5 rounded-xl shadow-md vd-shadow-cta active:scale-[0.98] transition flex items-center justify-center gap-2 font-bold"
+          rightIcon={<ChevronRight className="w-5 h-5" />}
         >
           Далее
-          <ChevronRight className="w-5 h-5" />
-        </button>
+        </Button>
       </div>
     </div>
   );

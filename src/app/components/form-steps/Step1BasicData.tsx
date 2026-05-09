@@ -4,6 +4,7 @@ import { CITIZENSHIP_OPTIONS, WORLD_COUNTRIES, SOUTH_ASIA_COUNTRIES } from '../.
 import { getFormFields, type VisaFormField } from '../../lib/db';
 import LatinNotice from '../shared/LatinNotice';
 import { useDialog } from '../shared/BrandDialog';
+import { Button } from '../ui/brand';
 
 interface Step1Props {
   country: string;
@@ -174,13 +175,16 @@ export default function Step1BasicData({ country, visaId, data, onChange, onNext
         </select>
       </div>
 
-      <button
+      <Button
+        variant="primary"
+        size="lg"
+        fullWidth
+        className="!py-4 !rounded-2xl !font-bold mt-6"
         onClick={validateAndNext}
-        className="w-full mt-6 vd-grad text-white py-4 rounded-2xl active:scale-[0.98] transition font-bold tracking-wide vd-shadow-cta flex items-center justify-center gap-2"
+        rightIcon={<ChevronRight className="w-5 h-5" />}
       >
         Далее
-        <ChevronRight className="w-5 h-5" />
-      </button>
+      </Button>
     </div>
   );
 }
