@@ -1117,13 +1117,16 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
             await dialog.success(visaUrl ? 'Виза загружена' : 'Статус обновлён', 'Уведомление отправлено в Telegram.');
           } else {
             // skipped by dedup (duplicate within 1 min) — changes saved, no double send
-            await dialog.success('Изменения сохранены', 'Уведомление уже было недавно отправлено.');
+            await dialog.success('Изменения сохранены');
           }
         } catch (notifyErr) {
-          await dialog.warning('Изменения сохранены', `Уведомление не отправлено: ${String(notifyErr)}`);
+          // Push best-effort: «chat not found» (юзер не /start'ил бота),
+          // network ошибки и т.п. — НЕ показываем это как warning, изменения
+          // в БД успешно сохранены, для founder'а это нерелевантный шум.
+          // Тихо логируем в консоль.
+          console.warn('[admin/applications] notify-status failed (non-fatal):', notifyErr);
+          await dialog.success('Изменения сохранены');
         }
-      } else if (status !== 'draft' && !application.telegramId) {
-        await dialog.warning('Изменения сохранены', 'Telegram ID не найден — уведомление не отправлено.');
       } else {
         await dialog.success('Изменения сохранены');
       }
@@ -1282,8 +1285,10 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                   onChange={(e) => setStatus(e.target.value as Application['status'])}
                   className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400"
                 >
-                  <option value="draft">Черновик</option>
-                  <option value="pending_payment">Ожидает оплаты</option>
+                  {/* Те же 4 статуса что у броней — единый язык в админке.
+                      'draft' и 'pending_payment' убраны из dropdown'а: черновик
+                      создаётся юзером (не админом), а оплата подтверждается
+                      переходом в pending_confirmation после прикрепления скрина. */}
                   <option value="pending_confirmation">Ожидает подтверждения</option>
                   <option value="in_progress">В работе</option>
                   <option value="completed">Готово</option>
