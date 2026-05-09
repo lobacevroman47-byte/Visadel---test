@@ -494,6 +494,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
           b={selectedHotel}
           onClose={() => setSelectedHotel(null)}
           onStatusChange={(status) => updateStatus('hotel_bookings', selectedHotel.id, status)}
+          onResendNotification={() => resendBookingNotification('hotel_bookings', selectedHotel)}
           onConfirmationUploaded={(url) => {
             setSelectedHotel(s => s ? { ...s, confirmation_url: url } : s);
             void refresh();
@@ -505,6 +506,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
           b={selectedFlight}
           onClose={() => setSelectedFlight(null)}
           onStatusChange={(status) => updateStatus('flight_bookings', selectedFlight.id, status)}
+          onResendNotification={() => resendBookingNotification('flight_bookings', selectedFlight)}
           onConfirmationUploaded={(url) => {
             setSelectedFlight(s => s ? { ...s, confirmation_url: url } : s);
             void refresh();
@@ -513,6 +515,45 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       )}
     </div>
   );
+
+  // Повторная отправка push клиенту с текущим статусом — пригодно для
+  // случаев когда первый push не дошёл (плохая связь, бот тогда не общался
+  // с юзером, etc.). Без смены статуса в БД.
+  async function resendBookingNotification(
+    table: 'hotel_bookings' | 'flight_bookings',
+    booking: HotelBooking | FlightBooking,
+  ) {
+    if (!booking.telegram_id) {
+      await dialog.warning('Telegram ID не указан', 'У этой брони нет привязки к юзеру — отправить нельзя.');
+      return;
+    }
+    const NOTIFY_STATUS_MAP: Record<string, string> = {
+      in_progress: 'booking_in_progress',
+      confirmed:   'booking_confirmed',
+      cancelled:   'booking_cancelled',
+    };
+    const notifyStatus = NOTIFY_STATUS_MAP[booking.status];
+    if (!notifyStatus) {
+      await dialog.warning('Нельзя отправить', 'Уведомление по этому статусу не отправляется (только В работе / Готово / Отменена).');
+      return;
+    }
+    try {
+      // Уникальный application_id чтобы обойти dedup в notify-status
+      // (раньше отправляли тот же id, dedup в течение 1 мин и игнорил)
+      await apiFetch('/api/notify-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegram_id: booking.telegram_id,
+          status: notifyStatus,
+          application_id: `booking_resend_${table}_${booking.id}_${Date.now()}`,
+        }),
+      });
+      await dialog.success('Уведомление отправлено', 'Клиент получил повторное сообщение в Telegram.');
+    } catch (e) {
+      await dialog.error('Не удалось отправить', e instanceof Error ? e.message : String(e));
+    }
+  }
 };
 
 // ─── Helper components ───────────────────────────────────────────────────────
@@ -717,9 +758,16 @@ function ModalShell({ children, onClose }: { children: React.ReactNode; onClose:
   );
 }
 
-function StatusSelector({ status, onChange }: { status: string; onChange: (s: string) => void }) {
+function StatusSelector({
+  status, onChange, onResend,
+}: {
+  status: string;
+  onChange: (s: string) => void;
+  onResend?: () => Promise<void> | void;
+}) {
   const [draft, setDraft] = useState(status);
   const [saving, setSaving] = useState(false);
+  const [resending, setResending] = useState(false);
   const [savedAt, setSavedAt] = useState<Date | null>(null);
 
   // Re-sync draft if upstream status changes (e.g. confirmation upload flips it)
@@ -738,6 +786,16 @@ function StatusSelector({ status, onChange }: { status: string; onChange: (s: st
     }
   };
 
+  const handleResend = async () => {
+    if (!onResend) return;
+    setResending(true);
+    try { await onResend(); } finally { setResending(false); }
+  };
+
+  // Кнопка повторной отправки видна только для статусов которые отправляют
+  // push (in_progress, confirmed, cancelled). Для new/pending — нет смысла.
+  const canResend = ['in_progress', 'confirmed', 'cancelled'].includes(status);
+
   return (
     <div>
       <label className="block text-sm text-gray-700 mb-2 font-medium">Статус заявки</label>
@@ -750,6 +808,22 @@ function StatusSelector({ status, onChange }: { status: string; onChange: (s: st
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
+
+      {/* «Отправить уведомление повторно» — зелёная кнопка, как у визы.
+          Появляется только если status уже в активной фазе (push был
+          отправлен раньше) и нет dirty изменений. */}
+      {onResend && canResend && !dirty && (
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={resending}
+          className="w-full mt-3 px-4 py-3 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 active:scale-[0.98] transition"
+        >
+          {resending ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>📨</span>}
+          {resending ? 'Отправляем…' : 'Отправить уведомление повторно'}
+        </button>
+      )}
+
       <div className="flex items-center gap-3 mt-3">
         <button
           type="button"
@@ -826,8 +900,9 @@ function ExtraFieldsBlock({ fields }: { fields: Record<string, string> | null })
   );
 }
 
-function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
+function HotelDetail({ b, onClose, onStatusChange, onResendNotification, onConfirmationUploaded }: {
   b: HotelBooking; onClose: () => void; onStatusChange: (s: string) => void;
+  onResendNotification: () => Promise<void> | void;
   onConfirmationUploaded: (url: string) => void;
 }) {
   return (
@@ -845,7 +920,7 @@ function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
       </div>
 
       <div className="px-5 py-5 space-y-4">
-        <StatusSelector status={b.status} onChange={onStatusChange} />
+        <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
 
         {/* Trip */}
         <div className="grid grid-cols-2 gap-3">
@@ -875,8 +950,9 @@ function HotelDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
   );
 }
 
-function FlightDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
+function FlightDetail({ b, onClose, onStatusChange, onResendNotification, onConfirmationUploaded }: {
   b: FlightBooking; onClose: () => void; onStatusChange: (s: string) => void;
+  onResendNotification: () => Promise<void> | void;
   onConfirmationUploaded: (url: string) => void;
 }) {
   return (
@@ -893,7 +969,7 @@ function FlightDetail({ b, onClose, onStatusChange, onConfirmationUploaded }: {
       </div>
 
       <div className="px-5 py-5 space-y-4">
-        <StatusSelector status={b.status} onChange={onStatusChange} />
+        <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
 
         <div className="grid grid-cols-2 gap-3">
           <DetailItem label="Откуда" value={b.from_city} />
