@@ -91,17 +91,34 @@ async function tryInsertBonusLog(telegram_id, type, amount, description, dedupe_
 //   partner_pending   — log only, не трогает баланс (в hold-периоде 30 дней)
 //   partner_approved  — log + increment partner_balance (после hold-а)
 //   partner_paid      — log + decrement partner_balance (амт обычно отрицательная)
-//   partner_cancelled — log only (откат комиссии при refund клиента)
+//   partner_cancelled — log + decrement partner_balance (если ранее approved → amt
+//                       отрицательная, иначе amt=0 и баланс не меняется)
 function isPartnerType(type) {
   return typeof type === 'string' && type.startsWith('partner_');
 }
 function affectsPartnerBalance(type) {
-  return type === 'partner_approved' || type === 'partner_paid';
+  return type === 'partner_approved' || type === 'partner_paid' || type === 'partner_cancelled';
 }
 function affectsBonusBalance(type) {
   // Все НЕ partner_* типы трогают bonus_balance.
-  // partner_pending / partner_cancelled — log only, балансы не трогают.
+  // partner_pending — log only, баланс не трогает (hold-период).
   return !isPartnerType(type);
+}
+
+// Атомарный inc/dec partner_balance через RPC (миграция 020).
+// Защита от race condition: cron approval и admin payout могли пересечься
+// при read→modify→write и затереть друг друга.
+async function incPartnerBalance(telegram_id, delta) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/inc_partner_balance`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ p_telegram_id: telegram_id, p_delta: delta }),
+  });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`inc_partner_balance failed: ${r.status} ${errText}`);
+  }
+  return r.json().catch(() => null);
 }
 
 async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
@@ -113,15 +130,12 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
     await dbInsert('bonus_logs', { telegram_id, type, amount, description });
   }
 
-  // 2) Партнёрский баланс — отдельная ветка. partner_pending/cancelled —
-  //    только лог, не трогают балансы вообще.
+  // 2) Партнёрский баланс — отдельная ветка через атомарную RPC.
+  //    partner_pending — только лог, баланс не трогает (hold-период).
   if (isPartnerType(type)) {
     if (!affectsPartnerBalance(type)) return { skipped: false };
-    const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=partner_balance`);
-    const newPartnerBalance = ((user?.partner_balance) ?? 0) + amount;
-    if (user) {
-      await dbPatch(`users?telegram_id=eq.${telegram_id}`, { partner_balance: newPartnerBalance });
-    }
+    if (amount === 0) return { skipped: false }; // нечего двигать
+    const newPartnerBalance = await incPartnerBalance(telegram_id, amount);
     return { newPartnerBalance };
   }
 
@@ -222,7 +236,9 @@ export default async function handler(req, res) {
     const newBalance = result.newBalance;
 
     // ── Referral bonus when a payment is confirmed ──────────────────────────
-    // Give 500₽ to whoever referred this user (once per user, first paid visa)
+    // Give referrer their flat bonus (once per user, first paid visa).
+    // Сумму читаем из app_settings.referrer_regular_bonus, чтобы админка
+    // могла менять без деплоя.
     if (type === 'payment' && application_id) {
       try {
         const [userRow] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=referred_by`);
@@ -233,11 +249,15 @@ export default async function handler(req, res) {
             `users?referral_code=eq.${encodeURIComponent(referredBy)}&select=telegram_id,bonus_balance`
           );
           if (referrerRow) {
+            const [settings] = await dbGet('app_settings?id=eq.1&select=referrer_regular_bonus');
+            const refAmount = Number.isFinite(settings?.referrer_regular_bonus)
+              ? settings.referrer_regular_bonus
+              : 500;
             await grantBonus(
               referrerRow.telegram_id,
               'referral',
-              500,
-              `+500₽ за визу друга (ref_for_${telegram_id})`,
+              refAmount,
+              `+${refAmount}₽ за визу друга (ref_for_${telegram_id})`,
               `ref_for_${telegram_id}`,
             );
           }

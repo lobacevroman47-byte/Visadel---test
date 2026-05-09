@@ -343,34 +343,50 @@ const PayoutModal: React.FC<{
     setSaving(true);
     setError(null);
     try {
-      // 1. Insert partner_payouts row (status='processed' immediately — founder
-      //    нажал кнопку = подтверждает что вручную сделал перевод)
-      const { error: payoutErr } = await supabase.from('partner_payouts').insert({
-        telegram_id: partner.telegram_id,
-        amount_rub: numericAmount,
-        status: 'processed',
-        card_last4: cardLast4.trim() || null,
-        note: note.trim() || null,
-        processed_at: new Date().toISOString(),
-      });
+      // 1. Insert partner_payouts row → возвращаем ID, чтобы использовать его
+      //    как dedupe_key в bonus_logs (защита от двойного списания при ретрае).
+      const { data: payoutRow, error: payoutErr } = await supabase
+        .from('partner_payouts')
+        .insert({
+          telegram_id: partner.telegram_id,
+          amount_rub: numericAmount,
+          status: 'processed',
+          card_last4: cardLast4.trim() || null,
+          note: note.trim() || null,
+          processed_at: new Date().toISOString(),
+        })
+        .select('id')
+        .single();
       if (payoutErr) throw new Error(`partner_payouts: ${payoutErr.message}`);
+      const payoutId = (payoutRow as { id: string }).id;
 
-      // 2. Decrement partner_balance
-      const newBalance = partner.partner_balance - numericAmount;
-      const { error: updErr } = await supabase
-        .from('users')
-        .update({ partner_balance: newBalance })
-        .eq('telegram_id', partner.telegram_id);
-      if (updErr) throw new Error(`users update: ${updErr.message}`);
-
-      // 3. Audit log: bonus_logs entry type='partner_paid' с отрицательной суммой
-      const { error: logErr } = await supabase.from('bonus_logs').insert({
-        telegram_id: partner.telegram_id,
-        type: 'partner_paid',
-        amount: -numericAmount,
-        description: `−${numericAmount}₽ выплата на карту${cardLast4 ? ` •• ${cardLast4}` : ''}${note ? ` (${note})` : ''}`,
-      });
+      // 2. Audit log с dedupe_key=partner_paid_<payoutId>. Идёт ПЕРЕД балансом —
+      //    если ретрай, unique constraint вернёт 0 строк → знаем что уже списали.
+      const { data: logInserted, error: logErr } = await supabase
+        .from('bonus_logs')
+        .upsert(
+          {
+            telegram_id: partner.telegram_id,
+            type: 'partner_paid',
+            amount: -numericAmount,
+            description: `−${numericAmount}₽ выплата на карту${cardLast4 ? ` •• ${cardLast4}` : ''}${note ? ` (${note})` : ''}`,
+            dedupe_key: `partner_paid_${payoutId}`,
+          },
+          { onConflict: 'telegram_id,type,dedupe_key', ignoreDuplicates: true },
+        )
+        .select('id');
       if (logErr) console.warn('bonus_logs insert failed (non-fatal):', logErr);
+      const wasNewLog = Array.isArray(logInserted) && logInserted.length > 0;
+
+      // 3. Атомарный декремент через RPC (миграция 020). Запускаем только если
+      //    лог реально вставился — если был дубль, баланс уже списан ранее.
+      if (wasNewLog) {
+        const { error: rpcErr } = await supabase.rpc('inc_partner_balance', {
+          p_telegram_id: partner.telegram_id,
+          p_delta: -numericAmount,
+        });
+        if (rpcErr) throw new Error(`inc_partner_balance: ${rpcErr.message}`);
+      }
 
       // 4. Push-уведомление партнёру: «X₽ переведено» (best-effort)
       apiFetch('/api/notify-status', {

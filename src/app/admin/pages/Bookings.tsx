@@ -202,6 +202,17 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       }
     }
 
+    // При отмене брони — откатываем партнёрскую комиссию (если уже начислена).
+    // Если был 'pending' — просто пишем log + меняем статус (баланс не трогали).
+    // Если был 'approved' — пишем log с отрицательной amount и dec balance.
+    if (status === 'cancelled') {
+      try {
+        await maybeReversePartnerCommission(table, id);
+      } catch (e) {
+        console.warn('[bookings] partner commission reversal failed (non-fatal):', e);
+      }
+    }
+
     void refresh();
     if (selectedHotel?.id === id) setSelectedHotel(s => s ? { ...s, status } : s);
     if (selectedFlight?.id === id) setSelectedFlight(s => s ? { ...s, status } : s);
@@ -242,7 +253,9 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     const amount = partnerCommission(b.price, pct);
     if (amount <= 0) return;
 
-    const kind = table === 'hotel_bookings' ? 'отеля' : 'авиабилета';
+    // Формат description унифицирован с visa flow (db.ts), чтобы UI breakdown
+    // в кабинете партнёра парсил оба единым regex'ом.
+    const kindKey = table === 'hotel_bookings' ? 'отель' : 'авиа';
     const dedupeKey = `partner_${table}_${bookingId}`;
     await apiFetch('/api/grant-bonus', {
       method: 'POST',
@@ -251,7 +264,7 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         telegram_id: r.telegram_id,
         type: 'partner_pending',
         amount,
-        description: `+${amount}₽ партнёру (${pct}% от ${b.price}₽ за бронь ${kind}) — в hold-периоде 30д`,
+        description: `+${amount}₽ партнёру (${kindKey} ${b.price}₽×${pct}%=${amount}₽) — hold 30д`,
         application_id: dedupeKey,
       }),
     });
@@ -275,6 +288,54 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
         application_id: `partner_notify_${dedupeKey}`,
       }),
     }).catch(e => console.warn('partner notify (booking) error:', e));
+  }
+
+  // Откат партнёрской комиссии при отмене брони. Идемпотентно через dedupe_key.
+  async function maybeReversePartnerCommission(table: 'hotel_bookings' | 'flight_bookings', bookingId: string) {
+    const { data: booking } = await supabase
+      .from(table)
+      .select('id, referrer_code, partner_commission_amount_rub, partner_commission_status')
+      .eq('id', bookingId)
+      .single();
+    const b = booking as {
+      referrer_code: string | null;
+      partner_commission_amount_rub: number | null;
+      partner_commission_status: string | null;
+    } | null;
+    if (!b || !b.referrer_code || !b.partner_commission_status) return;
+    if (b.partner_commission_status === 'cancelled') return; // уже отменено
+
+    const { data: refRow } = await supabase
+      .from('users')
+      .select('telegram_id')
+      .eq('referral_code', b.referrer_code)
+      .single();
+    const r = refRow as { telegram_id: number } | null;
+    if (!r) return;
+
+    // Если комиссия была approved — реверсируем баланс. Иначе amount=0
+    // (pending не трогает баланс, просто пишем log для аудита).
+    const wasApproved = b.partner_commission_status === 'approved';
+    const reverseAmount = wasApproved ? -(b.partner_commission_amount_rub ?? 0) : 0;
+    const dedupeKey = `partner_${table}_${bookingId}`;
+
+    await apiFetch('/api/grant-bonus', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegram_id: r.telegram_id,
+        type: 'partner_cancelled',
+        amount: reverseAmount,
+        description: wasApproved
+          ? `Отмена комиссии −${Math.abs(reverseAmount)}₽ — заказ отменён`
+          : `Отмена pending-комиссии (${b.partner_commission_amount_rub ?? 0}₽) — заказ отменён`,
+        application_id: dedupeKey,
+      }),
+    });
+
+    await supabase.from(table).update({
+      partner_commission_status: 'cancelled',
+    }).eq('id', bookingId);
   }
 
   const handleExportCsv = () => {
