@@ -16,6 +16,7 @@ import { apiFetch } from '../../lib/apiFetch';
 import { auditLog } from '../lib/audit';
 import { useAdmin } from '../contexts/AdminContext';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Modal } from '../../components/ui/brand';
 
 interface ApplicationsProps {
   filter?: { filter?: 'all' | 'in_progress' };
@@ -1140,19 +1141,15 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   };
 
   return (
-    <div className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 z-50">
-      <div className="bg-white rounded-2xl w-full sm:max-w-2xl max-h-[92vh] overflow-hidden flex flex-col">
+    <Modal open onClose={onClose} size="lg">
 
         {/* Header — same brand pattern as Брони */}
         <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100 shrink-0">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 pr-10">
             <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold flex items-center gap-1.5">
               <span>{application.countryFlag}</span>
               <span>{application.country} · {application.visaType}</span>
             </p>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95">
-              <X className="w-4 h-4" />
-            </button>
           </div>
           <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{application.clientName || 'Без имени'}</h2>
           <div className="flex items-center gap-3 text-xs text-[#0F2A36]/60 mt-1 flex-wrap">
@@ -1484,8 +1481,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

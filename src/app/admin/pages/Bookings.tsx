@@ -7,6 +7,7 @@ import { uploadFile, getAppSettings } from '../../lib/db';
 import { apiFetch } from '../../lib/apiFetch';
 import { partnerCommission } from '../../lib/bonus-config';
 import { useDialog } from '../../components/shared/BrandDialog';
+import { Modal } from '../../components/ui/brand';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -782,17 +783,9 @@ function PaymentBlock({ price, screenshotUrl }: { price: number | null; screensh
 
 function ModalShell({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   return (
-    <div
-      className="fixed inset-0 bg-[#0F2A36]/40 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4"
-      onClick={onClose}
-    >
-      <div
-        className="bg-white w-full sm:max-w-2xl rounded-2xl max-h-[92vh] overflow-hidden flex flex-col"
-        onClick={e => e.stopPropagation()}
-      >
-        {children}
-      </div>
-    </div>
+    <Modal open onClose={onClose} size="lg">
+      {children}
+    </Modal>
   );
 }
 
@@ -1046,14 +1039,11 @@ function BookingDetailModal({
     <ModalShell onClose={onClose}>
       {/* Header — идентичен визовой модалке (Applications.tsx) */}
       <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100 shrink-0">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-2 pr-10">
           <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold flex items-center gap-1.5">
             <span>{headerEmoji}</span>
             <span>{headerLabel}{headerDetails ? ` · ${headerDetails}` : ''}</span>
           </p>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95">
-            <X className="w-4 h-4" />
-          </button>
         </div>
         <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{b.first_name} {b.last_name}</h2>
         <div className="flex items-center gap-3 text-xs text-[#0F2A36]/60 mt-1 flex-wrap">
