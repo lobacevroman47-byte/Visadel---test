@@ -363,6 +363,9 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       const map = new Map<string, Enrichment>();
 
       // Визы — только данные о заказе, без PII клиента
+      // Используем .filter() (не .find()) потому что у одного sourceId может
+      // быть несколько pair'ов: pending log + approved log с тем же application_id.
+      // .find() возвращал бы только первый — второй pair оставался без enrichment.
       if (visaPairs.length) {
         const { data } = await supabase
           .from('applications')
@@ -370,14 +373,15 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           .in('id', visaPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<{ id: string; country: string; visa_type: string; price: number }>;
         for (const row of rows) {
-          const pair = visaPairs.find(x => x.sourceId === row.id);
-          if (!pair) continue;
-          map.set(pair.logId, {
-            service: 'visa',
-            country: row.country,
-            visa_type: row.visa_type,
-            price: row.price,
-          });
+          const pairs = visaPairs.filter(x => x.sourceId === row.id);
+          for (const pair of pairs) {
+            map.set(pair.logId, {
+              service: 'visa',
+              country: row.country,
+              visa_type: row.visa_type,
+              price: row.price,
+            });
+          }
         }
       }
 
@@ -389,17 +393,18 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           .in('id', hotelPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
-          const pair = hotelPairs.find(x => x.sourceId === row.id);
-          if (!pair) continue;
-          map.set(pair.logId, {
-            service: 'hotel_bookings',
-            country: row.country as string | undefined,
-            city: row.city as string | undefined,
-            check_in: row.check_in as string | undefined,
-            check_out: row.check_out as string | undefined,
-            price: row.price as number | undefined,
-            pct: row.partner_commission_pct as number | undefined,
-          });
+          const pairs = hotelPairs.filter(x => x.sourceId === row.id);
+          for (const pair of pairs) {
+            map.set(pair.logId, {
+              service: 'hotel_bookings',
+              country: row.country as string | undefined,
+              city: row.city as string | undefined,
+              check_in: row.check_in as string | undefined,
+              check_out: row.check_out as string | undefined,
+              price: row.price as number | undefined,
+              pct: row.partner_commission_pct as number | undefined,
+            });
+          }
         }
       }
 
@@ -411,16 +416,17 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           .in('id', flightPairs.map(x => x.sourceId));
         const rows = (data ?? []) as Array<Record<string, unknown> & { id: string }>;
         for (const row of rows) {
-          const pair = flightPairs.find(x => x.sourceId === row.id);
-          if (!pair) continue;
-          map.set(pair.logId, {
-            service: 'flight_bookings',
-            from_city: row.from_city as string | undefined,
-            to_city: row.to_city as string | undefined,
-            booking_date: row.booking_date as string | undefined,
-            price: row.price as number | undefined,
-            pct: row.partner_commission_pct as number | undefined,
-          });
+          const pairs = flightPairs.filter(x => x.sourceId === row.id);
+          for (const pair of pairs) {
+            map.set(pair.logId, {
+              service: 'flight_bookings',
+              from_city: row.from_city as string | undefined,
+              to_city: row.to_city as string | undefined,
+              booking_date: row.booking_date as string | undefined,
+              price: row.price as number | undefined,
+              pct: row.partner_commission_pct as number | undefined,
+            });
+          }
         }
       }
 
@@ -449,11 +455,38 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
     [logs],
   );
 
-  // Все начисления (pending + approved), не выплаты — сортировка по дате
-  const earnings = useMemo(
-    () => logs.filter(l => l.type === 'partner_pending' || l.type === 'partner_approved'),
-    [logs],
-  );
+  // Все начисления — дедуплицируем по canonical dedupe_key, чтобы для одного
+  // источника (визы/брони) показывалась ОДНА строка. Если для source есть и
+  // partner_pending, и partner_approved — приоритет approved (это финальное
+  // состояние, hold уже прошёл). Если только pending — показываем pending.
+  const earnings = useMemo(() => {
+    const filtered = logs.filter(l => l.type === 'partner_pending' || l.type === 'partner_approved');
+    const bySource = new Map<string, BonusLogEntry>();
+    for (const l of filtered) {
+      const canonical = (l.dedupe_key ?? l.id).replace(/^partner_[a-z]+:/, '');
+      const existing = bySource.get(canonical);
+      // Approved побеждает pending; в остальных случаях — оставляем первое
+      if (!existing) bySource.set(canonical, l);
+      else if (l.type === 'partner_approved' && existing.type === 'partner_pending') {
+        bySource.set(canonical, l);
+      }
+    }
+    return Array.from(bySource.values()).sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [logs]);
+
+  // Уникальные source_id из всех partner_*-логов — сколько РАЗНЫХ заказов
+  // (виза или бронь) реферал принёс партнёру.
+  const ordersCount = useMemo(() => {
+    const sources = new Set<string>();
+    for (const l of logs) {
+      if (l.type !== 'partner_pending' && l.type !== 'partner_approved') continue;
+      const canonical = (l.dedupe_key ?? '').replace(/^partner_[a-z]+:/, '');
+      if (canonical) sources.add(canonical);
+    }
+    return sources.size;
+  }, [logs]);
 
   // Vanity / link
   const activeCode = (appUser?.vanity_code || referralCode || '').toUpperCase();
@@ -636,24 +669,30 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
           )}
         </div>
 
-        {/* Переходы по ссылке: clicks + список зарегистрированных рефералов */}
+        {/* Переходы по ссылке: clicks + регистрации + оформленные заказы */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5">
           <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider mb-3">
             Переходы по ссылке
           </p>
 
-          {/* Stats grid: переходы / зарегистрировались */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          {/* 3 stats: воронка клик → регистрация → заказ */}
+          <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Переходов</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Кликов</p>
               <p className="text-xl font-bold tabular-nums text-[#0F2A36] mt-0.5">
                 {clicksCount.toLocaleString('ru-RU')}
               </p>
             </div>
             <div className="bg-gray-50 rounded-xl p-3">
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Зарегистрировались</p>
-              <p className="text-xl font-bold tabular-nums text-emerald-600 mt-0.5">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Регистраций</p>
+              <p className="text-xl font-bold tabular-nums text-[#3B5BFF] mt-0.5">
                 {referredUsers.length}
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-[10px] text-gray-500 uppercase tracking-wider">Оформили заказ</p>
+              <p className="text-xl font-bold tabular-nums text-emerald-600 mt-0.5">
+                {ordersCount}
               </p>
             </div>
           </div>
