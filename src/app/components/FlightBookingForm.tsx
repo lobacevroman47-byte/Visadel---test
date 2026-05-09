@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles } from 'lucide-react';
+import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
