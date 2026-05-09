@@ -1096,11 +1096,14 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         getStatusLog(application.id).then(setStatusLog).catch(() => {});
       }
 
-      // Pay referral bonus to the referrer when admin confirms payment (status -> in_progress).
+      // Pay referral bonus to the referrer when admin confirms payment.
       // — Regular referrer: flat 500₽
       // — Partner referrer: % of this order's price (per-product partner_commission_pct)
-      // payReferralBonus has built-in checks: only first paid app counts (dedup by referee).
-      if (status === 'in_progress' && application.telegramId) {
+      // Срабатывает на любом «paid» статусе — админ может пропустить in_progress
+      // и перевести сразу в ready/completed. Идемпотентность через dedupe_key
+      // защищает от повторного начисления при переключениях статуса.
+      const PAID_STATUSES = ['in_progress', 'ready', 'completed'];
+      if (PAID_STATUSES.includes(status) && application.telegramId) {
         payReferralBonus(application.telegramId, application.id).catch(e => console.warn('referral bonus error', e));
       }
 
