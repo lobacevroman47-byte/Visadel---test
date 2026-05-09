@@ -900,30 +900,214 @@ function ExtraFieldsBlock({ fields }: { fields: Record<string, string> | null })
   );
 }
 
+// Универсальный layout-обёртка для админских booking-модалок —
+// 4 таба «Основное / Анкета / Файлы / Оплата» как у визовой модалки.
+// Шапка в стиле визы: лейбл «бронь отеля» / «бронь авиабилета»,
+// крупное имя клиента, дата подачи + Telegram-ссылка справа.
+function BookingDetailModal({
+  b, kind, onClose, onStatusChange, onResendNotification, onConfirmationUploaded,
+  TripFields,
+}: {
+  b: HotelBooking | FlightBooking;
+  kind: 'hotel' | 'flight';
+  onClose: () => void;
+  onStatusChange: (s: string) => void;
+  onResendNotification: () => Promise<void> | void;
+  onConfirmationUploaded: (url: string) => void;
+  TripFields: React.ReactNode;
+}) {
+  const [activeTab, setActiveTab] = useState<'info' | 'form' | 'files' | 'payment'>('info');
+  const tgUsername = b.telegram_login?.replace(/^@/, '') || b.username || '';
+  const kindLabel = kind === 'hotel' ? 'бронь отеля' : 'бронь авиабилета';
+  const table = kind === 'hotel' ? 'hotel_bookings' : 'flight_bookings';
+
+  return (
+    <ModalShell onClose={onClose}>
+      {/* Header — same as visa modal */}
+      <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">{kindLabel}</p>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95 sm:hidden">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{b.first_name} {b.last_name}</h2>
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
+          <p className="text-xs text-[#0F2A36]/60">Подана {fmtDateTime(b.created_at)}</p>
+          {tgUsername && (
+            <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
+              className="text-xs text-[#3B5BFF] hover:underline flex items-center gap-1">
+              @{tgUsername}
+              <ChevronRight className="w-3 h-3" />
+            </a>
+          )}
+        </div>
+      </div>
+
+      {/* Tabs — идентично админке виз */}
+      <div className="flex border-b border-gray-200 shrink-0 sticky top-[110px] bg-white z-10">
+        {(['info', 'form', 'files', 'payment'] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`flex-1 py-3 text-sm font-medium transition ${
+              activeTab === tab ? 'border-b-2 border-blue-500 text-blue-600' : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {tab === 'info' ? 'Основное' : tab === 'form' ? 'Анкета' : tab === 'files' ? 'Файлы' : 'Оплата'}
+          </button>
+        ))}
+      </div>
+
+      <div className="px-5 py-5">
+        {/* ── Tab: Основное ── */}
+        {activeTab === 'info' && (
+          <div className="space-y-5">
+            {/* Контактная сетка как у визы */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-xs text-gray-500">ФИО / имя</p>
+                <p className="text-sm font-medium">{[b.first_name, b.last_name].filter(Boolean).join(' ') || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Telegram</p>
+                {tgUsername ? (
+                  <a href={`https://t.me/${tgUsername}`} target="_blank" rel="noreferrer"
+                    className="text-sm text-blue-600 hover:underline">
+                    @{tgUsername}
+                  </a>
+                ) : <p className="text-sm font-medium">—</p>}
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Телефон</p>
+                <p className="text-sm font-medium">{b.phone || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Email</p>
+                <p className="text-sm font-medium break-all">{b.email || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Дата подачи</p>
+                <p className="text-sm font-medium">{new Date(b.created_at).toLocaleDateString('ru-RU')}</p>
+              </div>
+            </div>
+
+            {/* Итого к оплате — как у визы */}
+            <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
+              <p className="text-sm text-gray-700">Итого к оплате</p>
+              <p className="text-lg font-bold text-blue-600">
+                {b.price != null ? `${b.price.toLocaleString('ru-RU')} ₽` : '—'}
+              </p>
+            </div>
+
+            {/* Финансы — без курса USD (бронь всегда в рублях, конвертация
+                не нужна). Налог можно при желании добавить позже, пока скрыт. */}
+
+            {/* Статус заявки + повторная отправка */}
+            <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
+          </div>
+        )}
+
+        {/* ── Tab: Анкета (детали поездки + extra_fields) ── */}
+        {activeTab === 'form' && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Детали поездки</p>
+              <div className="grid grid-cols-2 gap-3">
+                {TripFields}
+              </div>
+            </div>
+            {b.extra_fields && Object.keys(b.extra_fields).length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Доп. поля</p>
+                <div className="bg-gray-50 rounded-xl p-3 space-y-2">
+                  {Object.entries(b.extra_fields).map(([k, v]) => (
+                    <div key={k}>
+                      <p className="text-xs text-gray-500">{k}</p>
+                      {/^https?:\/\//.test(String(v)) ? (
+                        <a href={String(v)} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                          Открыть файл ↗
+                        </a>
+                      ) : (
+                        <p className="text-sm font-medium whitespace-pre-wrap">{String(v) || '—'}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Tab: Файлы (passport + confirmation) ── */}
+        {activeTab === 'files' && (
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Загранпаспорт клиента</p>
+              {b.passport_url ? (
+                <a href={b.passport_url} target="_blank" rel="noreferrer"
+                  className="bg-gray-50 hover:bg-gray-100 transition rounded-xl p-3 flex items-center gap-3">
+                  <FileText className="w-5 h-5 text-blue-600 shrink-0" />
+                  <span className="text-sm text-blue-600 font-medium flex-1">Открыть скан</span>
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                </a>
+              ) : (
+                <p className="text-sm text-gray-400">Не загружен</p>
+              )}
+            </div>
+            <ConfirmationUploader
+              url={b.confirmation_url}
+              status={b.status}
+              table={table}
+              id={b.id}
+              onUploaded={onConfirmationUploaded}
+            />
+          </div>
+        )}
+
+        {/* ── Tab: Оплата ── */}
+        {activeTab === 'payment' && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500">Стоимость</p>
+                <p className="text-lg font-bold text-blue-600 mt-0.5">
+                  {b.price != null ? `${b.price.toLocaleString('ru-RU')} ₽` : '—'}
+                </p>
+              </div>
+              {b.payment_screenshot_url && (
+                <a href={b.payment_screenshot_url} target="_blank" rel="noreferrer"
+                  className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm font-medium text-blue-600 hover:bg-blue-50 transition flex items-center gap-1.5">
+                  <FileText className="w-4 h-4" />
+                  Скриншот оплаты
+                </a>
+              )}
+            </div>
+            {!b.payment_screenshot_url && (
+              <p className="text-sm text-gray-400 text-center py-2">Скриншот оплаты не приложен</p>
+            )}
+          </div>
+        )}
+      </div>
+    </ModalShell>
+  );
+}
+
 function HotelDetail({ b, onClose, onStatusChange, onResendNotification, onConfirmationUploaded }: {
   b: HotelBooking; onClose: () => void; onStatusChange: (s: string) => void;
   onResendNotification: () => Promise<void> | void;
   onConfirmationUploaded: (url: string) => void;
 }) {
   return (
-    <ModalShell onClose={onClose}>
-      {/* Header */}
-      <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Бронь отеля</p>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95 sm:hidden">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{b.first_name} {b.last_name}</h2>
-        <p className="text-xs text-[#0F2A36]/60 mt-1">Подана {fmtDateTime(b.created_at)}</p>
-      </div>
-
-      <div className="px-5 py-5 space-y-4">
-        <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
-
-        {/* Trip */}
-        <div className="grid grid-cols-2 gap-3">
+    <BookingDetailModal
+      b={b}
+      kind="hotel"
+      onClose={onClose}
+      onStatusChange={onStatusChange}
+      onResendNotification={onResendNotification}
+      onConfirmationUploaded={onConfirmationUploaded}
+      TripFields={
+        <>
           <DetailItem label="Страна" value={b.country} />
           <DetailItem label="Город" value={b.city} />
           <DetailItem label="Заезд" value={fmtDate(b.check_in)} />
@@ -932,21 +1116,9 @@ function HotelDetail({ b, onClose, onStatusChange, onResendNotification, onConfi
           {b.children_ages.length > 0 && (
             <DetailItem label="Дети" value={`${b.children_ages.length} (${b.children_ages.join(', ')} лет)`} />
           )}
-        </div>
-
-        <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
-        <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
-        <PassportBlock url={b.passport_url} />
-        <ExtraFieldsBlock fields={b.extra_fields} />
-        <ConfirmationUploader
-          url={b.confirmation_url}
-          status={b.status}
-          table="hotel_bookings"
-          id={b.id}
-          onUploaded={onConfirmationUploaded}
-        />
-      </div>
-    </ModalShell>
+        </>
+      }
+    />
   );
 }
 
@@ -956,48 +1128,31 @@ function FlightDetail({ b, onClose, onStatusChange, onResendNotification, onConf
   onConfirmationUploaded: (url: string) => void;
 }) {
   return (
-    <ModalShell onClose={onClose}>
-      <div className="vd-grad-soft px-5 pt-5 pb-4 sticky top-0 z-10 border-b border-blue-100">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Бронь авиабилета</p>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white text-gray-500 hover:text-gray-700 flex items-center justify-center transition active:scale-95 sm:hidden">
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        <h2 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36]">{b.first_name} {b.last_name}</h2>
-        <p className="text-xs text-[#0F2A36]/60 mt-1">Подана {fmtDateTime(b.created_at)}</p>
-      </div>
-
-      <div className="px-5 py-5 space-y-4">
-        <StatusSelector status={b.status} onChange={onStatusChange} onResend={onResendNotification} />
-
-        <div className="grid grid-cols-2 gap-3">
+    <BookingDetailModal
+      b={b}
+      kind="flight"
+      onClose={onClose}
+      onStatusChange={onStatusChange}
+      onResendNotification={onResendNotification}
+      onConfirmationUploaded={onConfirmationUploaded}
+      TripFields={
+        <>
           <DetailItem label="Откуда" value={b.from_city} />
           <DetailItem label="Куда" value={b.to_city} />
           <DetailItem label="Дата брони" value={fmtDate(b.booking_date)} />
-        </div>
-
-        <ContactBlock email={b.email} phone={b.phone} telegramLogin={b.telegram_login} />
-        <PaymentBlock price={b.price} screenshotUrl={b.payment_screenshot_url} />
-        <PassportBlock url={b.passport_url} />
-        <ExtraFieldsBlock fields={b.extra_fields} />
-        <ConfirmationUploader
-          url={b.confirmation_url}
-          status={b.status}
-          table="flight_bookings"
-          id={b.id}
-          onUploaded={onConfirmationUploaded}
-        />
-      </div>
-    </ModalShell>
+        </>
+      }
+    />
   );
 }
 
+// Стиль ячейки идентичен Applications.tsx — text-xs gray-500 для лейбла,
+// text-sm font-medium для значения. Никаких больше unique-bookings цветов.
 function DetailItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-gray-50 rounded-lg p-2.5">
-      <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/50">{label}</p>
-      <p className="text-sm text-[#0F2A36] font-semibold mt-0.5">{value}</p>
+    <div>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className="text-sm font-medium mt-0.5">{value || '—'}</p>
     </div>
   );
 }
