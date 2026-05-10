@@ -93,9 +93,10 @@ const PARTNER_STATUSES = new Set([
   'partner_payout_processed',
   'partner_application_approved',
   'partner_application_rejected',
+  'partner_new_referral',  // юзер открыл реф-ссылку и стал «engaged» (миграция 023)
 ]);
 
-function buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason }) {
+function buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason, referee_name }) {
   const amt = `${(amount ?? 0).toLocaleString('ru-RU')}₽`;
   const sourceLabel = source === 'hotel' ? 'бронь отеля'
                     : source === 'flight' ? 'бронь авиабилета'
@@ -142,6 +143,17 @@ function buildPartnerMessage(status, { amount, country, source, card_last4, reje
         body: `К сожалению, мы не смогли одобрить заявку.\n\n`
             + (reject_reason ? `<b>Причина:</b> ${reject_reason}\n\n` : '')
             + `Через 7 дней можно подать новую заявку.`,
+      };
+    case 'partner_new_referral':
+      // Шлём при первом attach-е реферала (юзер открыл ссылку И что-то сделал
+      // в мини-аппе — markUserEngaged сработал). Шлём ОДНОКРАТНО на одного
+      // реферала, дальше push'и идут только при покупках (partner_referral_paid).
+      return {
+        emoji: '🎉',
+        title: 'Новый реферал по твоей ссылке',
+        body: `<b>${referee_name || 'Кто-то'}</b> зарегистрировался по твоей ссылке и зашёл в мини-апп.\n\n`
+            + `Когда оформит визу — получишь партнёрскую комиссию автоматически (с hold-периодом 30 дней).\n\n`
+            + `<i>Профиль → Партнёрский кабинет → видишь всех своих рефералов.</i>`,
       };
     default:
       return null;
@@ -232,7 +244,7 @@ export default async function handler(req, res) {
   }
 
   const body = req.body ?? {};
-  const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason } = body;
+  const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason, referee_name } = body;
   // user — только себе; admin / service — кому угодно
   const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
@@ -254,7 +266,7 @@ export default async function handler(req, res) {
 
   const isPartnerEvent = PARTNER_STATUSES.has(status);
   const msg = isPartnerEvent
-    ? buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason })
+    ? buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason, referee_name })
     : STATUS_MESSAGES[status];
   if (!msg) {
     console.error('[notify-status] unknown status:', status);
