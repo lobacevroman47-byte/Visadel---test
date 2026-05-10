@@ -266,14 +266,6 @@ const VisaFormSection: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-5 flex items-start gap-3">
-        <AlertCircle className="text-emerald-600 mt-0.5 shrink-0" size={18} />
-        <p className="text-sm text-emerald-900">
-          ✓ Изменения здесь сразу видны клиентам в анкете на странице визы. Если страна
-          ещё не импортирована — клиент видит старую версию из кода (fallback).
-        </p>
-      </div>
-
       {countries.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-5 bg-white p-2 rounded-xl border border-gray-200">
           {countries.map(c => (
@@ -1028,27 +1020,39 @@ export const BookingProductEditor: React.FC<{
             <div>
               <label className="block text-xs text-gray-700 mb-1 font-semibold">Цена для клиента ₽</label>
               <input
-                type="number" min={0}
-                value={draftRow.price}
-                onChange={e => setRow('price', parseInt(e.target.value, 10) || 0)}
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={draftRow.price === 0 ? '' : draftRow.price}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  setRow('price', v === '' ? 0 : parseInt(v, 10));
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div>
               <label className="block text-xs text-gray-700 mb-1 font-semibold">Себестоимость ₽</label>
               <input
-                type="number" min={0}
-                value={draftRow.cost_rub}
-                onChange={e => setRow('cost_rub', parseFloat(e.target.value) || 0)}
+                type="text" inputMode="decimal"
+                value={draftRow.cost_rub === 0 ? '' : draftRow.cost_rub}
+                onChange={e => {
+                  const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                  setRow('cost_rub', v === '' ? 0 : parseFloat(v) || 0);
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div>
               <label className="block text-xs text-gray-700 mb-1 font-semibold">Комиссия партнёра %</label>
               <input
-                type="number" min={0} max={100} step="0.5"
-                value={draftRow.partner_commission_pct ?? 0}
-                onChange={e => setRow('partner_commission_pct', parseFloat(e.target.value) || 0)}
+                type="text" inputMode="decimal"
+                value={(draftRow.partner_commission_pct ?? 0) === 0 ? '' : (draftRow.partner_commission_pct ?? 0)}
+                onChange={e => {
+                  const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                  setRow('partner_commission_pct', v === '' ? 0 : parseFloat(v) || 0);
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>

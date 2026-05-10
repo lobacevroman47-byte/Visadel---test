@@ -435,8 +435,14 @@ const ProductFormModal: React.FC<{
             <div>
               <label className="block text-sm text-gray-700 mb-1">Цена ₽ *</label>
               <input
-                type="number" value={form.price} onChange={e => set('price', parseInt(e.target.value) || 0)}
-                min={0} className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+                type="text" inputMode="numeric" pattern="[0-9]*"
+                value={form.price === 0 ? '' : form.price}
+                onChange={e => {
+                  const v = e.target.value.replace(/\D/g, '');
+                  set('price', v === '' ? 0 : parseInt(v, 10));
+                }}
+                placeholder="0"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
               />
             </div>
             <div>
@@ -450,8 +456,13 @@ const ProductFormModal: React.FC<{
             <div>
               <label className="block text-sm text-gray-700 mb-1">Комиссия партнёра %</label>
               <input
-                type="number" value={form.partner_commission_pct} step="0.5" min={0} max={100}
-                onChange={e => set('partner_commission_pct', parseFloat(e.target.value) || 0)}
+                type="text" inputMode="decimal"
+                value={form.partner_commission_pct === 0 ? '' : form.partner_commission_pct}
+                onChange={e => {
+                  const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                  set('partner_commission_pct', v === '' ? 0 : parseFloat(v) || 0);
+                }}
+                placeholder="0"
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -472,16 +483,26 @@ const ProductFormModal: React.FC<{
               <div>
                 <label className="block text-xs text-gray-700 mb-1">Сбор $</label>
                 <input
-                  type="number" value={form.cost_usd_fee} step="0.01" min={0}
-                  onChange={e => set('cost_usd_fee', parseFloat(e.target.value) || 0)}
+                  type="text" inputMode="decimal"
+                  value={form.cost_usd_fee === 0 ? '' : form.cost_usd_fee}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                    set('cost_usd_fee', v === '' ? 0 : parseFloat(v) || 0);
+                  }}
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>
               <div>
                 <label className="block text-xs text-gray-700 mb-1">Комиссия $</label>
                 <input
-                  type="number" value={form.cost_usd_commission} step="0.01" min={0}
-                  onChange={e => set('cost_usd_commission', parseFloat(e.target.value) || 0)}
+                  type="text" inputMode="decimal"
+                  value={form.cost_usd_commission === 0 ? '' : form.cost_usd_commission}
+                  onChange={e => {
+                    const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+                    set('cost_usd_commission', v === '' ? 0 : parseFloat(v) || 0);
+                  }}
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               </div>

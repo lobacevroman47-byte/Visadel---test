@@ -148,9 +148,13 @@ export const Settings: React.FC = () => {
               </label>
               {settings.max_bonus_usage_partner !== null && (
                 <input
-                  type="number" min={0}
-                  value={settings.max_bonus_usage_partner ?? 0}
-                  onChange={e => set('max_bonus_usage_partner', parseInt(e.target.value, 10) || 0)}
+                  type="text" inputMode="numeric" pattern="[0-9]*"
+                  value={(settings.max_bonus_usage_partner ?? 0) === 0 ? '' : settings.max_bonus_usage_partner}
+                  onChange={e => {
+                    const v = e.target.value.replace(/\D/g, '');
+                    set('max_bonus_usage_partner', v === '' ? 0 : parseInt(v, 10));
+                  }}
+                  placeholder="0"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                 />
               )}
@@ -271,8 +275,14 @@ const NumberRow: React.FC<{
     <label className="block text-sm text-gray-700 mb-1">{label}</label>
     <div className="flex items-center gap-2">
       <input
-        type="number" value={value} step={step} min={0}
-        onChange={e => onChange(parseFloat(e.target.value) || 0)}
+        type="text"
+        inputMode={step < 1 ? 'decimal' : 'numeric'}
+        value={value === 0 ? '' : value}
+        onChange={e => {
+          const v = e.target.value.replace(/[^0-9.,]/g, '').replace(',', '.');
+          onChange(v === '' ? 0 : parseFloat(v) || 0);
+        }}
+        placeholder="0"
         className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
       <span className="text-sm text-gray-500 w-6 text-center">{suffix}</span>
