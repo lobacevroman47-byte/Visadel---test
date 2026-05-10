@@ -1005,10 +1005,15 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
   const [status, setStatus] = useState(application.status);
   // Hold finance inputs as strings so user can fully clear the field while editing.
   // Parse to number on save and for the live tax preview.
-  const [usdRateStr, setUsdRateStr] = useState(String(application.usdRateRub));
+  const [usdRateStr, setUsdRateStr] = useState(application.usdRateRub != null ? String(application.usdRateRub) : '');
   const [taxPctStr, setTaxPctStr] = useState(String(application.taxPct));
   const usdRate = parseFloat(usdRateStr);
   const taxPct = parseFloat(taxPctStr);
+  // Курс обязателен при переводе в "В работе" / "Готово" — без него
+  // финансы не посчитаются (себестоимость = USD × курс).
+  const STATUSES_REQUIRING_RATE: Application['status'][] = ['in_progress', 'completed'];
+  const rateMissing = !Number.isFinite(usdRate) || usdRate <= 0;
+  const blockedByRate = STATUSES_REQUIRING_RATE.includes(status) && rateMissing;
   const [visaFile, setVisaFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [notifying, setNotifying] = useState(false);
@@ -1051,6 +1056,13 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
 
   const handleSave = async () => {
     if (saveGuard.current) return; // hard guard — no double execution
+    if (blockedByRate) {
+      await dialog.error(
+        'Укажите курс USD',
+        'Без курса нельзя перевести заявку в «В работе» или «Готово» — финансы не посчитаются. Заполните поле «Курс USD на момент оплаты» в блоке «Финансы заявки» выше.',
+      );
+      return;
+    }
     saveGuard.current = true;
     setSaving(true);
     try {
@@ -1253,17 +1265,23 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
                 <p className="text-xs font-medium text-amber-800 uppercase tracking-wider">Финансы заявки</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-700 mb-1">Курс USD на момент оплаты</label>
+                    <label className="block text-xs text-gray-700 mb-1">
+                      Курс USD на момент оплаты
+                      {rateMissing && <span className="text-red-600 ml-1">*</span>}
+                    </label>
                     <div className="flex items-center gap-1">
                       <span className="text-xs text-gray-500">1$ =</span>
                       <input
                         type="number" value={usdRateStr} step="0.01" min={0}
+                        placeholder="не задан"
                         onChange={(e) => setUsdRateStr(e.target.value)}
-                        onBlur={() => { if (usdRateStr.trim() === '' || !Number.isFinite(parseFloat(usdRateStr))) setUsdRateStr(String(application.usdRateRub)); }}
-                        className="flex-1 px-2 py-2 border border-amber-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 text-sm"
+                        className={`flex-1 px-2 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 text-sm ${rateMissing ? 'border-red-400 focus:ring-red-400' : 'border-amber-300 focus:ring-amber-400'}`}
                       />
                       <span className="text-xs text-gray-500">₽</span>
                     </div>
+                    {rateMissing && (
+                      <p className="text-[11px] text-red-600 mt-1">Без курса нельзя перевести заявку в «В работе» или «Готово»</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs text-gray-700 mb-1">Налог (%)</label>
@@ -1368,12 +1386,13 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={saving}
+                disabled={saving || blockedByRate}
                 aria-busy={saving}
+                title={blockedByRate ? 'Сначала укажите курс USD' : undefined}
                 className="w-full py-3 bg-[#3B5BFF] hover:bg-[#4F2FE6] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-1.5 active:scale-[0.98] transition"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                {saving ? 'Сохраняем…' : 'Сохранить изменения'}
+                {saving ? 'Сохраняем…' : blockedByRate ? 'Укажите курс USD' : 'Сохранить изменения'}
               </button>
 
               {/* Status history */}

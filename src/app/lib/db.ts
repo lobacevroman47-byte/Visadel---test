@@ -339,7 +339,7 @@ export async function saveApplication(app: Application): Promise<Application> {
         form_data: app.form_data,
         payment_proof_url: app.payment_proof_url ?? null,
         bonuses_used: app.bonuses_used,
-        usd_rate_rub: app.usd_rate_rub ?? BONUS_CONFIG.USD_RATE_RUB,
+        usd_rate_rub: app.usd_rate_rub ?? null,
         tax_pct: app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT,
       })
       .select()
