@@ -80,20 +80,26 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
     };
   }, [onBack]);
 
-  // Auto-save draft to localStorage on every change.
-  // Only files (passport, paymentScreenshot) are excluded — they can't be serialised.
+  // Auto-save draft to localStorage with debounce 1s — раньше писалось на каждый
+  // keystroke (10+ writes/сек при быстром вводе). С debounce: один write в конце
+  // паузы. Также трекаем lastSavedAt чтобы показать индикатор.
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   useEffect(() => {
     const anyContent = !!(firstName || lastName || country || city || checkIn || checkOut ||
       hasChildren === 'yes' || email || phone || telegramLogin);
     if (!anyContent) return;
-    try {
-      localStorage.setItem('hotel_booking_draft', JSON.stringify({
-        firstName, lastName, country, city, checkIn, checkOut,
-        guests, hasChildren, children,
-        email, phone, telegramLogin, extraValues,
-        savedAt: new Date().toISOString(),
-      }));
-    } catch { /* quota or json error — ignore */ }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('hotel_booking_draft', JSON.stringify({
+          firstName, lastName, country, city, checkIn, checkOut,
+          guests, hasChildren, children,
+          email, phone, telegramLogin, extraValues,
+          savedAt: new Date().toISOString(),
+        }));
+        setLastSavedAt(Date.now());
+      } catch { /* quota or json error — ignore */ }
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [firstName, lastName, country, city, checkIn, checkOut, guests, hasChildren, children, email, phone, telegramLogin, extraValues]);
 
   // UX state
@@ -275,7 +281,14 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
             </svg>
             <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
           </div>
-          <span className="w-9" />
+          {/* Индикатор автосохранения. Появляется на 2.5s после каждого write */}
+          {lastSavedAt && Date.now() - lastSavedAt < 2500 ? (
+            <span className="text-[10px] text-emerald-600/80 font-semibold animate-pulse">
+              ✓ Сохранено
+            </span>
+          ) : (
+            <span className="w-9" />
+          )}
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
@@ -217,7 +217,14 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     }).catch(console.error);
   };
 
-  const saveDraft = () => {
+  // ── Autosave: persistDraft = «тихая» запись в localStorage без push'ей,
+  //    запускается из автосейв-хука каждые ~1.5с после изменения. saveDraft
+  //    = ручной клик по «Сохранить черновик» — делает persistDraft + ставит
+  //    cron-напоминалку + показывает full-screen success-экран.
+  const [autoSaveAt, setAutoSaveAt] = useState<number | null>(null);
+
+  const persistDraft = useCallback(() => {
+    if (!draftId) return;
     // Strip File objects — they don't survive JSON.stringify
     const draftFormData = {
       ...formData,
@@ -231,27 +238,49 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
       urgent,
       savedAt: new Date().toISOString(),
     };
-    localStorage.setItem(draftId, JSON.stringify(draft));
+    try {
+      localStorage.setItem(draftId, JSON.stringify(draft));
 
-    // Also save to drafts list for ApplicationsTab
-    const draftsKey = 'visa_drafts';
-    const existingDrafts = JSON.parse(localStorage.getItem(draftsKey) || '[]');
-    const draftIndex = existingDrafts.findIndex((d: any) => d.id === draftId);
+      // Also save to drafts list for ApplicationsTab
+      const draftsKey = 'visa_drafts';
+      const existingDrafts = JSON.parse(localStorage.getItem(draftsKey) || '[]');
+      const draftIndex = existingDrafts.findIndex((d: { id?: string }) => d.id === draftId);
+      if (draftIndex >= 0) existingDrafts[draftIndex] = draft;
+      else existingDrafts.push(draft);
+      localStorage.setItem(draftsKey, JSON.stringify(existingDrafts));
 
-    if (draftIndex >= 0) {
-      existingDrafts[draftIndex] = draft;
-    } else {
-      existingDrafts.push(draft);
+      setAutoSaveAt(Date.now());
+    } catch (e) {
+      // localStorage quota / JSON serialization fail — игнорим, юзер
+      // увидит в индикаторе что не сохранилось (autoSaveAt не обновится).
+      console.warn('[autosave] persist failed:', e);
     }
+  }, [draftId, formData, currentStep, visa, urgent]);
 
-    localStorage.setItem(draftsKey, JSON.stringify(existingDrafts));
-
-    // Schedule draft reminders
+  const saveDraft = () => {
+    persistDraft();
     scheduleReminders('draft');
-
-    // Полноэкранный success вместо native alert (см. SuccessScreen ниже)
+    // Полноэкранный success — только при ручном клике
     setDraftSavedShown(true);
   };
+
+  // ── Автосохранение: запускаем persistDraft через 1.5s после последнего
+  //    изменения formData / currentStep. Раньше юзер мог потерять анкету
+  //    если случайно закрыл мини-апп — теперь данные пишутся в localStorage
+  //    автоматически на каждой паузе ввода.
+  useEffect(() => {
+    if (!draftId) return;
+    // Не сейвим пустую заявку (juser ещё не ввёл ничего)
+    const hasContent =
+      Object.keys(formData.basicData).length > 0 ||
+      formData.contactInfo.email || formData.contactInfo.phone || formData.contactInfo.telegram ||
+      formData.howHeard.length > 0 ||
+      formData.additionalDocs.hotelBooking || formData.additionalDocs.returnTicket ||
+      currentStep > 0;
+    if (!hasContent) return;
+    const timer = setTimeout(persistDraft, 1500);
+    return () => clearTimeout(timer);
+  }, [formData, currentStep, draftId, persistDraft]);
 
   // When user reaches payment step — schedule "payment abandoned" reminders (once)
   useEffect(() => {
@@ -381,9 +410,18 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
                 <span className="block text-[11px] text-gray-500 mt-0.5">{visa.country} · {STEPS[currentStep]}</span>
               )}
             </div>
-            <button onClick={saveDraft} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" title="Сохранить черновик">
-              <Save className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Тихий индикатор автосохранения. Показывается на 2.5s после
+                  каждого автосейва, потом плавно исчезает. */}
+              {autoSaveAt && Date.now() - autoSaveAt < 2500 && !keyboardOpen && (
+                <span className="text-[10px] text-emerald-600/80 font-semibold animate-pulse">
+                  ✓ Сохранено
+                </span>
+              )}
+              <button onClick={saveDraft} className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition" title="Сохранить черновик">
+                <Save className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           {/* Progress bar + step counter — always visible */}

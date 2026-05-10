@@ -72,18 +72,23 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
     };
   }, [onBack]);
 
-  // Auto-save draft to localStorage
+  // Auto-save draft to localStorage с debounce 1s + lastSavedAt трекинг.
+  const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   useEffect(() => {
     const anyContent = !!(firstName || lastName || fromCity || toCity || bookingDate ||
       email || phone || telegramLogin);
     if (!anyContent) return;
-    try {
-      localStorage.setItem('flight_booking_draft', JSON.stringify({
-        firstName, lastName, fromCity, toCity, bookingDate,
-        email, phone, telegramLogin, extraValues,
-        savedAt: new Date().toISOString(),
-      }));
-    } catch { /* no-op */ }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem('flight_booking_draft', JSON.stringify({
+          firstName, lastName, fromCity, toCity, bookingDate,
+          email, phone, telegramLogin, extraValues,
+          savedAt: new Date().toISOString(),
+        }));
+        setLastSavedAt(Date.now());
+      } catch { /* no-op */ }
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [firstName, lastName, fromCity, toCity, bookingDate, email, phone, telegramLogin, extraValues]);
 
   // UX state
@@ -229,7 +234,14 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
             </svg>
             <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
           </div>
-          <span className="w-9" />
+          {/* Индикатор автосохранения */}
+          {lastSavedAt && Date.now() - lastSavedAt < 2500 ? (
+            <span className="text-[10px] text-emerald-600/80 font-semibold animate-pulse">
+              ✓ Сохранено
+            </span>
+          ) : (
+            <span className="w-9" />
+          )}
         </div>
       </div>
 
