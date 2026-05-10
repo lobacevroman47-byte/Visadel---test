@@ -66,7 +66,51 @@ export default async function handler(req, res) {
   const last_name  = verifiedTgUser?.last_name  ?? body.last_name  ?? null;
   const username   = verifiedTgUser?.username   ?? body.username   ?? null;
   const photo_url  = verifiedTgUser?.photo_url  ?? body.photo_url  ?? null;
-  const referred_by = body.referred_by ?? null;
+
+  // Резолвим реф-код на сервере (не на фронте через anon-key, который RLS
+  // блокирует). Принимаем либо canonical (USR_XXX) либо vanity (PIRAT).
+  // Frontend может прислать любой — резолвим в canonical через service_key.
+  const referredByInput = (body.referred_by ?? '').toString().trim();
+  let referred_by = null;
+  if (referredByInput) {
+    try {
+      // Сначала пробуем как canonical (быстрее — exact match).
+      const codeRes = await fetch(
+        `${SUPABASE_URL}/rest/v1/users?referral_code=eq.${encodeURIComponent(referredByInput)}&select=referral_code&limit=1`,
+        { headers: headers() },
+      );
+      const codeRows = await codeRes.json().catch(() => []);
+      if (Array.isArray(codeRows) && codeRows[0]?.referral_code) {
+        referred_by = codeRows[0].referral_code;
+      } else {
+        // Не canonical — пробуем vanity (UPPERCASE для case-insensitive).
+        const vanityRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/users?vanity_code=eq.${encodeURIComponent(referredByInput.toUpperCase())}&select=referral_code&limit=1`,
+          { headers: headers() },
+        );
+        const vanityRows = await vanityRes.json().catch(() => []);
+        if (Array.isArray(vanityRows) && vanityRows[0]?.referral_code) {
+          referred_by = vanityRows[0].referral_code;
+        }
+      }
+      if (!referred_by) {
+        console.warn(`[upsert-user] referral_code "${referredByInput}" not found (neither canonical nor vanity)`);
+      }
+    } catch (e) {
+      console.warn('[upsert-user] referral resolve failed:', e);
+    }
+  }
+  // Self-referral guard: нельзя приписать самого себя как своего реферера
+  // (приходит при тестировании founder с собственной ссылкой).
+  // Без этого пара (telegram_id=X, referred_by=USR_X) ломает воронку
+  // (юзер сам себе реферер).
+  if (referred_by) {
+    const selfCode = `USR_${verifiedTgId.toString(36).toUpperCase()}`;
+    if (referred_by === selfCode) {
+      console.warn(`[upsert-user] self-referral blocked for ${verifiedTgId}`);
+      referred_by = null;
+    }
+  }
 
   try {
     // Проверяем существует ли юзер
