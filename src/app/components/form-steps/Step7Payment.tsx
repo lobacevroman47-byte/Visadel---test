@@ -5,6 +5,7 @@ import SuccessScreen from '../shared/SuccessScreen';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { saveApplication, uploadFile, getAppSettings } from '../../lib/db';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
@@ -161,7 +162,67 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
         bonuses_used: bonusAmount,
       });
 
-      // 3a. Notify user: application received (pending_confirmation)
+      // 3a. Списываем бонусы СНАЧАЛА (до notify-admin) — раньше делали
+      //     ПОСЛЕ notify, и если grant-bonus падал, заявка уже улетела
+      //     к админу, юзер получил визу не списав баланс (двойная выгода
+      //     или потеря денег для нас). Теперь:
+      //       1) spend-bonus → если упал → отменяем заявку (status=cancelled),
+      //          notify-admin вообще не отправляем, юзеру говорим попробовать
+      //          ещё раз. Никакого мусора у админа, никакой потери денег.
+      //       2) если spend OK или бонусы не используются → notify-admin/user.
+      let spendOk = true;
+      if (useBonuses && bonusAmount > 0 && telegramId) {
+        try {
+          const res = await apiFetch('/api/grant-bonus', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telegram_id: telegramId,
+              type: 'spent',
+              amount: -bonusAmount,
+              description: `−${bonusAmount}₽ оплата визы ${visa.country} (${savedApp?.id ?? 'pending'})`,
+              // dedupe_key = 'spent:<uuid>' защищает от двойного списания
+              // при повторном submit (юзер тыкает «Отправить» дважды).
+              application_id: savedApp?.id,
+            }),
+          });
+          const data = await res.json().catch(() => ({} as { newBalance?: number; skipped?: unknown }));
+          if (!res.ok) {
+            console.error('[step7] spend-bonus failed:', res.status, data);
+            spendOk = false;
+          } else if (data.skipped) {
+            // Уже списали ранее (повторный submit) — это ОК, продолжаем
+            console.warn('[step7] spend-bonus skipped (dedup)');
+          } else if (typeof data.newBalance === 'number') {
+            const updated = { ...userData, bonusBalance: data.newBalance };
+            localStorage.setItem('userData', JSON.stringify(updated));
+            localStorage.setItem('vd_user', JSON.stringify(updated));
+          }
+        } catch (e) {
+          console.error('[step7] spend-bonus exception:', e);
+          spendOk = false;
+        }
+      }
+
+      // 3b. Если spend упал — откатываем: помечаем заявку как cancelled,
+      //     админ не получает уведомление, юзер видит понятный текст.
+      if (!spendOk) {
+        if (savedApp?.id && isSupabaseConfigured()) {
+          try {
+            await supabase.from('applications')
+              .update({ status: 'cancelled' })
+              .eq('id', savedApp.id);
+          } catch (e) { console.warn('[step7] rollback cancel failed:', e); }
+        }
+        await dialog.error(
+          'Не удалось списать бонусы',
+          'Заявка не отправлена админу. Проверьте баланс бонусов и попробуйте ещё раз через минуту.',
+        );
+        setSubmitting(false);
+        return;
+      }
+
+      // 3c. Notify user: application received (pending_confirmation)
       if (telegramId) {
         apiFetch('/api/notify-status', {
           method: 'POST',
@@ -176,7 +237,7 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
         }).catch(console.error);
       }
 
-      // 3b. Notify all admins about new application
+      // 3d. Notify all admins about new application
       apiFetch('/api/notify-admin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -196,44 +257,6 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
 
       // 4. Referral bonus to the referrer is paid by admin when status moves to 'in_progress'
       // (i.e. only after the payment is actually confirmed). See admin/Applications.tsx.
-
-      // 5. Deduct bonuses via /api/grant-bonus с отрицательной суммой.
-      //    Раньше дёргали updateUser(...) напрямую через anon-key, но
-      //    после migration 004 RLS на users запрещает UPDATE для anon —
-      //    запрос тихо проваливался, локально баланс падал, в БД нет.
-      //    При следующем открытии приложения синк возвращал бонусы.
-      //    Через API endpoint со service-key UPDATE проходит, плюс в
-      //    bonus_logs появляется audit-запись с типом 'spent'.
-      if (useBonuses && bonusAmount > 0 && telegramId) {
-        try {
-          const res = await apiFetch('/api/grant-bonus', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telegram_id: telegramId,
-              type: 'spent',
-              amount: -bonusAmount,
-              description: `−${bonusAmount}₽ оплата визы ${visa.country} (${savedApp?.id ?? 'pending'})`,
-              // grant-bonus делает dedupe_key = `${type}:${application_id}` →
-              // 'spent:<uuid>'. Без application_id дедупа нет, можно
-              // продублировать списание при повторном submit.
-              application_id: savedApp?.id,
-            }),
-          });
-          const data = await res.json().catch(() => ({}));
-          if (!res.ok) {
-            console.error('[step7] spend-bonus failed:', res.status, data);
-            toast.error('Бонусы не списались — свяжитесь с поддержкой если баланс не обновился');
-          } else if (typeof data.newBalance === 'number') {
-            const updated = { ...userData, bonusBalance: data.newBalance };
-            localStorage.setItem('userData', JSON.stringify(updated));
-            localStorage.setItem('vd_user', JSON.stringify(updated));
-          }
-        } catch (e) {
-          console.error('[step7] spend-bonus exception:', e);
-          toast.error('Бонусы не списались — попробуй ещё раз');
-        }
-      }
 
       // 4. Remove draft — и одиночный ключ, и запись из массива visa_drafts
       // (массив читает ApplicationsTab; раньше чистили только ключ — после оплаты

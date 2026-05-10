@@ -10,8 +10,18 @@ interface ProfileTabProps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
-function yesterdayStr() { return new Date(Date.now() - 86_400_000).toISOString().slice(0, 10); }
+// Дата в локальной таймзоне (Москва) — раньше использовали toISOString()
+// (UTC), и юзер открывший check-in в 02:00 МСК видел вчерашнюю дату → streak
+// мог +1 после ~21 часа вместо 24, или ломаться на полночи.
+// Берём дату по local-tz через Intl, формат YYYY-MM-DD.
+function localDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function todayStr() { return localDateStr(new Date()); }
+function yesterdayStr() { return localDateStr(new Date(Date.now() - 86_400_000)); }
 function monthKey() { const n = new Date(); return `${n.getFullYear()}-${n.getMonth() + 1}`; }
 
 const WEEK_MILESTONES = [7, 14, 21, 28];
