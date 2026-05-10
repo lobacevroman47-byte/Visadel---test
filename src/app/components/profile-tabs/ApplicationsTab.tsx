@@ -235,9 +235,18 @@ function ReviewModal({ applicationId, country, telegramId, username, onClose, on
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Минимум 100 символов вместе с пробелами (.length включает пробелы;
+  // пользователю про пробелы не говорим — выводим просто "минимум 100 символов").
+  const MIN_COMMENT_LEN = 100;
+  const commentLen = comment.trim().length;
+  const commentTooShort = commentLen < MIN_COMMENT_LEN;
+
   const handleSubmit = async () => {
     if (rating === 0) { await dialog.warning('Поставьте оценку'); return; }
-    if (comment.trim().length < 5) { await dialog.warning('Напишите хотя бы несколько слов'); return; }
+    if (commentTooShort) {
+      await dialog.warning(`Минимум ${MIN_COMMENT_LEN} символов в отзыве. Сейчас — ${commentLen}.`);
+      return;
+    }
     setSubmitting(true);
     try {
       await submitReview({
@@ -274,14 +283,18 @@ function ReviewModal({ applicationId, country, telegramId, username, onClose, on
           <div>
             <label className="block text-sm font-medium text-[#0F2A36] mb-2">
               Комментарий <span className="text-rose-500">*</span>
+              <span className="ml-1 text-xs text-[#0F2A36]/50 font-normal">(минимум {MIN_COMMENT_LEN} символов)</span>
             </label>
             <textarea
               value={comment}
               onChange={e => setComment(e.target.value)}
-              rows={3}
+              rows={5}
               placeholder="Расскажите о вашем опыте..."
-              className="w-full px-4 py-3 border border-[#E1E5EC] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] resize-none"
+              className="w-full px-4 py-3 border border-[#E1E5EC] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#3B5BFF]/20 focus:border-[#3B5BFF] resize-y min-h-[120px]"
             />
+            <div className={`mt-1.5 text-xs text-right tabular-nums ${commentTooShort ? 'text-rose-500' : 'text-emerald-600'}`}>
+              {commentLen} / {MIN_COMMENT_LEN}
+            </div>
           </div>
           {/* Bonus hint — hidden for partners */}
           {!isPartner && (
