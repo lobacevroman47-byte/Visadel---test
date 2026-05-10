@@ -40,18 +40,21 @@ ORDER BY telegram_id;
 -- 2. Counts BEFORE
 -- ═══════════════════════════════════════════════════════════════════════════
 SELECT 'BEFORE'                    AS phase,
-       (SELECT COUNT(*) FROM public.users)               AS users,
-       (SELECT COUNT(*) FROM public.applications)        AS applications,
-       (SELECT COUNT(*) FROM public.bonus_logs)          AS bonus_logs,
-       (SELECT COUNT(*) FROM public.hotel_bookings)      AS hotel_bookings,
-       (SELECT COUNT(*) FROM public.flight_bookings)     AS flight_bookings,
-       (SELECT COUNT(*) FROM public.reviews)             AS reviews,
-       (SELECT COUNT(*) FROM public.tasks)               AS tasks,
-       (SELECT COUNT(*) FROM public.status_log)          AS status_log,
-       (SELECT COUNT(*) FROM public.reminders)           AS reminders,
-       (SELECT COUNT(*) FROM public.notification_dedup)  AS notif_dedup,
-       (SELECT COUNT(*) FROM public.referral_clicks)     AS ref_clicks,
-       (SELECT COUNT(*) FROM public.admin_audit_log)     AS admin_audit_log;
+       (SELECT COUNT(*) FROM public.users)                 AS users,
+       (SELECT COUNT(*) FROM public.applications)          AS applications,
+       (SELECT COUNT(*) FROM public.bonus_logs)            AS bonus_logs,
+       (SELECT COUNT(*) FROM public.hotel_bookings)        AS hotel_bookings,
+       (SELECT COUNT(*) FROM public.flight_bookings)       AS flight_bookings,
+       (SELECT COUNT(*) FROM public.reviews)               AS reviews,
+       (SELECT COUNT(*) FROM public.tasks)                 AS tasks,
+       (SELECT COUNT(*) FROM public.status_log)            AS status_log,
+       (SELECT COUNT(*) FROM public.booking_status_log)    AS booking_status_log,
+       (SELECT COUNT(*) FROM public.reminders)             AS reminders,
+       (SELECT COUNT(*) FROM public.notification_dedup)    AS notif_dedup,
+       (SELECT COUNT(*) FROM public.referral_clicks)       AS ref_clicks,
+       (SELECT COUNT(*) FROM public.partner_applications)  AS partner_apps,
+       (SELECT COUNT(*) FROM public.partner_payouts)       AS partner_payouts,
+       (SELECT COUNT(*) FROM public.admin_audit_log)       AS admin_audit_log;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 3. Удаление (порядок: дети → родители; FK CASCADE сделает остальное)
@@ -60,43 +63,55 @@ SELECT 'BEFORE'                    AS phase,
 -- 3a. Все визовые заявки (status_log + reviews по application_id каскадятся).
 DELETE FROM public.applications;
 
--- 3b. Брони отелей и авиа.
+-- 3b. Брони отелей и авиа (booking_status_log каскадится по FK).
 DELETE FROM public.hotel_bookings;
 DELETE FROM public.flight_bookings;
+-- Защитный сброс на случай если status_log не каскадится (старые миграции
+-- могли создать FK без ON DELETE CASCADE).
+DELETE FROM public.booking_status_log;
+DELETE FROM public.status_log;
 
--- 3c. Полная история бонусов (тестовые данные — гасим всю).
+-- 3c. Полная история бонусов (тестовые данные — гасим всю, включая
+--     partner_pending / partner_approved / partner_paid).
 DELETE FROM public.bonus_logs;
 
--- 3d. Напоминалки (cron-задачи на драфты — больше не релевантны).
+-- 3d. Партнёрская инфраструктура.
+DELETE FROM public.partner_payouts;       -- история выплат партнёрам
+DELETE FROM public.partner_applications;  -- заявки на партнёрство
+
+-- 3e. Напоминалки (cron-задачи на драфты — больше не релевантны).
 DELETE FROM public.reminders;
 
--- 3e. Дедуп-кэш Telegram-уведомлений (rebuild сам).
+-- 3f. Дедуп-кэш Telegram-уведомлений (rebuild сам).
 DELETE FROM public.notification_dedup;
 
--- 3f. Реферальные клики (чтобы рефералы открыли мини-апп «впервые»).
+-- 3g. Реферальные клики (чтобы рефералы открыли мини-апп «впервые»).
 DELETE FROM public.referral_clicks;
 
--- 3g. Tasks — оставляем только админские (cascades from users delete).
+-- 3h. Tasks — оставляем только админские (cascades from users delete).
 DELETE FROM public.tasks
   WHERE user_telegram_id NOT IN (SELECT telegram_id FROM _keep_admins);
 
--- 3h. Users — оставляем только админов из whitelist.
+-- 3i. Users — оставляем только админов из whitelist.
 --     Reviews по user FK каскадятся автоматически.
 DELETE FROM public.users
   WHERE telegram_id NOT IN (SELECT telegram_id FROM _keep_admins);
 
--- 3i. Сброс админских ряд users — баланс, streak, referred_by → как новые.
+-- 3j. Сброс админских ряд users — баланс, streak, referred_by → как новые.
 --     referral_code, имя, контакты, created_at оставляем (юзеры существуют,
---     просто без активности).
+--     просто без активности). partner_balance тоже обнуляем — иначе у
+--     founder-а останется накопленный partner_balance после стирания
+--     partner_payouts (получится баланс без подтверждающих логов).
 UPDATE public.users
-SET bonus_balance   = 0,
-    bonus_streak    = 0,
-    last_bonus_date = NULL,
-    referred_by     = NULL,
-    updated_at      = now()
+SET bonus_balance    = 0,
+    bonus_streak     = 0,
+    last_bonus_date  = NULL,
+    referred_by      = NULL,
+    partner_balance  = 0,
+    updated_at       = now()
 WHERE telegram_id IN (SELECT telegram_id FROM _keep_admins);
 
--- 3j. admin_audit_log — оставляем для compliance.
+-- 3k. admin_audit_log — оставляем для compliance.
 --     (Раскомментируй если хочешь стереть всю историю действий админов.)
 -- DELETE FROM public.admin_audit_log;
 
@@ -105,18 +120,21 @@ WHERE telegram_id IN (SELECT telegram_id FROM _keep_admins);
 --    users = кол-ву админов из whitelist (как минимум 1).
 -- ═══════════════════════════════════════════════════════════════════════════
 SELECT 'AFTER'                     AS phase,
-       (SELECT COUNT(*) FROM public.users)               AS users,
-       (SELECT COUNT(*) FROM public.applications)        AS applications,
-       (SELECT COUNT(*) FROM public.bonus_logs)          AS bonus_logs,
-       (SELECT COUNT(*) FROM public.hotel_bookings)      AS hotel_bookings,
-       (SELECT COUNT(*) FROM public.flight_bookings)     AS flight_bookings,
-       (SELECT COUNT(*) FROM public.reviews)             AS reviews,
-       (SELECT COUNT(*) FROM public.tasks)               AS tasks,
-       (SELECT COUNT(*) FROM public.status_log)          AS status_log,
-       (SELECT COUNT(*) FROM public.reminders)           AS reminders,
-       (SELECT COUNT(*) FROM public.notification_dedup)  AS notif_dedup,
-       (SELECT COUNT(*) FROM public.referral_clicks)     AS ref_clicks,
-       (SELECT COUNT(*) FROM public.admin_audit_log)     AS admin_audit_log;
+       (SELECT COUNT(*) FROM public.users)                 AS users,
+       (SELECT COUNT(*) FROM public.applications)          AS applications,
+       (SELECT COUNT(*) FROM public.bonus_logs)            AS bonus_logs,
+       (SELECT COUNT(*) FROM public.hotel_bookings)        AS hotel_bookings,
+       (SELECT COUNT(*) FROM public.flight_bookings)       AS flight_bookings,
+       (SELECT COUNT(*) FROM public.reviews)               AS reviews,
+       (SELECT COUNT(*) FROM public.tasks)                 AS tasks,
+       (SELECT COUNT(*) FROM public.status_log)            AS status_log,
+       (SELECT COUNT(*) FROM public.booking_status_log)    AS booking_status_log,
+       (SELECT COUNT(*) FROM public.reminders)             AS reminders,
+       (SELECT COUNT(*) FROM public.notification_dedup)    AS notif_dedup,
+       (SELECT COUNT(*) FROM public.referral_clicks)       AS ref_clicks,
+       (SELECT COUNT(*) FROM public.partner_applications)  AS partner_apps,
+       (SELECT COUNT(*) FROM public.partner_payouts)       AS partner_payouts,
+       (SELECT COUNT(*) FROM public.admin_audit_log)       AS admin_audit_log;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 5. COMMIT or ROLLBACK
