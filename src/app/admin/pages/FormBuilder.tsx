@@ -57,7 +57,9 @@ export const FormBuilder: React.FC = () => {
       </div>
 
       {topTab === 'visas'    && <VisaFormSection />}
-      {topTab === 'addons'   && <AdditionalServices />}
+      {/* Кнопка «Добавить услугу» скрыта — она доступна в Каталог
+          продуктов → Доп. услуги (один источник для добавления). */}
+      {topTab === 'addons'   && <AdditionalServices hideAddButton />}
       {topTab === 'bookings' && <BookingsConstructor />}
     </div>
   );

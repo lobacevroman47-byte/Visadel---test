@@ -27,7 +27,12 @@ type Mode = 'addons' | 'bookings';
 //   * 'bookings' — Каталог → Брони (standalone-брони: отдельный booking-flow)
 // Visa-аддоны и standalone-брони — независимые сущности (миграция 027),
 // изменения в одной не влияют на другую.
-export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' }) => {
+export const AdditionalServices: React.FC<{
+  mode?: Mode;
+  /** Скрыть кнопку «Добавить» (если этот же экран уже доступен в другом
+   *  месте — напр. Конструктор → Доп. услуги делегирует add в Каталог. */
+  hideAddButton?: boolean;
+}> = ({ mode = 'addons', hideAddButton = false }) => {
   const dialog = useDialog();
   const [services, setServices] = useState<AdditionalService[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -116,13 +121,15 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
-          >
-            <Plus size={16} strokeWidth={2.5} /> {isBookings ? 'Добавить бронь' : 'Добавить услугу'}
-          </button>
+          {!hideAddButton && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
+            >
+              <Plus size={16} strokeWidth={2.5} /> {isBookings ? 'Добавить бронь' : 'Добавить услугу'}
+            </button>
+          )}
           <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
@@ -135,14 +142,20 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
             📦
           </div>
           <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Пока пусто</h3>
-          <p className="text-sm text-[#0F2A36]/60 mb-5">Добавь первую услугу — она появится в калькуляторе на странице визы</p>
-          <button
-            type="button"
-            onClick={() => setAdding(true)}
-            className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition"
-          >
-            <Plus size={16} strokeWidth={2.5} /> Добавить услугу
-          </button>
+          <p className="text-sm text-[#0F2A36]/60 mb-5">
+            {hideAddButton
+              ? 'Добавь первую услугу через раздел Каталог продуктов → Доп. услуги'
+              : 'Добавь первую услугу — она появится в калькуляторе на странице визы'}
+          </p>
+          {!hideAddButton && (
+            <button
+              type="button"
+              onClick={() => setAdding(true)}
+              className="px-5 py-2.5 vd-grad text-white rounded-xl inline-flex items-center gap-2 select-none shadow-md vd-shadow-cta font-bold active:scale-[0.98] transition"
+            >
+              <Plus size={16} strokeWidth={2.5} /> Добавить услугу
+            </button>
+          )}
         </div>
       )}
 
