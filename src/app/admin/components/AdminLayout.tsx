@@ -6,8 +6,10 @@ import { AdminBottomNav, type AdminProductTab } from './AdminBottomNav';
 const Dashboard = lazy(() => import('../pages/Dashboard').then(m => ({ default: m.Dashboard })));
 import { Applications } from '../pages/Applications';
 import { Users } from '../pages/Users';
-import { Countries } from '../pages/Countries';
-import { FormBuilder } from '../pages/FormBuilder';
+import { Catalog } from '../pages/Catalog';
+// Countries и FormBuilder больше не рендерятся напрямую (заменены Catalog'ом),
+// но экспорты сохраняются — другие части админки (страницы/тесты) могут их
+// импортировать напрямую.
 import { Administrators } from '../pages/Administrators';
 import { Settings } from '../pages/Settings';
 import { AdditionalServices } from '../pages/AdditionalServices';
@@ -125,15 +127,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         ) : (
           <PermissionDenied />
         );
+      // Объединённый раздел «Каталог» — оба legacy-ключа (countries и
+      // form-builder) ведут сюда, чтобы не сломать существующие deeplink'и.
       case 'countries':
-        return hasPermission(['owner', 'admin']) ? (
-          <Countries />
-        ) : (
-          <PermissionDenied />
-        );
       case 'form-builder':
         return hasPermission(['owner', 'admin']) ? (
-          <FormBuilder />
+          <Catalog />
         ) : (
           <PermissionDenied />
         );
@@ -149,10 +148,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         ) : (
           <PermissionDenied />
         );
-      // Legacy redirect — раздел переехал в Конструктор анкет → вкладка «Доп. услуги»
+      // Legacy redirect — раздел переехал в Каталог → вкладка «Доп. услуги»
       case 'additional-services':
         return hasPermission(['owner', 'admin']) ? (
-          <FormBuilder />
+          <Catalog />
         ) : (
           <PermissionDenied />
         );

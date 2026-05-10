@@ -25,8 +25,16 @@ const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileText }[] = [
   { id: 'bookings', label: 'Брони',       Icon: Hotel    },
 ];
 
-export const Countries: React.FC = () => {
+// renderTopNav=false когда Countries встроен в новый Catalog (там
+// собственная top-nav). Ключи topTab остаются для обратной совместимости
+// если Countries рендерится отдельно (legacy).
+export const Countries: React.FC<{ renderTopNav?: boolean }> = ({ renderTopNav = true }) => {
   const [topTab, setTopTab] = useState<TopTab>('visas');
+  // Если Catalog встраивает Countries — показываем только список виз
+  // (visas section). Доп. услуги/брони у Catalog рендерятся отдельно.
+  if (!renderTopNav) {
+    return <div><VisasSection /></div>;
+  }
   return (
     <div>
       {/* Top nav — same brand pattern as FormBuilder */}
