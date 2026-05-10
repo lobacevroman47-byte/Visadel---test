@@ -25,6 +25,8 @@ import {
   type TelegramUser,
 } from './lib/telegram';
 import { upsertUser, resolveReferralCode, getAdminRole, markUserEngaged, type AppUser, type AdminRole } from './lib/db';
+import { getDraftsForVisa, type VisaDraft } from './lib/visaDrafts';
+import DraftPickerModal from './components/DraftPickerModal';
 import { AppCatalogProvider } from './contexts/AppCatalogContext';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
@@ -97,6 +99,12 @@ function App() {
   const [selectedVisa, setSelectedVisa] = useState<VisaOption | null>(null);
   const [urgentVisa, setUrgentVisa] = useState(false);
   const [prefilledAddons, setPrefilledAddons] = useState<{ urgent: boolean; hotel: boolean; ticket: boolean } | undefined>(undefined);
+  // Multi-draft режим: если у юзера есть незавершённые анкеты по выбранной визе,
+  // открываем DraftPickerModal (выбор «продолжить» / «начать новую»).
+  // null = модалка закрыта. Юзер выбирает — устанавливаем activeDraftId и
+  // переходим в application screen.
+  const [draftPicker, setDraftPicker] = useState<{ visa: VisaOption; urgent: boolean; addons?: { urgent: boolean; hotel: boolean; ticket: boolean }; drafts: VisaDraft[] } | null>(null);
+  const [activeDraftId, setActiveDraftId] = useState<string | undefined>(undefined);
   const [initialProfileTab, setInitialProfileTab] = useState<'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews' | undefined>(undefined);
 
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
@@ -283,16 +291,45 @@ function App() {
   }, [currentScreen, appUser?.telegram_id, hasEngaged]);
 
   const handleVisaSelect = (visa: VisaOption, urgent = false, addons?: { urgent: boolean; hotel: boolean; ticket: boolean }) => {
+    // Multi-draft: проверяем есть ли уже незавершённые анкеты на эту визу.
+    // Если 1+ → показываем DraftPickerModal (юзер выбирает «продолжить» или
+    // «начать новую»). Если 0 → сразу новая анкета.
+    const drafts = getDraftsForVisa(visa.id);
+    if (drafts.length > 0) {
+      setDraftPicker({ visa, urgent, addons, drafts });
+      return;
+    }
     setSelectedVisa(visa);
     setUrgentVisa(urgent);
     setPrefilledAddons(addons);
+    setActiveDraftId(undefined);
     setCurrentScreen('application');
   };
 
-  const handleContinueDraft = (draft: { visa: VisaOption; urgent: boolean }) => {
+  const handleContinueDraft = (draft: { id?: string; visa: VisaOption; urgent: boolean }) => {
     setSelectedVisa(draft.visa);
     setUrgentVisa(draft.urgent);
     setPrefilledAddons(undefined);
+    setActiveDraftId(draft.id);
+    setCurrentScreen('application');
+  };
+
+  // DraftPicker callbacks
+  const handlePickerContinue = (draft: VisaDraft) => {
+    setSelectedVisa(draft.visa);
+    setUrgentVisa(draft.urgent);
+    setPrefilledAddons(undefined);
+    setActiveDraftId(draft.id);
+    setDraftPicker(null);
+    setCurrentScreen('application');
+  };
+  const handlePickerStartNew = () => {
+    if (!draftPicker) return;
+    setSelectedVisa(draftPicker.visa);
+    setUrgentVisa(draftPicker.urgent);
+    setPrefilledAddons(draftPicker.addons);
+    setActiveDraftId(undefined);   // ← новая анкета, ApplicationForm сгенерит UUID
+    setDraftPicker(null);
     setCurrentScreen('application');
   };
 
@@ -382,8 +419,20 @@ function App() {
               onBack={handleBackToHome}
               onContinueDraft={handleContinueDraft}
               onGoToProfile={() => { setInitialProfileTab('applications'); setCurrentScreen('profile'); }}
+              initialDraftId={activeDraftId}
             />
           </Suspense>
+        )}
+
+        {/* Multi-draft picker — открывается при клике на визу с 1+ незавершёнными */}
+        {draftPicker && (
+          <DraftPickerModal
+            visa={draftPicker.visa}
+            drafts={draftPicker.drafts}
+            onContinue={handlePickerContinue}
+            onStartNew={handlePickerStartNew}
+            onClose={() => setDraftPicker(null)}
+          />
         )}
         {currentScreen === 'profile' && (
           <Suspense fallback={<SplashScreen />}>

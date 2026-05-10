@@ -22,9 +22,12 @@ interface Step7Props {
   onComplete: () => void;
   // Куда уйти из success-экранов (черновик / отправка) — обычно профиль.
   onGoToProfile?: () => void;
+  // Draft ID этой анкеты (UUID). Передаётся из ApplicationForm чтобы после
+  // оплаты удалить ИМЕННО этот черновик, не трогая другие драфты этой же визы.
+  draftId?: string;
 }
 
-export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete, onGoToProfile }: Step7Props) {
+export default function Step7Payment({ formData, visa, urgent, totalPrice, addonPrices, onPrev, onComplete, onGoToProfile, draftId }: Step7Props) {
   const dialog = useDialog();
   const [paymentScreenshot, setPaymentScreenshot] = useState<File | null>(null);
   const [useBonuses, setUseBonuses] = useState(false);
@@ -258,10 +261,11 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       // 4. Referral bonus to the referrer is paid by admin when status moves to 'in_progress'
       // (i.e. only after the payment is actually confirmed). See admin/Applications.tsx.
 
-      // 4. Remove draft — и одиночный ключ, и запись из массива visa_drafts
-      // (массив читает ApplicationsTab; раньше чистили только ключ — после оплаты
-      // черновик не уходил из «Моих заявок»).
-      const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
+      // 4. Remove draft — и одиночный ключ, и запись из массива visa_drafts.
+      // Multi-draft режим: удаляем ИМЕННО этот draftId (UUID), не трогая
+      // другие драфты этой же визы (могут быть для других членов семьи).
+      // Fallback на legacy-ключ для совместимости со старыми анкетами.
+      const draftKey = draftId || `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
       localStorage.removeItem(draftKey);
       try {
         const raw = localStorage.getItem('visa_drafts');

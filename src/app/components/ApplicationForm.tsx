@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { generateNewDraftId } from '../lib/visaDrafts';
 import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
 import type { VisaOption } from '../App';
@@ -26,6 +27,10 @@ interface ApplicationFormProps {
   // Куда вести юзера после "Сохранить черновик" / "Заявка отправлена" —
   // обычно в Профиль → вкладку "Мои заявки", чтобы он видел свой драфт.
   onGoToProfile?: () => void;
+  // Если задан — загружаем именно этот черновик (multi-draft режим).
+  // Если не задан — генерируем новый UUID для совершенно новой заявки.
+  // Передаётся из App.tsx после выбора в DraftPickerModal.
+  initialDraftId?: string;
 }
 
 // When a user picks the «Бронь отеля для визы» / «Бронь обратного билета»
@@ -93,7 +98,7 @@ const STEPS = [
   'Оплата',            // Step7Payment         — index 5
 ];
 
-export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft, onGoToProfile }: ApplicationFormProps) {
+export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft, onGoToProfile, initialDraftId }: ApplicationFormProps) {
   const [currentStep, setCurrentStep] = useState(0);
   // Когда юзер сохраняет черновик — показываем полноэкранный success
   // вместо native alert. 2 кнопки: "Продолжить оформление" (закрыть оверлей)
@@ -176,26 +181,38 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     };
   }, []);
 
-  // Load draft if exists
+  // Multi-draft setup:
+  //   * initialDraftId передан → загружаем именно этот черновик (юзер выбрал
+  //     его в DraftPickerModal или нажал «Продолжить» в «Мои заявки»)
+  //   * не передан → генерируем UUID для НОВОЙ заявки. Анкета пустая.
+  //
+  // Раньше draftKey был детерминированный (`draft_${visa.id}_${urgent}`) —
+  // это означало ОДИН черновик на визу. Если юзер заполнял для себя, потом
+  // открывал ту же визу для жены — данные перетирались. Теперь UUID = каждый
+  // драфт независимый, можно оформлять для всей семьи без потерь.
   useEffect(() => {
-    const draftKey = `draft_${visa.id}_${urgent ? 'urgent' : 'normal'}`;
-    setDraftId(draftKey);
-    const savedDraft = localStorage.getItem(draftKey);
-    if (savedDraft) {
-      try {
-        const parsed = JSON.parse(savedDraft);
-        setFormData(parsed.formData);
-        // Clamp step to valid range (0..STEPS.length-1) — handles legacy drafts with bad step values
-        const safeStep = Math.max(0, Math.min(parsed.step ?? 0, STEPS.length - 1));
-        setCurrentStep(safeStep);
-        if (onContinueDraft) {
-          onContinueDraft(parsed);
+    if (initialDraftId) {
+      // Загружаем существующий
+      setDraftId(initialDraftId);
+      const savedDraft = localStorage.getItem(initialDraftId);
+      if (savedDraft) {
+        try {
+          const parsed = JSON.parse(savedDraft);
+          setFormData(parsed.formData);
+          const safeStep = Math.max(0, Math.min(parsed.step ?? 0, STEPS.length - 1));
+          setCurrentStep(safeStep);
+          if (onContinueDraft) onContinueDraft(parsed);
+        } catch (e) {
+          console.error('Failed to load draft', e);
         }
-      } catch (e) {
-        console.error('Failed to load draft', e);
       }
+    } else {
+      // Новая анкета — генерируем UUID. Запись в localStorage появится только
+      // когда юзер начнёт заполнять (autosave debounce). До этого ключа нет.
+      setDraftId(generateNewDraftId());
     }
-  }, [visa.id, urgent]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialDraftId, visa.id, urgent]);
 
   const getTelegramId = (): number => {
     try { return JSON.parse(localStorage.getItem('userData') ?? '{}').telegramId ?? 0; } catch { return 0; }
@@ -508,6 +525,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
               onPrev={goToPrevStep}
               onComplete={onBack}
               onGoToProfile={onGoToProfile}
+              draftId={draftId}
             />
           )}
         </motion.div>

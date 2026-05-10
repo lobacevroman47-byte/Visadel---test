@@ -8,6 +8,7 @@ import {
   getReferralStats, getVisaProducts, getAdditionalServices,
   type VisaProduct, type AdditionalService,
 } from '../lib/db';
+import { loadAllDrafts } from '../lib/visaDrafts';
 
 interface HomeProps {
   onVisaSelect: (visa: VisaOption, urgent?: boolean, addons?: AddonsState) => void;
@@ -134,6 +135,9 @@ interface VisaCardProps {
   onSelect: (addons: AddonsState) => void;
   isUrgent?: boolean;
   hideCalculator?: boolean;
+  /** Кол-во незавершённых черновиков по этой визе. Если >0 — показываем
+   *  бейдж «📝 N» в шапке карточки и юзер при клике увидит DraftPicker. */
+  draftCount?: number;
 }
 
 function AddonToggle({ icon, label, hint, price, active, onToggle }: {
@@ -174,7 +178,7 @@ function AddonToggle({ icon, label, hint, price, active, onToggle }: {
   );
 }
 
-function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = false, hideCalculator = false }: VisaCardProps) {
+function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = false, hideCalculator = false, draftCount = 0 }: VisaCardProps) {
   const [showCalc, setShowCalc] = useState(false);
   const [urgent, setUrgent] = useState(false);
   const [hotel, setHotel] = useState(false);
@@ -202,7 +206,16 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
     <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
       {/* Header */}
       <div className="mb-4">
-        <h3 className="text-[#0F2A36] font-bold tracking-tight mb-1">{visa.type}</h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="text-[#0F2A36] font-bold tracking-tight mb-1 flex-1">{visa.type}</h3>
+          {/* Маркер незавершённых черновиков. Юзер видит сразу что есть начатая
+              анкета, при клике на «оформить» откроется DraftPickerModal. */}
+          {draftCount > 0 && (
+            <span className="inline-flex items-center gap-1 shrink-0 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+              📝 {draftCount === 1 ? 'Черновик' : `${draftCount} черновика`}
+            </span>
+          )}
+        </div>
         {visa.description && (
           <p className="text-sm text-[#0F2A36]/60 mb-1">{visa.description}</p>
         )}
@@ -369,7 +382,24 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [addonPrices, setAddonPrices] = useState<AddonPrices>(DEFAULT_ADDON_PRICES);
   const [addonAvailability, setAddonAvailability] = useState<AddonAvailability>(DEFAULT_ADDON_AVAILABILITY);
+  // Map<visaId, draftCount> — для бейджа «📝 N» на карточках виз.
+  // Перезагружается при каждом возвращении на home (useEffect ниже).
+  const [draftCounts, setDraftCounts] = useState<Record<string, number>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Подсчёт незавершённых черновиков по визам — на mount + при возвращении
+  // на home (юзер мог вернуться после сохранения новой анкеты).
+  useEffect(() => {
+    try {
+      const drafts = loadAllDrafts();
+      const counts: Record<string, number> = {};
+      for (const d of drafts) {
+        const visaId = d.visa?.id;
+        if (visaId) counts[visaId] = (counts[visaId] ?? 0) + 1;
+      }
+      setDraftCounts(counts);
+    } catch { /* localStorage error — игнорим */ }
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -575,6 +605,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                     addonPrices={addonPrices}
                     addonAvailability={addonAvailability}
                     hideCalculator
+                    draftCount={draftCounts[visa.id] ?? 0}
                     onSelect={() => onOpenExtension && onOpenExtension(visa)}
                   />
                 ))}
@@ -590,6 +621,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                     visa={visa}
                     addonPrices={addonPrices}
                     addonAvailability={addonAvailability}
+                    draftCount={draftCounts[visa.id] ?? 0}
                     onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}
@@ -614,6 +646,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                     visa={visa}
                     addonPrices={addonPrices}
                     addonAvailability={addonAvailability}
+                    draftCount={draftCounts[visa.id] ?? 0}
                     onSelect={(addons) => onVisaSelect(visa, true, addons)}
                     isUrgent
                   />
@@ -630,6 +663,7 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                     visa={visa}
                     addonPrices={addonPrices}
                     addonAvailability={addonAvailability}
+                    draftCount={draftCounts[visa.id] ?? 0}
                     onSelect={(addons) => onVisaSelect(visa, false, addons)}
                   />
                 ))}
