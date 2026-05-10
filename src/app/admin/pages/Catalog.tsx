@@ -13,13 +13,15 @@
 // видны в Mini App, как и раньше.
 
 import React, { useState } from 'react';
-import { FileText, Package, Hotel, FileEdit, Image as ImageIcon } from 'lucide-react';
+import { FileText, Package, Hotel, FileEdit } from 'lucide-react';
 import { Countries } from './Countries';
 import { AdditionalServices } from './AdditionalServices';
 import { VisaFormSection } from './FormBuilder';
 
 type TopTab = 'visas' | 'addons' | 'bookings';
-type VisasSubTab = 'catalog' | 'form' | 'photos';
+// «Фото-требования» доступны внутри «Поля анкеты» (внутренний таб
+// VisaFormSection), поэтому отдельный sub-tab не нужен — убрали дубль.
+type VisasSubTab = 'catalog' | 'form';
 
 const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileText }[] = [
   { id: 'visas',    label: 'Визы',        Icon: FileText },
@@ -28,9 +30,8 @@ const TOP_TABS: { id: TopTab; label: string; Icon: typeof FileText }[] = [
 ];
 
 const VISAS_SUB_TABS: { id: VisasSubTab; label: string; Icon: typeof FileText }[] = [
-  { id: 'catalog', label: 'Каталог виз',     Icon: FileText  },
-  { id: 'form',    label: 'Поля анкеты',     Icon: FileEdit  },
-  { id: 'photos',  label: 'Фото-требования', Icon: ImageIcon },
+  { id: 'catalog', label: 'Каталог виз', Icon: FileText },
+  { id: 'form',    label: 'Поля анкеты', Icon: FileEdit },
 ];
 
 export const Catalog: React.FC = () => {
@@ -89,9 +90,7 @@ export const Catalog: React.FC = () => {
       </div>
 
       {topTab === 'visas' && visasSubTab === 'catalog' && <Countries renderTopNav={false} />}
-      {topTab === 'visas' && (visasSubTab === 'form' || visasSubTab === 'photos') && (
-        <VisaFormSection initialTab={visasSubTab === 'form' ? 'fields' : 'photos'} />
-      )}
+      {topTab === 'visas' && visasSubTab === 'form' && <VisaFormSection initialTab="fields" />}
       {topTab === 'addons'   && <AdditionalServices mode="addons" />}
       {topTab === 'bookings' && <AdditionalServices mode="bookings" />}
     </div>
