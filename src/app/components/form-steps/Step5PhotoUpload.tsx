@@ -29,8 +29,11 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
   }, [formData]);
 
   const handleFileChange = async (field: string, file: File | null, isAdditional: boolean = false) => {
-    if (file && file.size > 5 * 1024 * 1024) {
-      await dialog.warning('Размер файла не должен превышать 5MB');
+    // PDF-сканы многостраничного загранпаспорта легко >5MB — раньше упирались.
+    // Подняли лимит до 10MB. Supabase free-bucket держит 50MB на файл, наш
+    // лимит — для UX (>10MB обычно низкое сжатие или скан в исходном качестве).
+    if (file && file.size > 10 * 1024 * 1024) {
+      await dialog.warning('Размер файла не должен превышать 10MB');
       return;
     }
 
@@ -134,7 +137,7 @@ export default function Step5PhotoUpload({ country, data, additionalDocs, onChan
       <div className="mb-6">
         <h2 className="text-2xl mb-2 text-gray-800">Загрузка фото</h2>
         <p className="text-gray-600 text-sm">
-          Максимальный размер файла: 5MB. Форматы: JPG, PNG, PDF
+          Максимальный размер файла: 10MB. Форматы: JPG, PNG, PDF
         </p>
       </div>
 
@@ -242,7 +245,7 @@ function FileUploadField({
             <p className={`text-sm ${error ? 'text-red-600' : 'text-gray-600'}`}>
               Нажмите для загрузки файла
             </p>
-            <p className="text-xs text-gray-400">JPG, PNG, PDF (макс. 5MB)</p>
+            <p className="text-xs text-gray-400">JPG, PNG, PDF (макс. 10MB)</p>
           </div>
           <input
             type="file"
