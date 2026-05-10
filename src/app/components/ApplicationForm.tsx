@@ -182,9 +182,11 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   }, []);
 
   // Multi-draft setup:
-  //   * initialDraftId передан → загружаем именно этот черновик (юзер выбрал
-  //     его в DraftPickerModal или нажал «Продолжить» в «Мои заявки»)
-  //   * не передан → генерируем UUID для НОВОЙ заявки. Анкета пустая.
+  //   * initialDraftId передан → загружаем этот черновик. Сначала пробуем
+  //     standalone-ключ localStorage[id], если пусто — fallback в массив
+  //     visa_drafts (по id). Двойной fallback защищает от случаев когда
+  //     одно есть, другого нет (race condition / partial write).
+  //   * не передан → генерируем UUID для НОВОЙ пустой анкеты.
   //
   // Раньше draftKey был детерминированный (`draft_${visa.id}_${urgent}`) —
   // это означало ОДИН черновик на визу. Если юзер заполнял для себя, потом
@@ -192,19 +194,34 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
   // драфт независимый, можно оформлять для всей семьи без потерь.
   useEffect(() => {
     if (initialDraftId) {
-      // Загружаем существующий
       setDraftId(initialDraftId);
-      const savedDraft = localStorage.getItem(initialDraftId);
-      if (savedDraft) {
+      // Tier 1: standalone key
+      let parsed: { formData?: FormData; step?: number } | null = null;
+      try {
+        const raw = localStorage.getItem(initialDraftId);
+        if (raw) parsed = JSON.parse(raw);
+      } catch (e) { console.warn('[draft-load] standalone parse failed', e); }
+      // Tier 2: fallback в массив visa_drafts (по id)
+      if (!parsed) {
         try {
-          const parsed = JSON.parse(savedDraft);
-          setFormData(parsed.formData);
-          const safeStep = Math.max(0, Math.min(parsed.step ?? 0, STEPS.length - 1));
-          setCurrentStep(safeStep);
-          if (onContinueDraft) onContinueDraft(parsed);
-        } catch (e) {
-          console.error('Failed to load draft', e);
-        }
+          const raw = localStorage.getItem('visa_drafts');
+          if (raw) {
+            const arr = JSON.parse(raw) as Array<{ id?: string; formData?: FormData; step?: number }>;
+            const found = Array.isArray(arr) ? arr.find(d => d.id === initialDraftId) : null;
+            if (found) {
+              parsed = found;
+              console.warn('[draft-load] standalone key missing, восстановили из visa_drafts');
+            }
+          }
+        } catch (e) { console.warn('[draft-load] array fallback failed', e); }
+      }
+      if (parsed?.formData) {
+        setFormData(parsed.formData);
+        const safeStep = Math.max(0, Math.min(parsed.step ?? 0, STEPS.length - 1));
+        setCurrentStep(safeStep);
+        if (onContinueDraft) onContinueDraft(parsed);
+      } else {
+        console.error('[draft-load] не нашли draft ни в standalone-ключе, ни в массиве:', initialDraftId);
       }
     } else {
       // Новая анкета — генерируем UUID. Запись в localStorage появится только
