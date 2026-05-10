@@ -493,7 +493,10 @@ function App() {
         )}
         {currentScreen === 'admin' && (
           <Suspense fallback={<SplashScreen />}>
-            <AdminApp onBackToApp={handleBackToHome} />
+            <AdminApp
+              onBackToApp={handleBackToHome}
+              onOpenMainTab={(tab) => { setMainTab(tab); setCurrentScreen('home'); }}
+            />
           </Suspense>
         )}
       </div>

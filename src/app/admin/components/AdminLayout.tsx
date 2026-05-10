@@ -1,6 +1,6 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { AdminSidebar } from './AdminSidebar';
-import { AdminBottomNav, type AdminProductTab } from './AdminBottomNav';
+import BottomNav, { type MainTab } from '../../components/BottomNav';
 // Dashboard тащит recharts (~65KB gzipped). Грузим только когда админ
 // открывает дашборд, а не на старте AdminApp.
 const Dashboard = lazy(() => import('../pages/Dashboard').then(m => ({ default: m.Dashboard })));
@@ -24,49 +24,10 @@ import { Menu, ArrowLeft } from 'lucide-react';
 
 interface AdminLayoutProps {
   onBackToApp?: () => void;
+  onOpenMainTab?: (tab: MainTab) => void;
 }
 
-type ProductSection = 'product-visas' | 'product-bookings' | 'product-flights' | 'product-hotels';
-
-const PRODUCT_PLACEHOLDERS: Record<Exclude<AdminProductTab, 'visas'>, { title: string; description: string; emoji: string }> = {
-  bookings: {
-    title: 'Брони',
-    description: 'Раздел управления отдельными бронями (отель + билет) появится с подключением API. Сейчас брони доступны как доп. услуги внутри визовых заявок.',
-    emoji: '📅',
-  },
-  flights: {
-    title: 'Авиабилеты',
-    description: 'Прямой поиск и продажа билетов через API. На стадии планирования — после интеграции появятся отдельные заявки и финансовая аналитика.',
-    emoji: '✈️',
-  },
-  hotels: {
-    title: 'Отели',
-    description: 'Каталог отелей с динамическими ценами через API. Будет работать так же, как раздел виз: каталог, заявки, статусы, выручка/прибыль.',
-    emoji: '🏨',
-  },
-};
-
-const ComingSoonAdmin: React.FC<{ tab: Exclude<AdminProductTab, 'visas'> }> = ({ tab }) => {
-  const data = PRODUCT_PLACEHOLDERS[tab];
-  return (
-    <div className="min-h-screen pb-32 lg:pb-12 px-5 pt-8 flex flex-col items-center text-center">
-      <div className="w-24 h-24 rounded-3xl vd-grad-soft border border-blue-100 flex items-center justify-center text-5xl shadow-sm mb-6">
-        {data.emoji}
-      </div>
-      <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Скоро</p>
-      <h1 className="text-[28px] font-extrabold tracking-tight text-[#0F2A36] mt-1">{data.title}</h1>
-      <p className="text-sm text-[#0F2A36]/60 mt-3 max-w-md leading-relaxed">{data.description}</p>
-      <div className="mt-8 vd-grad-soft border border-blue-100 rounded-2xl px-5 py-4 max-w-md">
-        <p className="text-[11px] uppercase tracking-widest text-[#3B5BFF] font-bold">Что уже работает</p>
-        <p className="text-sm text-[#0F2A36] mt-1">
-          Раздел <strong>«Визы»</strong> — каталог, заявки, финансы, конструктор анкет, доп. услуги.
-        </p>
-      </div>
-    </div>
-  );
-};
-
-export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
+export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp, onOpenMainTab }) => {
   const [activeSection, setActiveSection] = useState<string>('dashboard');
   const [sectionFilter, setSectionFilter] = useState<any>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -85,24 +46,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
     setIsSidebarOpen(false);
   };
 
-  const handleProductTabChange = (tab: AdminProductTab) => {
-    if (tab === 'visas') {
-      setActiveSection('applications');
-      setSectionFilter(null);
-    } else {
-      setActiveSection(`product-${tab}` as ProductSection);
-      setSectionFilter(null);
-    }
-  };
-
-  const productActive: AdminProductTab | undefined = (() => {
-    if (activeSection === 'applications') return 'visas';
-    if (activeSection.startsWith('product-')) {
-      return activeSection.slice('product-'.length) as AdminProductTab;
-    }
-    return undefined;
-  })();
-
   const renderContent = () => {
     switch (activeSection) {
       case 'dashboard':
@@ -115,12 +58,6 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         return <Applications filter={sectionFilter} />;
       case 'bookings':
         return <Bookings />;
-      case 'product-bookings':
-        return <Bookings />;
-      case 'product-flights':
-        return <Bookings initialTab="flights" />;
-      case 'product-hotels':
-        return <Bookings initialTab="hotels" />;
       case 'users':
         return hasPermission(['owner', 'admin']) ? (
           <Users filter={sectionFilter} />
@@ -260,11 +197,14 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ onBackToApp }) => {
         {renderContent()}
       </div>
 
-      {/* Mobile bottom nav — same style as main mini-app */}
-      <AdminBottomNav
-        active={productActive ?? 'visas'}
-        onChange={handleProductTabChange}
-      />
+      {/* Mobile bottom nav — клиентский BottomNav, при клике выходит из
+          админки в мини-апп → выбранный таб (Визы/Брони/Билеты/Отели/
+          Экскурсии). На десктопе скрыт — там навигация через sidebar. */}
+      {onOpenMainTab && (
+        <div className="lg:hidden">
+          <BottomNav active="visas" onChange={onOpenMainTab} />
+        </div>
+      )}
 
       <style>{`
         .admin-main {
