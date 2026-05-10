@@ -62,10 +62,18 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
   // соответствующие записи).
   const bookingIdsForMode = isBookings ? STANDALONE_BOOKING_IDS : VISA_ADDON_BOOKING_IDS;
 
-  const visible = useMemo(
-    () => isBookings ? services.filter(s => (bookingIdsForMode as readonly string[]).includes(s.id)) : services,
-    [services, isBookings, bookingIdsForMode],
-  );
+  const visible = useMemo(() => {
+    if (isBookings) {
+      // Каталог → Брони: показываем только standalone-* записи.
+      return services.filter(s => (bookingIdsForMode as readonly string[]).includes(s.id));
+    }
+    // Конструктор → Доп. услуги (mode='addons'): показываем все обычные
+    // visa-аддоны (hotel-booking / flight-booking / urgent-processing /
+    // custom). НО скрываем standalone-* — их место только в Брони,
+    // т.к. это самостоятельный flow в главном меню Mini App, а не
+    // visa-аддон.
+    return services.filter(s => !(STANDALONE_BOOKING_IDS as readonly string[]).includes(s.id));
+  }, [services, isBookings, bookingIdsForMode]);
   const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
   const HEADER_ICON = isBookings ? <Hotel className="w-5 h-5" /> : <Package className="w-5 h-5" />;
   const HEADER_TITLE = isBookings ? 'Брони' : 'Дополнительные услуги';
