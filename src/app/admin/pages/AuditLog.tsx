@@ -4,22 +4,111 @@ import { getAuditLog, type AuditLogRow } from '../lib/audit';
 import { Button, Input, Card, EmptyState } from '../../components/ui/brand';
 
 const ACTION_LABELS: Record<string, string> = {
-  'application.status_change':  'Статус заявки',
-  'application.visa_uploaded':  'Загружена виза',
-  'application.usd_rate_change':'Курс USD на заявку',
-  'application.tax_pct_change': 'Налог % на заявку',
-  'service.toggle':             'Услуга вкл/выкл',
-  'service.update':             'Услуга изменена',
-  'service.delete':             'Услуга удалена',
-  'visa.toggle':                'Виза вкл/выкл',
-  'visa.update':                'Виза изменена',
-  'visa.delete':                'Виза удалена',
-  'review.update':              'Отзыв изменён',
-  'booking.status_change':      'Статус брони',
-  'booking.confirmation_uploaded': 'Загружено подтверждение',
+  'application.status_change':   'Статус заявки',
+  'application.visa_uploaded':   'Загружена виза',
+  'application.usd_rate_change': 'Курс USD на заявку',
+  'application.tax_pct_change':  'Налог % на заявку',
+  'service.toggle':              'Услуга вкл/выкл',
+  'service.update':              'Услуга изменена',
+  'service.delete':              'Услуга удалена',
 };
 
-const fmt = (s: string) => new Date(s).toLocaleString('ru-RU', {
+const TARGET_TYPE_LABELS: Record<string, string> = {
+  application:        'Заявка',
+  additional_service: 'Услуга',
+  service:            'Услуга',
+};
+
+const STATUS_LABELS_RU: Record<string, string> = {
+  draft:                 'Черновик',
+  pending_payment:       'Ожидает оплаты',
+  pending_confirmation:  'Ожидает подтверждения',
+  in_progress:           'В работе',
+  completed:             'Готово',
+  ready:                 'Готово',
+};
+
+const fmtStatus = (s: unknown): string => {
+  const k = String(s ?? '');
+  return STATUS_LABELS_RU[k] ?? k ?? '—';
+};
+
+const fmtBool = (v: unknown): string => (v ? 'вкл' : 'выкл');
+
+const fmtMoney = (v: unknown): string => {
+  const n = Number(v);
+  return Number.isFinite(n) ? `${n.toLocaleString('ru-RU')} ₽` : String(v ?? '—');
+};
+
+/** Рендерит human-readable details для каждого известного action.
+ *  Возвращает null если action нам неизвестен — вызывающий код покажет
+ *  fallback (сырой JSON), чтобы не терять данные старых записей. */
+function renderDetails(action: string, d: Record<string, unknown>): React.ReactNode | null {
+  if (!d || typeof d !== 'object') return null;
+
+  switch (action) {
+    case 'application.status_change': {
+      const ctx = [d.country, d.visa].filter(Boolean).join(' · ');
+      return (
+        <>
+          <span className="text-[#0F2A36]/60">{fmtStatus(d.from)}</span>
+          <span className="text-[#0F2A36]/40 mx-1.5">→</span>
+          <span className="font-semibold text-[#0F2A36]">{fmtStatus(d.to)}</span>
+          {ctx && <span className="text-[#0F2A36]/55 ml-2 text-[11px]">({ctx})</span>}
+          {d.visa_uploaded === true && (
+            <span className="ml-2 text-[10px] uppercase tracking-wider font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">+виза</span>
+          )}
+        </>
+      );
+    }
+    case 'application.visa_uploaded':
+      return <span className="text-[#0F2A36]/65">Файл прикреплён к заявке</span>;
+    case 'application.usd_rate_change':
+      return (
+        <>
+          <span className="text-[#0F2A36]/60">{String(d.from ?? '—')} ₽/$</span>
+          <span className="text-[#0F2A36]/40 mx-1.5">→</span>
+          <span className="font-semibold text-[#0F2A36]">{String(d.to ?? '—')} ₽/$</span>
+        </>
+      );
+    case 'application.tax_pct_change':
+      return (
+        <>
+          <span className="text-[#0F2A36]/60">{String(d.from ?? '—')}%</span>
+          <span className="text-[#0F2A36]/40 mx-1.5">→</span>
+          <span className="font-semibold text-[#0F2A36]">{String(d.to ?? '—')}%</span>
+        </>
+      );
+    case 'service.toggle':
+      return (
+        <>
+          {d.name ? <span className="font-semibold text-[#0F2A36]">«{String(d.name)}»</span> : null}
+          <span className="text-[#0F2A36]/60 ml-1">{fmtBool(d.from)}</span>
+          <span className="text-[#0F2A36]/40 mx-1.5">→</span>
+          <span className="font-semibold text-[#0F2A36]">{fmtBool(d.to)}</span>
+        </>
+      );
+    case 'service.update':
+      return (
+        <>
+          {d.name ? <span className="font-semibold text-[#0F2A36]">«{String(d.name)}»</span> : null}
+          <span className="text-[#0F2A36]/60 ml-2">цена {fmtMoney(d.price)}</span>
+          <span className="text-[#0F2A36]/60 ml-2">· {fmtBool(d.enabled)}</span>
+        </>
+      );
+    case 'service.delete':
+      return (
+        <>
+          {d.name ? <span className="font-semibold text-[#0F2A36]">«{String(d.name)}»</span> : null}
+          <span className="text-[#0F2A36]/60 ml-2">(была {fmtMoney(d.price)})</span>
+        </>
+      );
+    default:
+      return null;
+  }
+}
+
+const fmtDate = (s: string) => new Date(s).toLocaleString('ru-RU', {
   day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit',
 });
 
@@ -70,7 +159,7 @@ export const AuditLog: React.FC = () => {
           type="text"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          placeholder="Поиск по админу, действию, target..."
+          placeholder="Поиск по админу, действию, объекту..."
           leftIcon={<Search className="w-4 h-4" />}
         />
       </div>
@@ -85,27 +174,34 @@ export const AuditLog: React.FC = () => {
         </Card>
       ) : (
         <div className="space-y-2">
-          {filtered.map(r => (
-            <Card key={r.id} variant="flat" padding="md" radius="xl">
-              <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="text-sm font-bold text-[#0F2A36]">{ACTION_LABELS[r.action] ?? r.action}</span>
-                {r.target_type && (
-                  <span className="text-[10px] uppercase tracking-wider font-bold text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
-                    {r.target_type}{r.target_id ? ` · ${r.target_id.slice(0, 8)}…` : ''}
-                  </span>
+          {filtered.map(r => {
+            const pretty = renderDetails(r.action, r.details);
+            const targetLabel = r.target_type ? (TARGET_TYPE_LABELS[r.target_type] ?? r.target_type) : null;
+            return (
+              <Card key={r.id} variant="flat" padding="md" radius="xl">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-sm font-bold text-[#0F2A36]">{ACTION_LABELS[r.action] ?? r.action}</span>
+                  {targetLabel && (
+                    <span className="text-[10px] uppercase tracking-wider font-bold text-[#3B5BFF] bg-[#EAF1FF] px-1.5 py-0.5 rounded">
+                      {targetLabel}
+                    </span>
+                  )}
+                  <span className="text-xs text-[#0F2A36]/45 ml-auto">{fmtDate(r.created_at)}</span>
+                </div>
+                <p className="text-xs text-[#0F2A36]/65 mb-1">
+                  {r.admin_name || `tg ${r.admin_tg_id}`}
+                </p>
+                {pretty && (
+                  <div className="text-sm mt-1 leading-relaxed">{pretty}</div>
                 )}
-                <span className="text-xs text-[#0F2A36]/45 ml-auto">{fmt(r.created_at)}</span>
-              </div>
-              <p className="text-xs text-[#0F2A36]/65">
-                {r.admin_name || `tg ${r.admin_tg_id}`}
-              </p>
-              {r.details && Object.keys(r.details).length > 0 && (
-                <pre className="mt-2 bg-gray-50 rounded-lg p-2 text-[11px] font-mono text-[#0F2A36]/80 overflow-x-auto">
-                  {JSON.stringify(r.details, null, 2)}
-                </pre>
-              )}
-            </Card>
-          ))}
+                {!pretty && r.details && Object.keys(r.details).length > 0 && (
+                  <pre className="mt-2 bg-gray-50 rounded-lg p-2 text-[11px] font-mono text-[#0F2A36]/80 overflow-x-auto">
+                    {JSON.stringify(r.details, null, 2)}
+                  </pre>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

@@ -35,6 +35,7 @@ export interface BookingProduct {
   description: string | null;
   price: number;
   cardNumber: string;
+  cardHolder: string;
   extraFields: ExtraFormField[];
   overrides: CoreFieldOverrides;
   loading: boolean;
@@ -95,6 +96,7 @@ export function useBookingProduct(kind: BookingKind, scope: BookingScope = 'stan
     description: null,
     price: cfg.defaultPrice,
     cardNumber: '5536 9140 3834 6908',
+    cardHolder: '',
     extraFields: [],
     overrides: {},
     loading: true,
@@ -117,6 +119,7 @@ export function useBookingProduct(kind: BookingKind, scope: BookingScope = 'stan
           description: row?.description ?? null,
           price: row?.price ?? fallbackPrice,
           cardNumber: s.payment_card_number || '5536 9140 3834 6908',
+          cardHolder: s.payment_card_holder ?? '',
           extraFields: cfg.pickExtraFields(s) ?? [],
           overrides: cfg.pickOverrides(s) ?? {},
           loading: false,
