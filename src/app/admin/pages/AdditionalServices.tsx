@@ -246,8 +246,8 @@ export const AdditionalServices: React.FC<{
       )}
 
       {/* Если редактируется бронь (hotel-booking/flight-booking) — открываем
-          полный BookingProductEditor (с полями анкеты). Иначе — упрощённый
-          ServiceFormModal (только цена/иконка/описание).
+          полный BookingProductEditor (Modal с полями анкеты внутри). Иначе —
+          упрощённый ServiceFormModal (только цена/иконка/описание).
           Если settings ещё не загрузились — показываем спиннер
           (race-condition защита). */}
       {editing && editingBookingType && !settings && (
@@ -259,18 +259,17 @@ export const AdditionalServices: React.FC<{
         </Modal>
       )}
       {editing && editingBookingType && settings && (
-        <Modal open onClose={() => setEditing(null)} size="xl">
-          <BookingProductEditor
-            type={editingBookingType}
-            row={editing}
-            settings={settings}
-            onClose={() => setEditing(null)}
-            onSaved={async () => {
-              setEditing(null);
-              await load();
-            }}
-          />
-        </Modal>
+        <BookingProductEditor
+          open
+          type={editingBookingType}
+          row={editing}
+          settings={settings}
+          onClose={() => setEditing(null)}
+          onSaved={async () => {
+            setEditing(null);
+            await load();
+          }}
+        />
       )}
 
       {((editing && !editingBookingType) || adding) && (
@@ -373,7 +372,7 @@ const ServiceFormModal: React.FC<{
               <input
                 type="text" value={form.icon ?? ''} onChange={e => set('icon', e.target.value)}
                 placeholder="⚡"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-2xl text-center"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-2xl text-center focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div className="md:col-span-2">
@@ -382,7 +381,7 @@ const ServiceFormModal: React.FC<{
                 type="text" value={form.id} onChange={e => set('id', e.target.value)}
                 disabled={!!service}
                 placeholder="urgent-processing"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm focus:outline-none focus:border-[#5C7BFF]"
                 required
               />
               <p className="text-xs text-gray-400 mt-1">Уникальный, только латинские буквы/цифры/тире (нельзя менять)</p>
@@ -394,7 +393,7 @@ const ServiceFormModal: React.FC<{
             <input
               type="text" value={form.name} onChange={e => set('name', e.target.value)}
               placeholder="Срочное оформление"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
             />
           </div>
 
@@ -404,7 +403,7 @@ const ServiceFormModal: React.FC<{
               value={form.description ?? ''} onChange={e => set('description', e.target.value)}
               rows={2}
               placeholder="Приоритетная обработка заявки"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
 
@@ -419,7 +418,7 @@ const ServiceFormModal: React.FC<{
                   set('price', v === '' ? 0 : parseInt(v, 10));
                 }}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
               />
             </div>
             <div>
@@ -432,7 +431,7 @@ const ServiceFormModal: React.FC<{
                   set('cost_rub', v === '' ? 0 : parseFloat(v));
                 }}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
               <p className="text-xs text-gray-400 mt-1">Сколько мы тратим на эту услугу (для финансов)</p>
             </div>
@@ -448,7 +447,7 @@ const ServiceFormModal: React.FC<{
                   set('partner_commission_pct', v === '' ? 0 : parseFloat(v));
                 }}
                 placeholder="15"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
               <p className="text-xs text-gray-400 mt-1">% от цены услуги, который получит партнёр-реферрер. 0 = не платим.</p>
             </div>
@@ -462,12 +461,12 @@ const ServiceFormModal: React.FC<{
                   set('sort_order', v === '' ? 0 : parseInt(v, 10));
                 }}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
             <div>
               <p className="text-sm font-medium text-gray-700">Видимость</p>
               <p className="text-xs text-gray-500">Если выключена — услуга не предлагается на странице визы</p>
@@ -484,7 +483,7 @@ const ServiceFormModal: React.FC<{
 
           {/* Страны, для которых эта услуга показывается как доп. опция */}
           {showCountries && (
-          <div className="bg-gray-50 rounded-lg p-3">
+          <div className="bg-gray-50 rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-gray-700">Страны, где услуга доступна</p>
               {form.countries.length > 0 && (
@@ -505,7 +504,7 @@ const ServiceFormModal: React.FC<{
                     key={c}
                     type="button"
                     onClick={() => toggleCountry(c)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition active:scale-95 ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition active:scale-95 ${
                       checked
                         ? 'vd-grad text-white shadow-sm'
                         : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'

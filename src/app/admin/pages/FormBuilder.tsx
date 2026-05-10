@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FileEdit, Image as ImageIcon, Plus, Edit2, Trash2, Save, Loader2,
   RefreshCw, Database, AlertCircle, Package, Hotel, Plane,
-  Eye, EyeOff, ChevronLeft, ChevronUp, ChevronDown,
+  Eye, EyeOff, ChevronUp, ChevronDown,
 } from 'lucide-react';
 import {
   getVisaProducts,
@@ -695,23 +695,21 @@ const BookingsConstructor: React.FC = () => {
   const editingType = editingId ? BOOKING_TYPES.find(bt => bt.serviceId === editingId) : null;
   const editingRow = editingId ? services.find(s => s.id === editingId) : null;
 
-  if (editingType && settings) {
-    return (
-      <BookingProductEditor
-        type={editingType}
-        row={editingRow ?? null}
-        settings={settings}
-        onClose={() => setEditingId(null)}
-        onSaved={async () => {
-          await load();
-          setEditingId(null);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="p-4 md:p-8">
+      {editingType && settings && (
+        <BookingProductEditor
+          open
+          type={editingType}
+          row={editingRow ?? null}
+          settings={settings}
+          onClose={() => setEditingId(null)}
+          onSaved={async () => {
+            await load();
+            setEditingId(null);
+          }}
+        />
+      )}
       {/* Hero — копия Доп. услуг */}
       <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <div className="flex items-center gap-3">
@@ -827,12 +825,13 @@ const BookingsConstructor: React.FC = () => {
 // Один редактор для записи брони — атомарный save в additional_services +
 // app_settings (overrides + extras).
 export const BookingProductEditor: React.FC<{
+  open: boolean;
   type: BookingType;
   row: AdditionalService | null;
   settings: AppSettings;
   onClose: () => void;
   onSaved: () => Promise<void>;
-}> = ({ type, row, settings, onClose, onSaved }) => {
+}> = ({ open, type, row, settings, onClose, onSaved }) => {
   const dialog = useDialog();
   // Локальный draft объединяет данные обеих таблиц; save сбрасывает в обе
   const [draftRow, setDraftRow] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
@@ -950,28 +949,34 @@ export const BookingProductEditor: React.FC<{
   };
 
   return (
-    <div className="p-4 md:p-8">
-      {/* Top bar with back + save */}
-      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={onClose}
-          className="px-3 py-2 rounded-xl bg-white border border-gray-200 text-sm font-semibold text-[#0F2A36] hover:bg-gray-50 active:scale-95 transition flex items-center gap-1.5"
-        >
-          <ChevronLeft className="w-4 h-4" /> К списку броней
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2.5 vd-grad text-white rounded-xl flex items-center gap-2 font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition disabled:opacity-60"
-        >
-          {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-          {saving ? 'Сохраняем…' : 'Сохранить'}
-        </button>
-      </div>
-
-      <div className="space-y-4">
+    <Modal
+      open={open}
+      onClose={onClose}
+      icon={draftRow.icon || type.fallbackIcon}
+      label="Редактирование"
+      title={draftRow.name || type.fallbackName}
+      subtitle={type.serviceId}
+      size="xl"
+      footer={
+        <div className="flex gap-2">
+          <Button type="button" variant="secondary" size="lg" fullWidth onClick={onClose}>
+            Отмена
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            size="lg"
+            fullWidth
+            loading={saving}
+            onClick={handleSave}
+            leftIcon={!saving ? <Save size={16} /> : undefined}
+          >
+            {saving ? 'Сохраняем…' : 'Сохранить'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="p-5 space-y-4">
         {/* About product card */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center gap-3 mb-4">
@@ -1350,7 +1355,7 @@ export const BookingProductEditor: React.FC<{
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -1407,7 +1412,7 @@ const FieldFormModal: React.FC<{
                 type="text" value={form.field_key} onChange={e => set('field_key', e.target.value)}
                 disabled={!!field}
                 placeholder="citizenship"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl disabled:bg-gray-100 disabled:text-gray-500 font-mono text-sm focus:outline-none focus:border-[#5C7BFF]"
                 required
               />
               <p className="text-xs text-gray-400 mt-1">Английский ключ — нельзя менять после создания</p>
@@ -1417,7 +1422,7 @@ const FieldFormModal: React.FC<{
               <select
                 value={form.field_type}
                 onChange={e => set('field_type', e.target.value as FormFieldType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               >
                 {Object.entries(FIELD_TYPE_LABELS).map(([k, v]) => (
                   <option key={k} value={k}>{v}</option>
@@ -1431,7 +1436,7 @@ const FieldFormModal: React.FC<{
             <input
               type="text" value={form.label} onChange={e => set('label', e.target.value)}
               placeholder="Гражданство"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
             />
           </div>
 
@@ -1440,7 +1445,7 @@ const FieldFormModal: React.FC<{
             <input
               type="text" value={form.comment ?? ''} onChange={e => set('comment', e.target.value || null)}
               placeholder="например: 'если СССР, пишите Россия'"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
 
@@ -1448,7 +1453,7 @@ const FieldFormModal: React.FC<{
             <label className="block text-sm text-gray-700 mb-1">Placeholder (внутри поля)</label>
             <input
               type="text" value={form.placeholder ?? ''} onChange={e => set('placeholder', e.target.value || null)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
 
@@ -1459,7 +1464,7 @@ const FieldFormModal: React.FC<{
                 value={optionsText} onChange={e => setOptionsText(e.target.value)}
                 rows={4}
                 placeholder="Да&#10;Нет"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm resize-none"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl font-mono text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
           )}
@@ -1469,7 +1474,7 @@ const FieldFormModal: React.FC<{
             <select
               value={form.visa_id ?? ''}
               onChange={e => set('visa_id', e.target.value || null)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
             >
               <option value="">Все визы страны</option>
               {visasOfCountry.map(v => (
@@ -1484,7 +1489,7 @@ const FieldFormModal: React.FC<{
 
           {/* Обязательное — единственный toggle здесь. Поле "Порядок"
               убрано: порядок меняется кнопками ↑↓ прямо в списке. */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
             <p className="text-sm font-medium text-gray-700">Обязательное</p>
             <input
               type="checkbox" checked={form.required}
@@ -1557,7 +1562,7 @@ const PhotoFormModal: React.FC<{
               type="text" value={form.field_key} onChange={e => set('field_key', e.target.value)}
               disabled={!!photo}
               placeholder="passportPhoto"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 font-mono text-sm" required
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl disabled:bg-gray-100 font-mono text-sm focus:outline-none focus:border-[#5C7BFF]" required
             />
           </div>
           <div>
@@ -1565,7 +1570,7 @@ const PhotoFormModal: React.FC<{
             <input
               type="text" value={form.label} onChange={e => set('label', e.target.value)}
               placeholder="Главная страница загранпаспорта"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
             />
           </div>
           <div>
@@ -1573,7 +1578,7 @@ const PhotoFormModal: React.FC<{
             <textarea
               value={form.requirements ?? ''} onChange={e => set('requirements', e.target.value || null)}
               rows={2} placeholder="без бликов, чёткое, со всеми углами"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -1582,7 +1587,7 @@ const PhotoFormModal: React.FC<{
               <input
                 type="text" value={form.formats ?? ''} onChange={e => set('formats', e.target.value || null)}
                 placeholder="JPG/PNG/PDF"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div>
@@ -1590,7 +1595,7 @@ const PhotoFormModal: React.FC<{
               <input
                 type="text" value={form.max_size ?? ''} onChange={e => set('max_size', e.target.value || null)}
                 placeholder="5MB"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
           </div>
@@ -1600,7 +1605,7 @@ const PhotoFormModal: React.FC<{
             <select
               value={form.visa_id ?? ''}
               onChange={e => set('visa_id', e.target.value || null)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
             >
               <option value="">Все визы страны</option>
               {visasOfCountry.map(v => (
@@ -1610,7 +1615,7 @@ const PhotoFormModal: React.FC<{
           </div>
 
           {/* Порядок задаётся через ↑↓ в списке, не здесь */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
             <p className="text-sm font-medium text-gray-700">Обязательное</p>
             <input type="checkbox" checked={form.required}
               onChange={e => set('required', e.target.checked)}
