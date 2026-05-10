@@ -1504,14 +1504,18 @@ export interface FinanceStats {
   bookingsRevenue: number;  // Выручка только с подтверждённых броней (отель + авиа)
   costOfGoods: number;      // Себестоимость = себест. виз + себест. броней
   taxes: number;            // Налог = (выручка × tax_pct / 100) для каждой позиции
-  commissionsPaid: number;  // Партнёрам = Σ bonus_logs WHERE type='referral' (реальное профит-шеринг)
+  commissionsPaid: number;  // РЕАЛЬНЫЕ выплаты партнёрам за период = Σ bonus_logs WHERE type='partner_paid'
   // ── Информационно (НЕ вычитается из прибыли — это ещё не cash-out, а лишь обязательство):
   welcomeBonusesPaid: number; // Новичкам по реф. ссылке — Σ bonus_logs WHERE type='welcome'
-  otherBonusesPaid: number;   // Прочее (daily/weekly/review/level/admin_*) — Σ bonus_logs остальных типов
-  bonusesIssued: number;    // Σ всех начислений за период
+  referralBonusesIssued: number; // Реф-бонусы обычным юзерам — Σ bonus_logs WHERE type='referral' (увеличивают bonus_balance, реальный cash-out — когда юзер применит)
+  otherBonusesPaid: number;   // Прочее (daily/weekly/review/level/admin_*) — Σ bonus_logs БЕЗ welcome/referral/partner_*/spent
+  bonusesIssued: number;    // Σ всех положительных начислений за период (welcome + referral + other)
   bonusesUsed: number;      // Σ bonuses_used (уже учтено в выручке)
-  bonusesOutstanding: number; // Текущий долг компании: Σ users.bonus_balance
-  profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid
+  bonusesOutstanding: number; // Долг по обычным бонусам: Σ users.bonus_balance
+  // ── Долг компании по партнёрской программе (snapshot, не period-bound):
+  partnerOwedToPay: number;     // К выплате СЕЙЧАС: Σ users.partner_balance (approved − paid)
+  partnerHoldOutstanding: number; // В hold (cron approveнет через 30д): Σ partner_pending − Σ partner_approved за всю историю
+  profit: number;           // Прибыль = revenue − costOfGoods − taxes − commissionsPaid (cash-out партнёрам)
   paidApplicationsCount: number;
   bookingsCount: number;    // Количество подтверждённых броней
   series: { date: string; revenue: number; profit: number }[];
@@ -1522,8 +1526,10 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   const empty: FinanceStats = {
     revenue: 0, visaRevenue: 0, bookingsRevenue: 0,
     costOfGoods: 0, taxes: 0,
-    commissionsPaid: 0, welcomeBonusesPaid: 0, otherBonusesPaid: 0,
+    commissionsPaid: 0,
+    welcomeBonusesPaid: 0, referralBonusesIssued: 0, otherBonusesPaid: 0,
     bonusesIssued: 0, bonusesUsed: 0, bonusesOutstanding: 0,
+    partnerOwedToPay: 0, partnerHoldOutstanding: 0,
     profit: 0, paidApplicationsCount: 0, bookingsCount: 0, series: [],
   };
   if (!isSupabaseConfigured()) return empty;
@@ -1544,8 +1550,17 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   let bonusQ = supabase.from('bonus_logs').select('type, amount, created_at');
   if (sinceISO) bonusQ = bonusQ.gte('created_at', sinceISO);
 
-  // Outstanding balance — sum of all current bonus_balance values (snapshot, not period-bound)
-  const balanceQ = supabase.from('users').select('bonus_balance');
+  // Outstanding balances — snapshot, не period-bound:
+  //   bonus_balance     — обычные бонусы (₽-скидка)
+  //   partner_balance   — партнёрские деньги к выплате (= approved − paid)
+  const balanceQ = supabase.from('users').select('bonus_balance, partner_balance');
+
+  // Партнёрский hold = Σ pending за всю историю − Σ approved за всю историю.
+  // Не period-bound: показываем сколько ВСЕГО сейчас висит в hold у компании.
+  const partnerHoldQ = supabase
+    .from('bonus_logs')
+    .select('type, amount')
+    .in('type', ['partner_pending', 'partner_approved']);
 
   // Product cost lookup
   const productsQ = supabase.from('visa_products').select('id, cost_usd_fee, cost_usd_commission');
@@ -1560,13 +1575,14 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   let flightBookingsQ = supabase.from('flight_bookings').select('price, status, created_at').is('deleted_at', null).eq('status', 'confirmed');
   if (sinceISO) flightBookingsQ = flightBookingsQ.gte('created_at', sinceISO);
 
-  const [appsRes, bonusRes, balanceRes, productsRes, addonsRes, hotelBookingsRes, flightBookingsRes] = await Promise.all([
-    appsQ, bonusQ, balanceQ, productsQ, addonsQ, hotelBookingsQ, flightBookingsQ,
+  const [appsRes, bonusRes, balanceRes, productsRes, addonsRes, hotelBookingsRes, flightBookingsRes, partnerHoldRes] = await Promise.all([
+    appsQ, bonusQ, balanceQ, productsQ, addonsQ, hotelBookingsQ, flightBookingsQ, partnerHoldQ,
   ]);
 
   const apps = (appsRes.data ?? []) as Array<{ price: number; bonuses_used: number; visa_id: string; status: string; created_at: string; updated_at: string; usd_rate_rub: number | null; tax_pct: number | null; form_data: Record<string, unknown> | null }>;
   const bonusLogs = (bonusRes.data ?? []) as Array<{ type: string; amount: number; created_at: string }>;
-  const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number }>;
+  const balances = (balanceRes.data ?? []) as Array<{ bonus_balance: number; partner_balance: number | null }>;
+  const partnerHoldLogs = (partnerHoldRes.data ?? []) as Array<{ type: string; amount: number }>;
   const products = (productsRes.data ?? []) as Array<{ id: string; cost_usd_fee: number; cost_usd_commission: number }>;
   const addons = (addonsRes.data ?? []) as Array<{ id: string; cost_rub: number }>;
   const hotelBookings = (hotelBookingsRes.data ?? []) as Array<{ price: number | null; created_at: string }>;
@@ -1636,23 +1652,48 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
   const bookingsCount = hotelBookings.length + flightBookings.length;
   const revenue = visaRevenue + bookingsRevenue;
 
+  // commissionsPaid = РЕАЛЬНЫЕ выплаты партнёрам за период (cash-out из кассы).
+  // Раньше тут был filter type='referral' — это обычные реф-бонусы юзерам, они
+  // лишь увеличивают bonus_balance (НЕ cash-out). Реальный cash-out = когда
+  // админ нажимает «Выплатить» в /Партнёры → создаётся лог partner_paid.
   const commissionsPaid = bonusLogs
-    .filter(b => b.type === 'referral')
+    .filter(b => b.type === 'partner_paid')
     .reduce((s, b) => s + (b.amount ?? 0), 0);
   const welcomeBonusesPaid = bonusLogs
     .filter(b => b.type === 'welcome')
     .reduce((s, b) => s + (b.amount ?? 0), 0);
-  const otherBonusesPaid = bonusLogs
-    .filter(b => !['referral', 'welcome'].includes(b.type))
+  const referralBonusesIssued = bonusLogs
+    .filter(b => b.type === 'referral')
     .reduce((s, b) => s + (b.amount ?? 0), 0);
-  const bonusesIssued = commissionsPaid + welcomeBonusesPaid + otherBonusesPaid;
+  // otherBonusesPaid: всё что НЕ welcome/referral/partner_*/spent. Партнёрские
+  // партнёрские логи раньше попадали сюда дублями (3 лога: pending + approved
+  // + paid за одну партнёрскую транзакцию) — давало 3× реальной суммы.
+  const PARTNER_LIKE = new Set(['welcome', 'referral', 'partner_pending', 'partner_approved', 'partner_paid', 'spent']);
+  const otherBonusesPaid = bonusLogs
+    .filter(b => !PARTNER_LIKE.has(b.type))
+    .reduce((s, b) => s + (b.amount ?? 0), 0);
+  const bonusesIssued = welcomeBonusesPaid + referralBonusesIssued + otherBonusesPaid;
   const bonusesOutstanding = balances.reduce((s, b) => s + (b.bonus_balance ?? 0), 0);
 
-  // Profit subtracts only direct cash-equivalent outflows: cost-of-goods, tax,
-  // and partner commissions (real profit-sharing). Welcome / daily / admin
-  // bonuses are user-balance liabilities that turn into cost only when the
-  // user redeems them on a visa — which already shows up via bonuses_used in
-  // the revenue line, so adding them here would double-count.
+  // Партнёрские обязательства (snapshot, не period-bound).
+  const partnerOwedToPay = balances.reduce((s, b) => s + (b.partner_balance ?? 0), 0);
+  const partnerHoldOutstanding = (() => {
+    const totalPending = partnerHoldLogs
+      .filter(l => l.type === 'partner_pending')
+      .reduce((s, l) => s + (l.amount ?? 0), 0);
+    const totalApproved = partnerHoldLogs
+      .filter(l => l.type === 'partner_approved')
+      .reduce((s, l) => s + (l.amount ?? 0), 0);
+    return Math.max(0, totalPending - totalApproved);
+  })();
+
+  // Profit вычитает только реальные cash-out за период:
+  //   - costOfGoods (мы заплатили посольству + за билет/отель)
+  //   - taxes (УСН с выручки)
+  //   - commissionsPaid (мы перевели партнёрам на карту = partner_paid)
+  // Обычные бонусы (welcome/referral/admin) НЕ вычитаются — они увеличивают
+  // bonus_balance юзера (долг), реальный cash-out возникает когда юзер их
+  // применяет (это уже учтено в revenue через price − bonuses_used).
   const profit = revenue - costOfGoods - taxes - commissionsPaid;
 
   // Build daily series — buckets only for displayed period (cap at 90 days for chart density)
@@ -1686,8 +1727,9 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
         dayTax += (p * defaultTaxPct) / 100;
       }
     }
+    // Реальные выплаты партнёрам за день (cash-out) — partner_paid, не referral.
     const dayCommissions = bonusLogs
-      .filter(b => b.type === 'referral' && b.created_at?.slice(0, 10) === key)
+      .filter(b => b.type === 'partner_paid' && b.created_at?.slice(0, 10) === key)
       .reduce((s, b) => s + (b.amount ?? 0), 0);
     series.push({ date: key, revenue: dayRev, profit: dayRev - dayCost - dayTax - dayCommissions });
   }
@@ -1700,10 +1742,13 @@ export async function getFinanceStats(periodDays: number): Promise<FinanceStats>
     taxes,
     commissionsPaid,
     welcomeBonusesPaid,
+    referralBonusesIssued,
     otherBonusesPaid,
     bonusesIssued,
     bonusesUsed,
     bonusesOutstanding,
+    partnerOwedToPay,
+    partnerHoldOutstanding,
     profit,
     paidApplicationsCount: apps.length,
     bookingsCount,
