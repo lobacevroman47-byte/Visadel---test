@@ -435,17 +435,20 @@ function App() {
           />
         )}
         {currentScreen === 'profile' && (
-          <Suspense fallback={<SplashScreen />}>
-            <UserProfile
-              onBack={handleBackToHome}
-              onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
-              onOpenPartnerDashboard={() => setCurrentScreen('partner_dashboard')}
-              onContinueDraft={handleContinueDraft}
-              onContinueHotelDraft={() => setCurrentScreen('hotel_booking')}
-              onContinueFlightDraft={() => setCurrentScreen('flight_booking')}
-              initialTab={initialProfileTab}
-            />
-          </Suspense>
+          <>
+            <Suspense fallback={<SplashScreen />}>
+              <UserProfile
+                onBack={handleBackToHome}
+                onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
+                onOpenPartnerDashboard={() => setCurrentScreen('partner_dashboard')}
+                onContinueDraft={handleContinueDraft}
+                onContinueHotelDraft={() => setCurrentScreen('hotel_booking')}
+                onContinueFlightDraft={() => setCurrentScreen('flight_booking')}
+                initialTab={initialProfileTab}
+              />
+            </Suspense>
+            <BottomNav active={mainTab} onChange={(tab) => { setMainTab(tab); setCurrentScreen('home'); }} />
+          </>
         )}
 
         {currentScreen === 'extension' && selectedVisa && (
@@ -463,9 +466,12 @@ function App() {
           </Suspense>
         )}
         {currentScreen === 'partner_dashboard' && (
-          <Suspense fallback={<SplashScreen />}>
-            <PartnerDashboard onBack={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }} />
-          </Suspense>
+          <>
+            <Suspense fallback={<SplashScreen />}>
+              <PartnerDashboard onBack={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }} />
+            </Suspense>
+            <BottomNav active={mainTab} onChange={(tab) => { setMainTab(tab); setCurrentScreen('home'); }} />
+          </>
         )}
         {currentScreen === 'hotel_booking' && (
           <Suspense fallback={<SplashScreen />}>

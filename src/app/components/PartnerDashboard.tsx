@@ -604,7 +604,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#F5F7FA] pb-10">
+    <div className="min-h-screen bg-[#F5F7FA] pb-20">
       {/* Header: ←  ✓ VISADEL  [Profile][Admin] (без Partner — мы на нём) */}
       <div className="bg-white sticky top-0 z-20 border-b border-gray-100">
         <div className="max-w-2xl mx-auto px-5 pt-3 pb-3 flex items-center justify-between gap-2">
