@@ -150,18 +150,14 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
           onClick={() => onSectionChange('users')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
+        {/* Объединённый раздел «Каталог» — заменил собой два бывших
+            «Каталог продуктов» + «Конструктор анкет». activeSection
+            'countries' и 'form-builder' оба ведут сюда (см. AdminLayout). */}
         <SidebarItem
           icon={<Globe size={20} />}
-          label="Каталог продуктов"
-          active={activeSection === 'countries'}
+          label="Каталог"
+          active={activeSection === 'countries' || activeSection === 'form-builder'}
           onClick={() => onSectionChange('countries')}
-          disabled={!hasPermission(['owner', 'admin'])}
-        />
-        <SidebarItem
-          icon={<FileEdit size={20} />}
-          label="Конструктор анкет"
-          active={activeSection === 'form-builder'}
-          onClick={() => onSectionChange('form-builder')}
           disabled={!hasPermission(['owner', 'admin'])}
         />
         <SidebarItem

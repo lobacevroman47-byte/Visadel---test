@@ -88,13 +88,14 @@ const FIELD_TYPE_LABELS: Record<FormFieldType, string> = {
 };
 
 // Существующий конструктор анкет виз — теперь вкладка внутри обёртки FormBuilder.
-const VisaFormSection: React.FC = () => {
+// Также используется в Catalog (объединённый раздел админки).
+export const VisaFormSection: React.FC<{ initialTab?: 'fields' | 'photos' }> = ({ initialTab = 'fields' }) => {
   const dialog = useDialog();
   const [products, setProducts] = useState<VisaProduct[]>([]);
   const [allFields, setAllFields] = useState<VisaFormField[]>([]);
   const [allPhotos, setAllPhotos] = useState<VisaPhotoRequirement[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<string | null>(null);
-  const [tab, setTab] = useState<'fields' | 'photos'>('fields');
+  const [tab, setTab] = useState<'fields' | 'photos'>(initialTab);
   const [editingField, setEditingField] = useState<VisaFormField | null>(null);
   const [addingField, setAddingField] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<VisaPhotoRequirement | null>(null);
