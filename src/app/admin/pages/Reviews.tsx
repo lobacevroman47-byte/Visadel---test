@@ -320,6 +320,41 @@ export const Reviews: React.FC = () => {
 
   useEffect(() => { loadReviews(); }, [loadReviews]);
 
+  // Realtime: подписка на reviews — когда юзер сабмитит новый отзыв,
+  // он мгновенно появляется в админке без F5. Раньше админ его не видел
+  // если уже был на странице Отзывы и не перезагрузил.
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const channel = supabase
+      .channel('admin-reviews')
+      .on(
+        'postgres_changes' as any,
+        { event: 'INSERT', schema: 'public', table: 'reviews' },
+        (payload: any) => {
+          setReviews(prev => {
+            if (prev.find(r => r.id === payload.new.id)) return prev;
+            return [payload.new as Review, ...prev];
+          });
+        },
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: 'UPDATE', schema: 'public', table: 'reviews' },
+        (payload: any) => {
+          setReviews(prev => prev.map(r => r.id === payload.new.id ? { ...r, ...payload.new } : r));
+        },
+      )
+      .on(
+        'postgres_changes' as any,
+        { event: 'DELETE', schema: 'public', table: 'reviews' },
+        (payload: any) => {
+          setReviews(prev => prev.filter(r => r.id !== payload.old.id));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // ── Approve ────────────────────────────────────────────────────────────────
   const handleApprove = async (id: string) => {
     setApproving(id);
