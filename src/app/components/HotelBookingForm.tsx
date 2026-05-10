@@ -59,7 +59,9 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
 
   // Все настройки бронь-аддона (цена, карта, поля анкеты, overrides) из
   // единого источника — useBookingProduct. См. hooks/useBookingProduct.ts.
-  const product = useBookingProduct('hotel');
+  // Scope='standalone' — отдельная сущность от visa-аддона (миграция 027).
+  // Изменения цены/полей в Конструктор → Брони не влияют на Конструктор → Доп. услуги.
+  const product = useBookingProduct('hotel', 'standalone');
   const price = product.price;
   const cardNumber = product.cardNumber;
   const extraFields = product.extraFields;

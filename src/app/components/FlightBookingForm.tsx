@@ -52,7 +52,8 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
   const [cardCopied, setCardCopied] = useState(false);
 
   // Все настройки бронь-аддона из единого источника
-  const product = useBookingProduct('flight');
+  // Scope='standalone' — отдельная сущность от visa-аддона (миграция 027).
+  const product = useBookingProduct('flight', 'standalone');
   const price = product.price;
   const cardNumber = product.cardNumber;
   const extraFields = product.extraFields;

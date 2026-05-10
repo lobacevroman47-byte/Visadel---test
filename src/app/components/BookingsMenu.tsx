@@ -43,8 +43,9 @@ export default function BookingsMenu({ onOpenProfile, onOpenHotelBooking, onOpen
     getAdditionalServices()
       .then(rows => {
         if (!alive) return;
-        const h = rows.find(x => x.id === 'hotel-booking')  ?? null;
-        const f = rows.find(x => x.id === 'flight-booking') ?? null;
+        // Standalone scope — отдельные сущности от visa-аддонов (миграция 027).
+        const h = rows.find(x => x.id === 'standalone-hotel-booking')  ?? null;
+        const f = rows.find(x => x.id === 'standalone-flight-booking') ?? null;
         const slim = (s: AdditionalService | null): Slim | null => s
           ? { name: s.name, description: s.description, enabled: s.enabled, icon: s.icon }
           : null;

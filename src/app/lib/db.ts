@@ -1372,15 +1372,23 @@ export interface AppSettings {
   // Payment (shared across visas + bookings)
   payment_card_number: string;
   payment_card_holder: string;
-  // Booking prices
+  // Booking prices — visa addon ВНУТРИ визы (Step2AdditionalDocs)
   hotel_booking_price: number;
   flight_booking_price: number;
-  // Extra custom fields appended at the bottom of the form
+  // Extra custom fields appended at the bottom of the form (visa addon)
   hotel_extra_fields: ExtraFormField[];
   flight_extra_fields: ExtraFormField[];
-  // Per-key overrides for built-in form fields (rename / hide / required)
+  // Per-key overrides for built-in form fields (rename / hide / required) — visa addon
   hotel_core_overrides?: CoreFieldOverrides;
   flight_core_overrides?: CoreFieldOverrides;
+  // ── Standalone бронь (отдельный flow в главном меню Mini App) ──
+  // Полностью независима от visa-аддона — отдельная цена, поля, overrides.
+  standalone_hotel_booking_price?: number;
+  standalone_flight_booking_price?: number;
+  standalone_hotel_extra_fields?: ExtraFormField[];
+  standalone_flight_extra_fields?: ExtraFormField[];
+  standalone_hotel_core_overrides?: CoreFieldOverrides;
+  standalone_flight_core_overrides?: CoreFieldOverrides;
   updated_at?: string;
 }
 
@@ -1400,6 +1408,10 @@ const SETTINGS_DEFAULTS: AppSettings = {
   flight_booking_price: 2000,
   hotel_extra_fields: [],
   flight_extra_fields: [],
+  standalone_hotel_booking_price: 1000,
+  standalone_flight_booking_price: 2000,
+  standalone_hotel_extra_fields: [],
+  standalone_flight_extra_fields: [],
 };
 
 export async function getAppSettings(): Promise<AppSettings> {
