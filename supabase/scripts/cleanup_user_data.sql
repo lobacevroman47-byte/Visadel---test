@@ -60,7 +60,12 @@ SELECT 'BEFORE'                    AS phase,
 -- 3. Удаление (порядок: дети → родители; FK CASCADE сделает остальное)
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- 3a. Все визовые заявки (status_log + reviews по application_id каскадятся).
+-- 3a. Reviews — явный DELETE (FK к applications и users могут не каскадиться).
+--     Раньше полагались на cascade, но в проде остались sirote-строки
+--     с application_id ссылкой на удалённую заявку.
+DELETE FROM public.reviews;
+
+-- 3a-bis. Все визовые заявки (status_log каскадится).
 DELETE FROM public.applications;
 
 -- 3b. Брони отелей и авиа (booking_status_log каскадится по FK).
