@@ -514,7 +514,10 @@ const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequ
 // Тот же id используется визовым калькулятором и stand-alone формами в
 // мини-аппе → клиент видит изменения сразу.
 
-interface BookingType {
+// Экспорт чтобы AdditionalServices мог переиспользовать тот же редактор
+// (BookingProductEditor) когда админ кликает на hotel-booking /
+// flight-booking запись в каталоге Доп. услуг.
+export interface BookingType {
   serviceId: string;          // additional_services.id
   kind: 'hotel' | 'flight';   // выбирает coreFields + ключ в app_settings
   fallbackName: string;
@@ -526,7 +529,7 @@ interface BookingType {
   overridesKey: 'hotel_core_overrides' | 'flight_core_overrides';
 }
 
-const BOOKING_TYPES: BookingType[] = [
+export const BOOKING_TYPES: BookingType[] = [
   {
     serviceId: 'hotel-booking',
     kind: 'hotel',
@@ -754,7 +757,7 @@ const BookingsConstructor: React.FC = () => {
 // ─── Booking product editor ───────────────────────────────────────────────────
 // Один редактор для записи брони — атомарный save в additional_services +
 // app_settings (overrides + extras).
-const BookingProductEditor: React.FC<{
+export const BookingProductEditor: React.FC<{
   type: BookingType;
   row: AdditionalService | null;
   settings: AppSettings;

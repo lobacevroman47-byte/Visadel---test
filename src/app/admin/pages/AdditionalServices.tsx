@@ -4,11 +4,12 @@ import {
 } from 'lucide-react';
 import {
   getAdditionalServices, upsertAdditionalService, deleteAdditionalService,
-  type AdditionalService,
+  getAppSettings, type AdditionalService, type AppSettings,
 } from '../../lib/db';
 import { auditLog } from '../lib/audit';
 import { useDialog } from '../../components/shared/BrandDialog';
 import { Button, Modal } from '../../components/ui/brand';
+import { BookingProductEditor, BOOKING_TYPES } from './FormBuilder';
 
 const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
 type Mode = 'addons' | 'bookings';
@@ -24,6 +25,7 @@ type Mode = 'addons' | 'bookings';
 export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' }) => {
   const dialog = useDialog();
   const [services, setServices] = useState<AdditionalService[]>([]);
+  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<AdditionalService | null>(null);
   const [adding, setAdding] = useState(false);
@@ -32,11 +34,21 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
 
   const load = async () => {
     setLoading(true);
-    try { setServices(await getAdditionalServices()); }
-    finally { setLoading(false); }
+    try {
+      const [s, st] = await Promise.all([getAdditionalServices(), getAppSettings()]);
+      setServices(s);
+      setSettings(st);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, []);
+
+  // Если редактируется бронь (hotel-booking / flight-booking) — нужен
+  // расширенный редактор с полями анкеты, не упрощённый ServiceFormModal.
+  const editingBookingType = useMemo(
+    () => editing ? BOOKING_TYPES.find(bt => bt.serviceId === editing.id) : null,
+    [editing],
+  );
 
   const visible = useMemo(
     () => isBookings ? services.filter(s => (BOOKING_IDS as readonly string[]).includes(s.id)) : services,
@@ -202,7 +214,25 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
         </div>
       )}
 
-      {(editing || adding) && (
+      {/* Если редактируется бронь (hotel-booking/flight-booking) — открываем
+          полный BookingProductEditor (с полями анкеты). Иначе — упрощённый
+          ServiceFormModal (только цена/иконка/описание). */}
+      {editing && editingBookingType && settings && (
+        <Modal open onClose={() => setEditing(null)} size="xl">
+          <BookingProductEditor
+            type={editingBookingType}
+            row={editing}
+            settings={settings}
+            onClose={() => setEditing(null)}
+            onSaved={async () => {
+              setEditing(null);
+              await load();
+            }}
+          />
+        </Modal>
+      )}
+
+      {((editing && !editingBookingType) || adding) && (
         <ServiceFormModal
           service={editing}
           mode={mode}
