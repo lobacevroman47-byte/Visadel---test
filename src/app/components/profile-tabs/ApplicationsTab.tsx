@@ -99,8 +99,17 @@ const PROGRESS_STEPS = [
   { id: 'ready',               label: 'Готово',             icon: '🎉' },
 ];
 
+// Mapping реальных DB-статусов на step-index:
+//   pending_payment      → 0 (Заявка подана — ждём оплату от юзера)
+//   pending_confirmation → 1 (Проверка оплаты — юзер прислал скрин,
+//                              админ его проверяет — РАНЬШЕ ошибочно был 0,
+//                              из-за чего "Проверка оплаты" мгновенно
+//                              показывалась как ✓ done)
+//   in_progress          → 2 (Виза оформляется)
+//   ready                → 3 (Готово)
 function getProgressIndex(status: string): number {
-  if (status === 'pending_confirmation') return 0;
+  if (status === 'pending_payment' || status === 'draft') return 0;
+  if (status === 'pending_confirmation') return 1;
   if (status === 'in_progress') return 2;
   if (status === 'ready') return 3;
   return -1;
@@ -170,7 +179,11 @@ const BOOKING_PROGRESS_STEPS = [
 ];
 
 function getBookingProgressIndex(status: string): number {
-  if (status === 'pending_confirmation' || status === 'new' || status === 'pending_payment') return 0;
+  // pending_payment / new — юзер ещё не прислал скрин → step 0 (Заявка подана)
+  if (status === 'new' || status === 'pending_payment') return 0;
+  // pending_confirmation — скрин получен, админ проверяет → step 1 (Проверка оплаты)
+  // РАНЬШЕ был 0 — "Проверка оплаты" мгновенно показывалась как ✓.
+  if (status === 'pending_confirmation') return 1;
   if (status === 'in_progress') return 2;
   if (status === 'confirmed') return 3;
   return -1; // cancelled и прочее не показываем
