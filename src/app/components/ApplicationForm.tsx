@@ -496,7 +496,13 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
       {/* Form Steps */}
       <div className="max-w-2xl mx-auto p-4">
         <motion.div
-          key={currentStep}
+          // key=draftId+step гарантирует что при загрузке другого черновика
+          // (draftId меняется) все шаги REMOUNTятся → их внутренний useState(data)
+          // переинициализируется свежим data prop. Без этого ключа Step1/Step2/Step4
+          // показывали пустые поля даже после setFormData(loadedDraft) — так как
+          // useState создаёт state ТОЛЬКО на первом mount и игнорирует обновления
+          // prop. Это объясняет жалобу «нажал продолжить, поля пустые».
+          key={`${draftId}-${currentStep}`}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
