@@ -78,13 +78,19 @@ export interface FormData {
   };
 }
 
+// Имена файлов form-steps/Step{N}.tsx остались исторические — Step3HowHeard
+// был удалён (слили в Step1), но переименовывать остальные файлы (Step4 →
+// Step3, и т.д.) не стали — слишком много импортов. Поэтому Step4ContactInfo
+// рендерится как индекс 2, Step5PhotoUpload как 3, Step6Review как 4,
+// Step7Payment как 5. STEPS-массив тут — единственный источник
+// display-нумерации.
 const STEPS = [
-  'Основные данные',
-  'Усиление заявки',
-  'Контакты',
-  'Загрузка фото',
-  'Проверка',
-  'Оплата'
+  'Основные данные',   // Step1BasicData       — index 0
+  'Усиление заявки',   // Step2AdditionalDocs  — index 1
+  'Контакты',          // Step4ContactInfo     — index 2
+  'Загрузка фото',     // Step5PhotoUpload     — index 3
+  'Проверка',          // Step6Review          — index 4
+  'Оплата',            // Step7Payment         — index 5
 ];
 
 export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack, onContinueDraft, onGoToProfile }: ApplicationFormProps) {
