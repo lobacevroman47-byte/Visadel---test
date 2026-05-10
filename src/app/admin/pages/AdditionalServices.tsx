@@ -236,7 +236,17 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
 
       {/* Если редактируется бронь (hotel-booking/flight-booking) — открываем
           полный BookingProductEditor (с полями анкеты). Иначе — упрощённый
-          ServiceFormModal (только цена/иконка/описание). */}
+          ServiceFormModal (только цена/иконка/описание).
+          Если settings ещё не загрузились — показываем спиннер
+          (race-condition защита). */}
+      {editing && editingBookingType && !settings && (
+        <Modal open onClose={() => setEditing(null)} size="sm">
+          <div className="p-10 flex flex-col items-center gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-[#3B5BFF]" />
+            <p className="text-sm text-[#0F2A36]/60">Загружаем настройки…</p>
+          </div>
+        </Modal>
+      )}
       {editing && editingBookingType && settings && (
         <Modal open onClose={() => setEditing(null)} size="xl">
           <BookingProductEditor

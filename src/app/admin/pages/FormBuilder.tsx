@@ -942,6 +942,12 @@ export const BookingProductEditor: React.FC<{
         [type.extraFieldsKey]: draftExtras,
         [type.overridesKey]: draftOverrides,
       });
+      await dialog.success(
+        'Сохранено',
+        type.extraFieldsKey.startsWith('standalone_')
+          ? 'Изменения видны в разделе «Брони» в главном меню Mini App.'
+          : 'Изменения видны в визовой форме (Шаг 2 → доп. услуги).',
+      );
       await onSaved();
     } catch (e) {
       await dialog.error('Ошибка сохранения', e instanceof Error ? e.message : String(e));
