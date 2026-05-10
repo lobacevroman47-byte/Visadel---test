@@ -216,12 +216,16 @@ function BookingProgress({ status }: { status: string }) {
 }
 
 // ── Review Modal ──────────────────────────────────────────────────────────────
+// Универсальная модалка отзыва — используется и для виз, и для броней.
 // Сабмит только пишет отзыв в БД (status='pending' — админ модерирует в
-// разделе Отзывы). Бонус +200₽ начисляется родителем (handleReviewSubmitted)
+// разделе Отзывы). Бонус +200₽ начисляется родителем (onSubmitted-handler)
 // через /api/grant-bonus с оптимистичным UI и rollback при ошибке —
 // чтобы баланс был синхронизирован с сервером, а не только локально.
-function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
-  app: Application;
+function ReviewModal({ applicationId, country, telegramId, username, onClose, onSubmitted, isPartner }: {
+  applicationId: string;
+  country: string;
+  telegramId: number;
+  username: string;
   onClose: () => void;
   onSubmitted: () => Promise<void> | void;
   isPartner: boolean;
@@ -231,12 +235,6 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const userData = (() => {
-    try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
-  })();
-  const telegramId: number = userData.telegramId ?? 0;
-  const username: string = userData.username ?? '';
-
   const handleSubmit = async () => {
     if (rating === 0) { await dialog.warning('Поставьте оценку'); return; }
     if (comment.trim().length < 5) { await dialog.warning('Напишите хотя бы несколько слов'); return; }
@@ -244,8 +242,8 @@ function ReviewModal({ app, onClose, onSubmitted, isPartner }: {
     try {
       await submitReview({
         telegramId,
-        applicationId: app.id!,
-        country: app.country,
+        applicationId,
+        country,
         rating,
         text: comment.trim(),
         username,
@@ -824,7 +822,10 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
 
       {reviewApp && (
         <ReviewModal
-          app={reviewApp}
+          applicationId={reviewApp.id!}
+          country={reviewApp.country}
+          telegramId={telegramId}
+          username={(appUser as { username?: string } | null)?.username ?? ''}
           onClose={() => setReviewApp(null)}
           onSubmitted={() => handleReviewSubmitted(reviewApp)}
           isPartner={appUser?.is_influencer ?? false}
@@ -870,37 +871,24 @@ function BookingActions({
   onUpdate: (patch: Partial<HotelBookingRow & FlightBookingRow>) => void;
   kindLabel: string;
 }) {
-  const [submitting, setSubmitting] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
+  const [showReview, setShowReview] = useState(false);
   const reviewed = !!booking.review_bonus_granted;
   // Mirror the visa pattern: deliverable is "ready" only when status='confirmed' AND file is uploaded
   const ready = booking.status === 'confirmed' && !!booking.confirmation_url;
 
-  const handleReview = async () => {
-    if (submitting || reviewed || !ready) return;
-    setSubmitting(true);
+  // После успешного сабмита отзыва (запись в БД с status='pending'): начисляем
+  // +200₽ через /api/grant-bonus (для не-партнёров), помечаем бронь как
+  // review_bonus_granted чтобы кнопка больше не показывалась. Бонус
+  // оптимистично прибавляем сразу с rollback при ошибке. Никакого 10s
+  // таймера и авто-фейкового отзыва — пользователь сам ставит оценку и
+  // пишет комментарий, админ потом модерирует.
+  const handleReviewSubmitted = async () => {
+    setShowReview(false);
 
-    // 10-секундный countdown до фактического начисления бонуса и разблокировки.
-    // Кнопка показывает «Проверяем X» и заблокирована.
-    for (let i = 10; i >= 1; i--) {
-      setCountdown(i);
-      await new Promise(r => setTimeout(r, 1000));
-    }
-    setCountdown(null);
-
+    // 1. Optimistic UI: +200₽ моментально (только не-партнёрам)
     const eligibleForBonus = !!telegramId && !isPartner;
-
-    // 1. Optimistic UI: +200₽ моментально
     let original = 0;
     try { original = JSON.parse(localStorage.getItem('userData') ?? '{}').bonusBalance ?? 0; } catch {}
-    const applyDelta = (delta: number) => {
-      try {
-        const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
-        ud.bonusBalance = (ud.bonusBalance ?? 0) + delta;
-        localStorage.setItem('userData', JSON.stringify(ud));
-        onBonusChange?.(ud.bonusBalance);
-      } catch {}
-    };
     const syncTo = (actual: number) => {
       try {
         const ud = JSON.parse(localStorage.getItem('userData') ?? '{}');
@@ -912,24 +900,10 @@ function BookingActions({
     const rollback = () => syncTo(original);
 
     if (eligibleForBonus) {
-      applyDelta(+200);
+      syncTo(original + 200);
       try { (window as { Telegram?: { WebApp?: { HapticFeedback?: { notificationOccurred?: (t: string) => void } } } }).Telegram?.WebApp?.HapticFeedback?.notificationOccurred?.('success'); } catch {}
-    }
-
-    try {
-      // 2. Параллельно: review (best-effort) + bonus (нам важен ответ)
-      const reviewPromise = submitReview({
-        telegramId,
-        applicationId: `${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`,
-        country: kindLabel,
-        rating: 5,
-        text: 'Отзыв оставлен в Telegram-канале',
-        username,
-      }).catch(e => { console.warn('submitReview for booking failed:', e); });
-
-      let bonusPromise: Promise<{ res: Response; data: { skipped?: unknown; newBalance?: number; error?: string } }> | null = null;
-      if (eligibleForBonus) {
-        bonusPromise = apiFetch('/api/grant-bonus', {
+      try {
+        const res = await apiFetch('/api/grant-bonus', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -939,45 +913,36 @@ function BookingActions({
             description: `+200₽ за отзыв о брони (${kindLabel}, ${booking.id})`,
             application_id: `booking_${booking.id}`,
           }),
-        }).then(async (res) => ({ res, data: await res.json().catch(() => ({})) as { skipped?: unknown; newBalance?: number; error?: string } }));
-      } else if (!telegramId) {
-        toast.error('Переоткрой мини-апп через бота — нет данных пользователя');
-      }
-
-      // 3. Подтверждаем баланс или откатываем
-      if (bonusPromise) {
-        try {
-          const { res, data } = await bonusPromise;
-          if (!res.ok) {
-            rollback();
-            toast.error(`Бонус не начислен (${res.status})`);
-            console.error('[booking-review-bonus] HTTP error', res.status, data);
-          } else if (data.skipped) {
-            rollback();
-            toast.info('Бонус за этот отзыв уже был начислен');
-          } else if (typeof data.newBalance === 'number') {
-            syncTo(data.newBalance);
-            toast.success('+200 ₽ за отзыв');
-          }
-        } catch (e) {
+        });
+        const data = await res.json().catch(() => ({} as { skipped?: unknown; newBalance?: number }));
+        if (!res.ok) {
           rollback();
-          toast.error('Бонус не начислен — попробуй ещё раз');
-          console.error('[booking-review-bonus] exception', e);
+          toast.error(`Бонус не начислен (${res.status})`);
+        } else if (data.skipped) {
+          rollback();
+          toast.info('Бонус за этот отзыв уже был начислен');
+        } else if (typeof data.newBalance === 'number') {
+          syncTo(data.newBalance);
+          toast.success('+200 ₽ за отзыв');
+        } else {
+          toast.success('Спасибо за отзыв!');
         }
+      } catch (e) {
+        rollback();
+        toast.error('Бонус не начислен — попробуй ещё раз');
+        console.error('[booking-review-bonus]', e);
       }
+    } else if (isPartner) {
+      toast.success('Спасибо за отзыв!');
+    }
 
-      await reviewPromise;
-
-      // 3) Mark on the booking row so we don't show the button again
+    // 2. Помечаем бронь как «отзыв оставлен» — кнопка пропадёт, скачивание
+    // подтверждения разблокируется.
+    try {
       await markBookingReviewBonusGranted(table, booking.id);
       onUpdate({ review_bonus_granted: true });
-
-      // 4) Open Telegram channel
-      const tg = (window as any).Telegram?.WebApp;
-      if (tg?.openTelegramLink) tg.openTelegramLink('https://t.me/visadel_recall');
-      else window.open('https://t.me/visadel_recall', '_blank');
-    } finally {
-      setSubmitting(false);
+    } catch (e) {
+      console.warn('markBookingReviewBonusGranted failed:', e);
     }
   };
 
@@ -1001,14 +966,11 @@ function BookingActions({
           </button>
           <button
             type="button"
-            onClick={handleReview}
-            disabled={submitting}
-            className="w-full py-3 vd-grad text-white shadow-md vd-shadow-cta disabled:opacity-60 rounded-xl active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm font-bold"
+            onClick={() => setShowReview(true)}
+            className="w-full py-3 vd-grad text-white shadow-md vd-shadow-cta rounded-xl active:scale-[0.99] transition flex items-center justify-center gap-2 text-sm font-bold"
           >
-            {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
-            {countdown != null
-              ? `Проверяем отзыв… ${countdown}с`
-              : isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
+            <Star className="w-4 h-4" />
+            {isPartner ? 'Оставить отзыв' : 'Оставить отзыв (+200 ₽)'}
           </button>
         </>
       ) : (
@@ -1025,6 +987,18 @@ function BookingActions({
             <p className="text-xs text-green-700">✓ Отзыв оставлен · спасибо!</p>
           </div>
         </>
+      )}
+
+      {showReview && (
+        <ReviewModal
+          applicationId={`${table === 'hotel_bookings' ? 'hotel_' : 'flight_'}${booking.id}`}
+          country={kindLabel}
+          telegramId={telegramId}
+          username={username}
+          onClose={() => setShowReview(false)}
+          onSubmitted={handleReviewSubmitted}
+          isPartner={isPartner}
+        />
       )}
     </div>
   );
