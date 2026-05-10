@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
 import { generateNewDraftId } from '../lib/visaDrafts';
 import { motion } from 'motion/react';
 import { ChevronLeft, Save } from 'lucide-react';
@@ -221,7 +222,23 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
         setCurrentStep(safeStep);
         if (onContinueDraft) onContinueDraft(parsed);
       } else {
-        console.error('[draft-load] не нашли draft ни в standalone-ключе, ни в массиве:', initialDraftId);
+        // Видимая диагностика для юзера если по какой-то причине не загрузилось
+        // (вместо тихого open-with-empty). Показываем что лежит в localStorage
+        // — юзер может screenshot отправить.
+        let arrInfo = 'visa_drafts: не читается';
+        try {
+          const raw = localStorage.getItem('visa_drafts');
+          if (raw) {
+            const arr = JSON.parse(raw) as Array<{ id?: string }>;
+            arrInfo = `visa_drafts: ${Array.isArray(arr) ? arr.length : '?'} записей, ids: ${arr.slice(0, 5).map(d => d.id).join(', ')}`;
+          } else {
+            arrInfo = 'visa_drafts: пусто';
+          }
+        } catch (e) { arrInfo = `visa_drafts: parse error ${e}`; }
+        const stKey = `localStorage[${initialDraftId}] ${localStorage.getItem(initialDraftId) ? 'есть' : 'пусто'}`;
+        const msg = `Не удалось загрузить черновик ${initialDraftId.slice(0, 14)}…\n${stKey}\n${arrInfo}`;
+        console.error('[draft-load]', msg);
+        toast.error(msg, { duration: 15000 });
       }
     } else {
       // Новая анкета — генерируем UUID. Запись в localStorage появится только
