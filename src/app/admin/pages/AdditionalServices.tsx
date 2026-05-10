@@ -14,8 +14,9 @@ import { BookingProductEditor, VISA_ADDON_BOOKING_TYPES, STANDALONE_BOOKING_TYPE
 // IDs для каждого scope (миграция 027 — split):
 //   * visa-аддоны (внутри визы):  hotel-booking, flight-booking
 //   * standalone (главное меню):  standalone-hotel-booking, standalone-flight-booking
-const VISA_ADDON_BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
-const STANDALONE_BOOKING_IDS = ['standalone-hotel-booking', 'standalone-flight-booking'] as const;
+// Префиксы ID для разделения visa-аддонов и standalone:
+//   * standalone-* — самостоятельные брони (Каталог → Брони + главное меню)
+//   * не standalone — visa-аддоны и обычные доп. услуги
 type Mode = 'addons' | 'bookings';
 
 // All services live in one list — visa addons (Подтверждение проживания /
@@ -58,22 +59,21 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
     [editing, bookingTypesForMode],
   );
 
-  // Список IDs для фильтрации списка в bookings mode (показываем только
-  // соответствующие записи).
-  const bookingIdsForMode = isBookings ? STANDALONE_BOOKING_IDS : VISA_ADDON_BOOKING_IDS;
 
   const visible = useMemo(() => {
     if (isBookings) {
-      // Каталог → Брони: показываем только standalone-* записи.
-      return services.filter(s => (bookingIdsForMode as readonly string[]).includes(s.id));
+      // Каталог → Брони: показываем все записи с префиксом standalone-
+      // (включая дефолтные standalone-hotel-booking / standalone-flight-booking
+      // и любые добавленные админом custom standalone-XXX).
+      return services.filter(s => s.id.startsWith('standalone-'));
     }
     // Конструктор → Доп. услуги (mode='addons'): показываем все обычные
     // visa-аддоны (hotel-booking / flight-booking / urgent-processing /
     // custom). НО скрываем standalone-* — их место только в Брони,
     // т.к. это самостоятельный flow в главном меню Mini App, а не
     // visa-аддон.
-    return services.filter(s => !(STANDALONE_BOOKING_IDS as readonly string[]).includes(s.id));
-  }, [services, isBookings, bookingIdsForMode]);
+    return services.filter(s => !s.id.startsWith('standalone-'));
+  }, [services, isBookings]);
   const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
   const HEADER_ICON = isBookings ? <Hotel className="w-5 h-5" /> : <Package className="w-5 h-5" />;
   const HEADER_TITLE = isBookings ? 'Брони' : 'Дополнительные услуги';
@@ -116,15 +116,13 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
         </div>
         <div className="flex items-center gap-2">
           {loading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-          {!isBookings && (
-            <button
-              type="button"
-              onClick={() => setAdding(true)}
-              className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
-            >
-              <Plus size={16} strokeWidth={2.5} /> Добавить услугу
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="px-4 py-2.5 vd-grad text-white rounded-xl flex items-center gap-1.5 text-sm font-bold select-none shadow-md vd-shadow-cta active:scale-[0.98] transition"
+          >
+            <Plus size={16} strokeWidth={2.5} /> {isBookings ? 'Добавить бронь' : 'Добавить услугу'}
+          </button>
           <button onClick={load} className="w-10 h-10 rounded-xl bg-white border border-gray-200 hover:bg-gray-50 flex items-center justify-center transition active:scale-95" title="Обновить">
             <RefreshCw size={16} className="text-gray-500" />
           </button>
@@ -294,6 +292,9 @@ const ServiceFormModal: React.FC<{
   // Брони в нижнем меню оформляются без визы — поэтому ограничение по странам
   // не имеет смысла. Поле видно только в режиме доп. услуг.
   const showCountries = mode === 'addons';
+  // Префиксуем id новой записи в режиме bookings — чтобы она появилась
+  // в списке Каталог → Брони (фильтр по startsWith('standalone-')).
+  const idPrefix = mode === 'bookings' ? 'standalone-' : '';
   const [form, setForm] = useState<Omit<AdditionalService, 'created_at' | 'updated_at'>>(
     service
       ? {
@@ -302,9 +303,10 @@ const ServiceFormModal: React.FC<{
           partner_commission_pct: service.partner_commission_pct ?? 15,
         }
       : {
-          id: '', name: '', icon: '⭐', description: '',
+          id: idPrefix, name: '', icon: mode === 'bookings' ? '🧳' : '⭐',
+          description: '',
           price: 0, cost_rub: 0,
-          partner_commission_pct: 15,
+          partner_commission_pct: mode === 'bookings' ? 10 : 15,
           enabled: true, sort_order: 0, countries: [],
         }
   );

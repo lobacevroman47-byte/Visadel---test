@@ -172,19 +172,11 @@ const VisasSection: React.FC = () => {
         </div>
       </div>
 
-      {/* Country selector — pills like в Конструкторе анкет */}
+      {/* Country selector — pills like в Конструкторе анкет.
+          Без «Все страны» — пока админ не выбрал страну, виз не показываем
+          (см. условие ниже). Сначала только список стран на чистом экране. */}
       {countries.length > 0 && (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-3 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setSelectedCountry(null)}
-            className={`px-3 py-1.5 rounded-lg text-sm flex items-center gap-1.5 transition ${
-              selectedCountry === null ? 'bg-[#3B5BFF] text-white shadow-sm' : 'text-[#0F2A36] hover:bg-gray-100'
-            }`}
-          >
-            <span className="text-base">🌍</span>
-            Все страны
-          </button>
           {countries.map(c => (
             <button
               key={c.name}
@@ -201,12 +193,14 @@ const VisasSection: React.FC = () => {
         </div>
       )}
 
-      {/* Filters — brand pill style */}
+      {/* Filters + Visa list — показываются только когда выбрана страна.
+          На стартовом экране админ видит только список стран сверху. */}
+      {selectedCountry && (
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 mb-5 flex flex-wrap gap-2 items-center">
         <div className="relative flex-1 min-w-[220px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
           <input
-            type="text" placeholder="Поиск по стране или названию..."
+            type="text" placeholder="Поиск по названию..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-9 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#5C7BFF]/40 focus:border-[#5C7BFF]"
@@ -229,6 +223,18 @@ const VisasSection: React.FC = () => {
           <Eye size={14} /> Только активные
         </button>
       </div>
+      )}
+
+      {/* Hint когда страна не выбрана */}
+      {!loading && products.length > 0 && !selectedCountry && (
+        <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl vd-grad-soft border border-blue-100 flex items-center justify-center text-3xl mx-auto mb-4">
+            🌍
+          </div>
+          <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Выбери страну</h3>
+          <p className="text-sm text-[#0F2A36]/60">Нажми на любую страну выше — откроется список её виз</p>
+        </div>
+      )}
 
       {/* Empty state with seed CTA — brand-styled */}
       {!loading && products.length === 0 && (
@@ -249,15 +255,15 @@ const VisasSection: React.FC = () => {
         </div>
       )}
 
-      {grouped.length === 0 && products.length > 0 && (
+      {selectedCountry && grouped.length === 0 && products.length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-10 text-center text-sm text-gray-400 shadow-sm">
           По выбранным фильтрам ничего не найдено
         </div>
       )}
 
-      {/* Country groups — each group's title is a brand subheader, visas are stand-alone cards */}
+      {/* Country groups — показываются только когда выбрана страна */}
       <div className="space-y-6">
-        {grouped.map(([country, items]) => (
+        {selectedCountry && grouped.map(([country, items]) => (
           <div key={country} className="space-y-2.5">
             <div className="flex items-center gap-2 px-1">
               <span className="text-xl">{items[0].flag ?? '🌍'}</span>
