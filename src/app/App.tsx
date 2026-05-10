@@ -207,7 +207,10 @@ function App() {
           .catch((e) => { console.warn('[track-click] fetch failed:', e, 'code:', codeToTrack); });
       }
 
-      return upsertUser(tg, resolvedRefCode ?? undefined);
+      // Передаём в upsertUser RAW код если резолв на фронте не сработал
+      // (RLS блокирует anon SELECT users — resolveReferralCode возвращает null).
+      // API на сервере сам резолвит canonical через service_key.
+      return upsertUser(tg, resolvedRefCode ?? referralCode ?? undefined);
       })
         .then(async u => {
           setAppUser(u);
