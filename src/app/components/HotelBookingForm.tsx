@@ -64,6 +64,7 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
   const product = useBookingProduct('hotel', 'standalone');
   const price = product.price;
   const cardNumber = product.cardNumber;
+  const cardHolder = product.cardHolder;
   const extraFields = product.extraFields;
   const overrides = product.overrides;
   const ov = (key: string, fallbackLabel: string, fallbackRequired: boolean) =>
@@ -530,6 +531,12 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
                 {cardCopied ? 'Скопировано' : 'Копировать'}
               </button>
             </div>
+            {cardHolder && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <p className="text-[10px] uppercase tracking-wider font-bold text-[#0F2A36]/55 mb-0.5">Получатель</p>
+                <p className="text-sm font-semibold text-[#0F2A36]">{cardHolder}</p>
+              </div>
+            )}
           </div>
 
           {/* Screenshot upload */}

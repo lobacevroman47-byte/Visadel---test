@@ -39,12 +39,14 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
   // (продолжить оформление / в личный кабинет) — заменяет native alert.
   const [draftSavedShown, setDraftSavedShown] = useState(false);
   const [cardNumber, setCardNumber] = useState('5536 9140 3834 6908');
+  const [cardHolder, setCardHolder] = useState('');
 
   useEffect(() => {
     let alive = true;
     getAppSettings().then(s => {
       if (!alive) return;
       if (s.payment_card_number) setCardNumber(s.payment_card_number);
+      if (s.payment_card_holder) setCardHolder(s.payment_card_holder);
     }).catch(() => { /* defaults stay */ });
     return () => { alive = false; };
   }, []);
@@ -369,6 +371,12 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
             <h3 className="text-[#0F2A36] font-bold text-sm">Реквизиты для оплаты</h3>
             <p className="text-[10px] text-[#0F2A36]/60 mt-1.5 uppercase tracking-wider font-semibold">Номер карты</p>
             <p className="text-[#0F2A36] font-mono text-[15px] mt-0.5 tracking-wide">{cardNumber}</p>
+            {cardHolder && (
+              <>
+                <p className="text-[10px] text-[#0F2A36]/60 mt-2 uppercase tracking-wider font-semibold">Получатель</p>
+                <p className="text-[#0F2A36] text-[14px] mt-0.5 font-semibold">{cardHolder}</p>
+              </>
+            )}
             <p className="text-[11px] text-[#0F2A36]/60 mt-2">После оплаты загрузите скриншот перевода</p>
           </div>
         </div>

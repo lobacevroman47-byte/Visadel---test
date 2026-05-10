@@ -1373,7 +1373,6 @@ export interface AppSettings {
   flight_partner_pct_default?: number;
   max_bonus_usage_regular: number;
   max_bonus_usage_partner: number | null;
-  bonus_expiration_days: number;
   // Payment (shared across visas + bookings)
   payment_card_number: string;
   payment_card_holder: string;
@@ -1406,7 +1405,6 @@ const SETTINGS_DEFAULTS: AppSettings = {
   flight_partner_pct_default: 10,
   max_bonus_usage_regular: BONUS_CONFIG.MAX_BONUS_USAGE_REGULAR,
   max_bonus_usage_partner: BONUS_CONFIG.MAX_BONUS_USAGE_PARTNER,
-  bonus_expiration_days: 365,
   payment_card_number: '',
   payment_card_holder: '',
   hotel_booking_price: 1000,
