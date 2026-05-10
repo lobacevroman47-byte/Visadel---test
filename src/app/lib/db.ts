@@ -103,22 +103,29 @@ export async function resolveReferralCode(input: string): Promise<string | null>
 
 /**
  * Отметка что юзер «остался» в мини-аппе (сделал какое-то действие после
- * первого открытия). Используется для метрики «Регистраций» в реф-программе:
- * без этого поля все open'ы по реф-ссылке считались бы регистрациями, даже
- * если юзер открыл и сразу закрыл.
+ * первого открытия). Используется для метрики «Регистраций» в реф-программе.
  *
- * Идемпотентно: ставит engaged_at = now() ТОЛЬКО если оно ещё null.
- * Если миграция 023 не применена — silent fail (column не существует),
- * запросы по engaged_at просто получат null для всех юзеров.
+ * Идёт через /api/mark-engaged (service_key) потому что миграция 004
+ * заблокировала UPDATE на users для anon. Direct supabase update silently
+ * failed → engaged_at никогда не ставился → партнёр всегда видел 0 регистраций.
+ *
+ * Идемпотентно: API ставит engaged_at = now() ТОЛЬКО если ещё null.
  */
 export async function markUserEngaged(telegramId: number): Promise<void> {
   if (!telegramId || !isSupabaseConfigured()) return;
-  // engaged_at IS NULL guard — не перезаписываем если уже стоит
-  await supabase
-    .from('users')
-    .update({ engaged_at: new Date().toISOString() })
-    .eq('telegram_id', telegramId)
-    .is('engaged_at', null);
+  try {
+    const res = await apiFetch('/api/mark-engaged', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      console.warn('[markUserEngaged] non-OK:', res.status, body);
+    }
+  } catch (e) {
+    console.warn('[markUserEngaged] failed:', e);
+  }
 }
 
 const LS_KEY = 'vd_user';
@@ -146,67 +153,61 @@ export async function upsertUser(tgUser: TelegramUser, referredBy?: string): Pro
   const referralCode = generateReferralCode(tgUser.id);
 
   if (isSupabaseConfigured()) {
-    // Check if user exists
-    const { data: existing } = await supabase
-      .from('users')
-      .select('*')
-      .eq('telegram_id', tgUser.id)
-      .single();
-
-    if (existing) {
-      // Update name/photo if changed
-      const { data: updated } = await supabase
-        .from('users')
-        .update({
+    // Идём через /api/upsert-user (service_key) — миграция 004 заблокировала
+    // INSERT/UPDATE на public.users для anon. Direct supabase fail silent →
+    // новые юзеры по реф-ссылке вообще не создавались, name/photo не
+    // обновлялись. API использует service_key (bypass RLS).
+    try {
+      const res = await apiFetch('/api/upsert-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: tgUser.first_name,
           last_name: tgUser.last_name ?? null,
           username: tgUser.username ?? null,
           photo_url: tgUser.photo_url ?? null,
-        })
-        .eq('telegram_id', tgUser.id)
-        .select()
-        .single();
-      const user = (updated ?? existing) as AppUser;
-      lsSet(LS_KEY, user);
-      return user;
+          referred_by: referredBy ?? null,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json().catch(() => ({} as { user?: AppUser }));
+        if (data.user) {
+          lsSet(LS_KEY, data.user);
+          return data.user;
+        }
+      } else {
+        console.warn('[upsertUser] API non-OK:', res.status, await res.text().catch(() => ''));
+      }
+    } catch (e) {
+      console.warn('[upsertUser] API failed, fallback to direct supabase:', e);
     }
 
-    // Create new user
-    // Welcome bonus: read from app_settings (fallback BONUS_CONFIG.NEW_USER_WELCOME)
-    const settings = await getAppSettings();
-    const welcomeBonus = referredBy ? settings.new_user_welcome_bonus : 0;
-    const { data: created, error } = await supabase
+    // Fallback: попробовать через anon-key (для случая если API вообще
+    // недоступен — на dev-окружении). В проде с RLS это вернёт пустоту,
+    // но для совместимости оставляем.
+    const { data: existing } = await supabase
       .from('users')
-      .insert({
-        telegram_id: tgUser.id,
-        first_name: tgUser.first_name,
-        last_name: tgUser.last_name ?? null,
-        username: tgUser.username ?? null,
-        photo_url: tgUser.photo_url ?? null,
-        bonus_balance: welcomeBonus,
-        is_influencer: false,
-        referral_code: referralCode,
-        referred_by: referredBy ?? null,
-        bonus_streak: 0,
-      })
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    // Log welcome bonus
-    if (welcomeBonus > 0) {
-      try {
-        await supabase.from('bonus_logs').insert({
-          telegram_id: tgUser.id,
-          type: 'welcome',
-          amount: welcomeBonus,
-          description: `+${welcomeBonus}₽ приветственный бонус по реферальной ссылке`,
-        });
-      } catch (e) { console.warn('welcome bonus log failed', e); }
+      .select('*')
+      .eq('telegram_id', tgUser.id)
+      .maybeSingle();
+    if (existing) {
+      lsSet(LS_KEY, existing as AppUser);
+      return existing as AppUser;
     }
-
-    const user = created as AppUser;
+    // Если /api fail И юзера в БД нет — возвращаем «in-memory» AppUser
+    // чтобы UI не упал. Балланс/реф-код — заполнятся при следующем успешном
+    // вызове. ВАЖНО: referred_by здесь будет потерян до следующей попытки.
+    const user: AppUser = {
+      telegram_id: tgUser.id,
+      first_name: tgUser.first_name,
+      last_name: tgUser.last_name,
+      username: tgUser.username,
+      photo_url: tgUser.photo_url,
+      bonus_balance: 0,
+      is_influencer: false,
+      referral_code: referralCode,
+      bonus_streak: 0,
+    };
     lsSet(LS_KEY, user);
     return user;
   }
