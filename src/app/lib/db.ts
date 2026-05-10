@@ -904,13 +904,17 @@ export async function payReferralBonus(refereeTelegramId: number, applicationId?
   // Default: flat regular bonus from app_settings (fallback to BONUS_CONFIG)
   const settings = await getAppSettings();
   let amount = settings.referrer_regular_bonus;
-  let description = `+${amount}₽ за реферала ${refereeTelegramId} (оплачена первая виза)`;
+  let description = `+${amount}₽ за визу реферала ${refereeTelegramId} (заявка ${applicationId ?? '—'})`;
   // Тип записи в bonus_logs:
   //   'referral'        — обычный реф, мгновенно увеличивает bonus_balance
   //   'partner_pending' — партнёр, hold-период 30 дней, потом cron approves
   //                       и инкрементит users.partner_balance (в ₽ к выплате)
   let bonusType = 'referral';
-  let dedupeKey = `referral_${refereeTelegramId}`;
+  // Dedup PER-APPLICATION: каждая визa реферала = новый бонус рефереру.
+  // Раньше был `referral_${refereeTelegramId}` — все визы того же друга
+  // дедупились в одну, реферер получал бонус только за ПЕРВУЮ визу.
+  // Теперь бонус идёт с каждой оплаченной визы навсегда.
+  let dedupeKey = `referral_${refereeTelegramId}_${applicationId ?? 'noapp'}`;
 
   // Partner override: процент по компонентам заказа + pending статус.
   // Заявка может содержать визу + addons (срочное, бронь отеля, бронь авиа),

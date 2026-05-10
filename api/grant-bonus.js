@@ -236,7 +236,9 @@ export default async function handler(req, res) {
     const newBalance = result.newBalance;
 
     // ── Referral bonus when a payment is confirmed ──────────────────────────
-    // Give referrer their flat bonus (once per user, first paid visa).
+    // Givе referrer бонус С КАЖДОЙ ОПЛАЧЕННОЙ ЗАЯВКИ (раньше дедуп был
+    // ref_for_<friendId> — только за первую визу). Теперь dedupe_key
+    // включает application_id → каждая новая виза реферала = новый бонус.
     // Сумму читаем из app_settings.referrer_regular_bonus, чтобы админка
     // могла менять без деплоя.
     if (type === 'payment' && application_id) {
@@ -257,8 +259,8 @@ export default async function handler(req, res) {
               referrerRow.telegram_id,
               'referral',
               refAmount,
-              `+${refAmount}₽ за визу друга (ref_for_${telegram_id})`,
-              `ref_for_${telegram_id}`,
+              `+${refAmount}₽ за визу друга (заявка ${application_id})`,
+              `ref_for_${telegram_id}_${application_id}`,
             );
           }
         }
