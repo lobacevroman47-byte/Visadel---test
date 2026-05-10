@@ -131,7 +131,16 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
     if (checkIn && new Date(checkIn) < today) return 'Дата заезда не может быть в прошлом';
     if (new Date(checkOut) <= new Date(checkIn)) return 'Дата выезда должна быть позже даты заезда';
     if (guests < 1) return 'Должен быть хотя бы один гость';
-    if (hasChildren === 'yes' && children.some(c => !c.age.trim())) return 'Укажите возраст всех детей';
+    if (hasChildren === 'yes') {
+      // Раньше проверяли только trim()=='' — невалидный ввод (буквы, отрицательные,
+      // >17) проходил. Сейчас: число 0-17 обязательно.
+      for (const c of children) {
+        const n = parseInt(c.age.trim(), 10);
+        if (!c.age.trim() || Number.isNaN(n) || n < 0 || n > 17) {
+          return 'Укажите возраст каждого ребёнка числом от 0 до 17';
+        }
+      }
+    }
     if (!email.trim() || !phone.trim() || !telegramLogin.trim()) return 'Заполните все контактные данные';
     // Валидация формата (раньше .includes('@') пропускал мусор).
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return 'Укажите корректный email';

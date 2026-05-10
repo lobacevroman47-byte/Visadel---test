@@ -99,8 +99,17 @@ const PROGRESS_STEPS = [
   { id: 'ready',               label: 'Готово',             icon: '🎉' },
 ];
 
+// Mapping реальных DB-статусов на step-index:
+//   pending_payment      → 0 (Заявка подана — ждём оплату от юзера)
+//   pending_confirmation → 1 (Проверка оплаты — юзер прислал скрин,
+//                              админ его проверяет — РАНЬШЕ ошибочно был 0,
+//                              из-за чего "Проверка оплаты" мгновенно
+//                              показывалась как ✓ done)
+//   in_progress          → 2 (Виза оформляется)
+//   ready                → 3 (Готово)
 function getProgressIndex(status: string): number {
-  if (status === 'pending_confirmation') return 0;
+  if (status === 'pending_payment' || status === 'draft') return 0;
+  if (status === 'pending_confirmation') return 1;
   if (status === 'in_progress') return 2;
   if (status === 'ready') return 3;
   return -1;
@@ -170,7 +179,11 @@ const BOOKING_PROGRESS_STEPS = [
 ];
 
 function getBookingProgressIndex(status: string): number {
-  if (status === 'pending_confirmation' || status === 'new' || status === 'pending_payment') return 0;
+  // pending_payment / new — юзер ещё не прислал скрин → step 0 (Заявка подана)
+  if (status === 'new' || status === 'pending_payment') return 0;
+  // pending_confirmation — скрин получен, админ проверяет → step 1 (Проверка оплаты)
+  // РАНЬШЕ был 0 — "Проверка оплаты" мгновенно показывалась как ✓.
+  if (status === 'pending_confirmation') return 1;
   if (status === 'in_progress') return 2;
   if (status === 'confirmed') return 3;
   return -1; // cancelled и прочее не показываем
@@ -712,6 +725,11 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                 const isReady = app.status === 'ready';
                 const hasVisa = !!app.visa_file_url;
 
+                // Имя из form_data.basicData (юзер заполняет в Step1).
+                // Отображается под visa_type — синхронно с booking-карточкой.
+                const basicData = (app.form_data as { basicData?: { firstName?: string; lastName?: string; fullName?: string } } | undefined)?.basicData ?? {};
+                const fullName = [basicData.firstName, basicData.lastName].filter(Boolean).join(' ').trim() || basicData.fullName || '';
+
                 return (
                   <div key={app.id} className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -721,6 +739,7 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                           <span className="truncate">{app.country}</span>
                         </h4>
                         <p className="text-sm text-gray-500 mt-0.5">{app.visa_type}</p>
+                        {fullName && <p className="text-sm font-semibold text-[#0F2A36]/80 mt-0.5 truncate">{fullName}</p>}
                       </div>
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
                         {cfg.label}
@@ -804,13 +823,11 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
           )}
         </div>
 
-        {/* ── Bookings (hotel + flight) ─────────────────────── */}
+        {/* ── Bookings (hotel + flight) — без отдельного заголовка,
+             идут единым списком вместе с визовыми «Мои заявки». ── */}
         {(hotelBookings.length > 0 || flightBookings.length > 0) && (
           <BookingsErrorBoundary>
             <div>
-              <h3 className="text-lg text-gray-800 mb-3 flex items-center gap-2">
-                <Hotel className="w-5 h-5" /> Мои брони
-              </h3>
               <div className="space-y-3">
                 {hotelBookings.map(b => (
                   <HotelBookingCard
@@ -1037,18 +1054,19 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
 }) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
   const childrenAges = Array.isArray(b.children_ages) ? b.children_ages : [];
-  const place = [b.country, b.city].filter(Boolean).join(', ') || 'Бронь отеля';
+  const fullName = [b.first_name, b.last_name].filter(Boolean).join(' ').trim();
+  const place = [b.country, b.city].filter(Boolean).join(', ');
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
       {/* Header — типографика 1-в-1 с визовой ApplicationCard:
-          text-base font-bold для заголовка + text-sm gray-500 для подзаголовка. */}
+          text-base font-bold для заголовка + Имя Фамилия как подзаголовок. */}
       <div className="flex items-start justify-between mb-2">
         <div className="min-w-0 flex-1">
           <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
             <span aria-hidden>🏨</span>
             <span className="truncate">Бронь отеля</span>
           </h4>
-          <p className="text-sm text-gray-500 mt-0.5">{place}</p>
+          {fullName && <p className="text-sm font-semibold text-[#0F2A36]/80 mt-0.5 truncate">{fullName}</p>}
         </div>
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
           {cfg.label}
@@ -1064,6 +1082,12 @@ function HotelBookingCard({ b, ...common }: { b: HotelBookingRow } & BookingCard
           <div className="flex justify-between items-center">
             <span>К оплате:</span>
             <span className="text-base font-semibold text-gray-800">{b.price.toLocaleString('ru-RU')} ₽</span>
+          </div>
+        )}
+        {place && (
+          <div className="flex justify-between">
+            <span>Куда:</span>
+            <span className="text-right">{place}</span>
           </div>
         )}
         <div className="flex justify-between">
@@ -1094,7 +1118,8 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
   onUpdate: (patch: Partial<FlightBookingRow>) => void;
 }) {
   const cfg = BOOKING_STATUS[b.status] ?? BOOKING_STATUS.new;
-  const route = (b.from_city && b.to_city) ? `${b.from_city} → ${b.to_city}` : 'Бронь авиабилета';
+  const fullName = [b.first_name, b.last_name].filter(Boolean).join(' ').trim();
+  const route = (b.from_city && b.to_city) ? `${b.from_city} → ${b.to_city}` : '';
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
       {/* Header — типографика 1-в-1 с визовой ApplicationCard. */}
@@ -1104,7 +1129,7 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
             <span aria-hidden>✈️</span>
             <span className="truncate">Бронь авиабилета</span>
           </h4>
-          <p className="text-sm text-gray-500 mt-0.5">{route}</p>
+          {fullName && <p className="text-sm font-semibold text-[#0F2A36]/80 mt-0.5 truncate">{fullName}</p>}
         </div>
         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap shrink-0 ${cfg.color}`}>
           {cfg.label}
@@ -1120,6 +1145,12 @@ function FlightBookingCard({ b, ...common }: { b: FlightBookingRow } & BookingCa
           <div className="flex justify-between items-center">
             <span>К оплате:</span>
             <span className="text-base font-semibold text-gray-800">{b.price.toLocaleString('ru-RU')} ₽</span>
+          </div>
+        )}
+        {route && (
+          <div className="flex justify-between">
+            <span>Маршрут:</span>
+            <span className="text-right">{route}</span>
           </div>
         )}
         <div className="flex justify-between">

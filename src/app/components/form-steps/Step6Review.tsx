@@ -269,8 +269,7 @@ function getFieldLabel(key: string): string {
     tripDateTo: 'Дата окончания',
     addressInKorea: 'Адрес в Корее',
     
-    // Israel
-    arrivalAirport: 'Аэропорт прилёта',
+    // Israel — arrivalAirport реюзится из Vietnam-секции выше (тот же label).
     isBiometric: 'Биометрический паспорт',
     hasSecondCitizenship: 'Второе гражданство',
     homeAddress: 'Домашний адрес',

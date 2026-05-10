@@ -60,11 +60,17 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
   const fd = (row.form_data as Record<string, unknown>) ?? {};
   const contact = (fd.contactInfo as Record<string, string>) ?? {};
   const basic = (fd.basicData as Record<string, string>) ?? {};
-  // Pull from form_data root first (new universal firstName/lastName fields),
-  // then fall back to legacy basicData.fullName, then to telegram ID.
+  // Имя живёт в basicData.firstName/lastName (Step1BasicData сохраняет туда).
+  // Раньше читали fd.firstName на корне — там их нет, поэтому clientName
+  // всегда падал на fallback `ID <telegram>`. Сейчас порядок:
+  //   1. basicData.firstName + basicData.lastName (canonical)
+  //   2. legacy fullName / lastName на корне basicData
+  //   3. fdAny.firstName на корне form_data (на случай старых записей)
+  //   4. fallback на telegram_id
   const fdAny = fd as Record<string, string>;
-  const universalName = [fdAny.firstName, fdAny.lastName].filter(Boolean).join(' ').trim();
-  const clientName = universalName || basic.fullName || basic.lastName || `ID ${row.user_telegram_id}`;
+  const fromBasic = [basic.firstName, basic.lastName].filter(Boolean).join(' ').trim();
+  const fromRoot = [fdAny.firstName, fdAny.lastName].filter(Boolean).join(' ').trim();
+  const clientName = fromBasic || basic.fullName || fromRoot || basic.lastName || `ID ${row.user_telegram_id}`;
   return {
     id: row.id as string,
     telegramId: row.user_telegram_id as number,
