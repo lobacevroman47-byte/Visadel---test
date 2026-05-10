@@ -208,12 +208,22 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
       <div className="mb-4">
         <div className="flex items-start justify-between gap-2">
           <h3 className="text-[#0F2A36] font-bold tracking-tight mb-1 flex-1">{visa.type}</h3>
-          {/* Маркер незавершённых черновиков. Юзер видит сразу что есть начатая
-              анкета, при клике на «оформить» откроется DraftPickerModal. */}
+          {/* Маркер незавершённых черновиков — теперь КЛИКАБЕЛЬНЫЙ. Тап
+              сразу открывает DraftPickerModal минуя «Оформить». */}
           {draftCount > 0 && (
-            <span className="inline-flex items-center gap-1 shrink-0 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                // Открываем DraftPicker через стандартный onSelect — App.tsx
+                // увидит что drafts > 0 и покажет модалку выбора.
+                onSelect({ urgent: false, hotel: false, ticket: false });
+              }}
+              className="inline-flex items-center gap-1 shrink-0 bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-full hover:bg-amber-100 active:scale-95 transition cursor-pointer"
+              aria-label="Открыть черновики"
+            >
               📝 {draftCount === 1 ? 'Черновик' : `${draftCount} черновика`}
-            </span>
+            </button>
           )}
         </div>
         {visa.description && (
