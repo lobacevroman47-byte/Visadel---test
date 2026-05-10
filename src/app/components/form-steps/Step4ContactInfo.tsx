@@ -54,11 +54,17 @@ export default function Step4ContactInfo({ data, onChange, onNext, onPrev }: Ste
   const validateAndNext = async () => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.email || !formData.email.includes('@')) {
-      newErrors.email = 'Укажите корректный email';
+    // Email: должна быть локальная часть + @ + домен с точкой (foo@bar.com).
+    // Раньше .includes('@') пропускал «a@» — админ не мог связаться с клиентом.
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!formData.email || !EMAIL_RE.test(formData.email.trim())) {
+      newErrors.email = 'Укажите корректный email (например ivan@mail.ru)';
     }
-    if (!formData.phone) {
-      newErrors.phone = 'Укажите номер телефона';
+    // Телефон: минимум 10 цифр (с любыми разделителями: пробел, тире, +, скобки).
+    // Раньше пропускал «1» — мусор в БД.
+    const phoneDigits = (formData.phone ?? '').replace(/\D/g, '');
+    if (!formData.phone || phoneDigits.length < 10) {
+      newErrors.phone = 'Укажите корректный номер (минимум 10 цифр)';
     }
     if (!formData.telegram) {
       newErrors.telegram = 'Укажите логин в Telegram';

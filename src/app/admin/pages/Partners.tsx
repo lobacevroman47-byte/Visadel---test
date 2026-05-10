@@ -19,7 +19,9 @@ import { apiFetch } from '../../lib/apiFetch';
 import { useDialog } from '../../components/shared/BrandDialog';
 import { Button, Modal } from '../../components/ui/brand';
 
-const BOT_USERNAME = 'Visadel_test_bot'; // в /app?startapp=<code>
+// Имя бота — из env (VITE_TG_BOT_USERNAME). Fallback для dev — Visadel_test_bot.
+// Меняется в Vercel → Settings → Environment Variables.
+const BOT_USERNAME = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) || 'Visadel_test_bot';
 
 interface BonusLogEntry {
   id: string;

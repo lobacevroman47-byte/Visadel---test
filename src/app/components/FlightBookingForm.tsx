@@ -102,7 +102,15 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
     if (!fromCity.trim()) return 'Укажите город вылета';
     if (!toCity.trim()) return 'Укажите город прилёта';
     if (!bookingDate) return 'Укажите дату брони';
+    // Защита от прошедших дат — DateInput позволяет ввести вручную, native min только для picker.
+    {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      if (new Date(bookingDate) < today) return 'Дата брони не может быть в прошлом';
+    }
     if (!email.trim() || !phone.trim() || !telegramLogin.trim()) return 'Заполните все контактные данные';
+    // Валидация формата.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return 'Укажите корректный email';
+    if (phone.replace(/\D/g, '').length < 10) return 'Укажите корректный номер телефона (минимум 10 цифр)';
     for (const f of extraFields) {
       if (f.required && !((extraValues[f.id] ?? '').trim())) return `Заполните поле «${f.label}»`;
     }
@@ -280,7 +288,7 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
             ); })()}
             {(() => { const f = ov('bookingDate', 'Дата брони', true); return f.visible && (
               <Field label={f.label} required={f.required} icon={<Calendar className="w-3.5 h-3.5" />}>
-                <DateInput value={bookingDate} onChange={setBookingDate} />
+                <DateInput value={bookingDate} min={new Date().toISOString().slice(0, 10)} onChange={setBookingDate} />
               </Field>
             ); })()}
           </div>
@@ -332,7 +340,14 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
                 className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0];
-                  if (f) setPassport(f);
+                  if (!f) return;
+                  if (f.size > 10 * 1024 * 1024) {
+                    setError('Файл паспорта больше 10 МБ. Сожми или уменьши скан.');
+                    e.target.value = '';
+                    return;
+                  }
+                  setError(null);
+                  setPassport(f);
                 }}
               />
             </label>

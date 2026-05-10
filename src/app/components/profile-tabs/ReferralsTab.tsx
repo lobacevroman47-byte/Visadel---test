@@ -18,8 +18,10 @@ interface ReferralTabProps {
   onOpenPartnerDashboard?: () => void;
 }
 
-const BOT_USERNAME = 'Visadel_test_bot';
-const MINI_APP_SHORT_NAME = 'app';
+// Имя бота берётся из env (VITE_TG_BOT_USERNAME). Хардкод — fallback для dev.
+// Для смены prod-бота: задать переменную в Vercel → Settings → Environment Variables.
+const BOT_USERNAME = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) || 'Visadel_test_bot';
+const MINI_APP_SHORT_NAME = (import.meta.env.VITE_TG_MINI_APP_NAME as string | undefined) || 'app';
 
 export default function ReferralsTab({ onOpenPartnerApplication, onOpenPartnerDashboard }: ReferralTabProps) {
   const { appUser } = useTelegram();
