@@ -29,6 +29,10 @@ interface PartnerDashboardProps {
 
 const HOLD_DAYS = 30;
 
+// Имя бота — из env (VITE_TG_BOT_USERNAME). Fallback Visadel_test_bot для dev.
+const BOT_USERNAME = (import.meta.env.VITE_TG_BOT_USERNAME as string | undefined) || 'Visadel_test_bot';
+const MINI_APP_SHORT_NAME = (import.meta.env.VITE_TG_MINI_APP_NAME as string | undefined) || 'app';
+
 // Зарезервированные слова — не дать партнёру vanity, ломающий deeplinks
 // или конфликтующий с системными коммандами / маршрутами мини-аппа.
 const RESERVED_VANITY = new Set([
@@ -499,7 +503,7 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
 
   // Vanity / link
   const activeCode = (appUser?.vanity_code || referralCode || '').toUpperCase();
-  const link = `https://t.me/Visadel_test_bot/app?startapp=${activeCode}`;
+  const link = `https://t.me/${BOT_USERNAME}/${MINI_APP_SHORT_NAME}?startapp=${activeCode}`;
 
   const copyLink = useCallback(async () => {
     try {

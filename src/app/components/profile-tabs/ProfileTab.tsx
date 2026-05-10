@@ -40,7 +40,7 @@ function saveMeta(telegramId: number, m: BonusMeta) {
 async function getSupabaseUser(telegramId: number) {
   if (!isSupabaseConfigured() || !telegramId) return null;
   const { data } = await supabase.from('users')
-    .select('bonus_balance,bonus_streak,last_bonus_date,phone,email,first_name,last_name,username')
+    .select('bonus_balance,bonus_streak,last_bonus_date,phone,email,first_name,last_name,username,is_influencer')
     .eq('telegram_id', telegramId).single();
   return data as any;
 }

@@ -192,11 +192,19 @@ function App() {
       resolvedPromise.then(resolvedRefCode => {
       // Track referral click (по введённому коду или каноническому)
       if (referralCode) {
+        const codeToTrack = resolvedRefCode ?? referralCode;
         fetch('/api/track-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referral_code: resolvedRefCode ?? referralCode, telegram_id: tg.id }),
-        }).catch(() => {});
+          body: JSON.stringify({ referral_code: codeToTrack, telegram_id: tg.id }),
+        })
+          .then(async (r) => {
+            if (!r.ok) {
+              const body = await r.text().catch(() => '');
+              console.warn('[track-click] non-OK response:', r.status, body, 'code:', codeToTrack);
+            }
+          })
+          .catch((e) => { console.warn('[track-click] fetch failed:', e, 'code:', codeToTrack); });
       }
 
       return upsertUser(tg, resolvedRefCode ?? undefined);

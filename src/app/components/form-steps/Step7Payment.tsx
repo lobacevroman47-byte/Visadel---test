@@ -187,9 +187,8 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
           visa_type: visa.type,
           price: totalPrice,
           urgent,
-          customer_name: [formData.firstName, formData.lastName].filter(Boolean).join(' ').trim()
+          customer_name: [formData.basicData?.firstName, formData.basicData?.lastName].filter(Boolean).join(' ').trim()
             || formData.basicData?.fullName
-            || formData.basicData?.lastName
             || null,
           customer_telegram: formData.contactInfo?.telegram ?? null,
         }),

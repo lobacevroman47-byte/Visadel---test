@@ -125,10 +125,17 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
     if (reqLastName && !lastName.trim()) return 'Заполните фамилию (как в загранпаспорте)';
     if ((reqCountry && !country.trim()) || (reqCity && !city.trim())) return 'Укажите страну и город назначения';
     if ((reqCheckIn && !checkIn) || (reqCheckOut && !checkOut)) return 'Укажите даты заезда и выезда';
+    // Защита от прошедших дат — пользователь мог ввести их вручную в DateInput
+    // (HTML min применяется только в native picker, в text-режиме нет).
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (checkIn && new Date(checkIn) < today) return 'Дата заезда не может быть в прошлом';
     if (new Date(checkOut) <= new Date(checkIn)) return 'Дата выезда должна быть позже даты заезда';
     if (guests < 1) return 'Должен быть хотя бы один гость';
     if (hasChildren === 'yes' && children.some(c => !c.age.trim())) return 'Укажите возраст всех детей';
     if (!email.trim() || !phone.trim() || !telegramLogin.trim()) return 'Заполните все контактные данные';
+    // Валидация формата (раньше .includes('@') пропускал мусор).
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return 'Укажите корректный email';
+    if (phone.replace(/\D/g, '').length < 10) return 'Укажите корректный номер телефона (минимум 10 цифр)';
     for (const f of extraFields) {
       if (f.required && !((extraValues[f.id] ?? '').trim())) return `Заполните поле «${f.label}»`;
     }
@@ -321,7 +328,7 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {(() => { const f = ov('checkIn', 'Дата заезда', true); return f.visible && (
                 <Field label={f.label} required={f.required}>
-                  <DateInput value={checkIn} onChange={setCheckIn} />
+                  <DateInput value={checkIn} min={new Date().toISOString().slice(0, 10)} onChange={setCheckIn} />
                 </Field>
               ); })()}
               {(() => { const f = ov('checkOut', 'Дата выезда', true); return f.visible && (
@@ -428,7 +435,14 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
                 className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0];
-                  if (f) setPassport(f);
+                  if (!f) return;
+                  if (f.size > 10 * 1024 * 1024) {
+                    setError('Файл паспорта больше 10 МБ. Сожми или уменьши скан.');
+                    e.target.value = '';
+                    return;
+                  }
+                  setError(null);
+                  setPassport(f);
                 }}
               />
             </label>
