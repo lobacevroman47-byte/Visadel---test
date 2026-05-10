@@ -78,18 +78,68 @@ export default async function handler(req, res) {
     const existing = Array.isArray(existRows) && existRows.length > 0 ? existRows[0] : null;
 
     if (existing) {
-      // UPDATE name/photo — referred_by НЕ перезаписываем (раз привязали — навсегда)
+      // UPDATE name/photo. Реферер пристёгивается ТОЛЬКО если ещё NULL —
+      // раз привязали навсегда, но если предыдущей привязки не было
+      // (юзер открыл апп без ссылки → потом открыл по ссылке) — ставим.
+      // Это критично для случая: друг уже зарегистрирован в боте, потом
+      // партнёр кидает ему ссылку — без этого upsert просто игнорил referredBy.
+      const updateBody = { first_name, last_name, username, photo_url };
+      let referrerJustAttached = false;
+      if (referred_by && !existing.referred_by) {
+        updateBody.referred_by = referred_by;
+        referrerJustAttached = true;
+      }
       const updRes = await fetch(
         `${SUPABASE_URL}/rest/v1/users?telegram_id=eq.${verifiedTgId}`,
         {
           method: 'PATCH',
           headers: headers({ Prefer: 'return=representation' }),
-          body: JSON.stringify({ first_name, last_name, username, photo_url }),
+          body: JSON.stringify(updateBody),
         },
       );
       const updRows = await updRes.json().catch(() => []);
       const user = (Array.isArray(updRows) && updRows.length > 0) ? updRows[0] : existing;
-      res.status(200).json({ user, isNew: false, welcomeBonusGranted: false });
+
+      // Welcome бонус существующему юзеру если он ВПЕРВЫЕ привязался к рефереру.
+      // (Эквивалент логики «приветственный бонус по реф-ссылке» при первой
+      // встрече ссылки.)
+      let welcomeBonusGranted = false;
+      if (referrerJustAttached) {
+        try {
+          const settingsRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/app_settings?id=eq.1&select=new_user_welcome_bonus`,
+            { headers: headers() },
+          );
+          const settings = (await settingsRes.json().catch(() => []))?.[0];
+          const welcomeBonus = Number.isFinite(settings?.new_user_welcome_bonus) ? settings.new_user_welcome_bonus : 0;
+          if (welcomeBonus > 0) {
+            await fetch(`${SUPABASE_URL}/rest/v1/bonus_logs`, {
+              method: 'POST',
+              headers: headers({ Prefer: 'return=minimal' }),
+              body: JSON.stringify({
+                telegram_id: verifiedTgId,
+                type: 'welcome',
+                amount: welcomeBonus,
+                description: `+${welcomeBonus}₽ приветственный бонус (привязка к рефереру)`,
+              }),
+            });
+            // Также инкрементим bonus_balance юзера
+            const newBalance = (user.bonus_balance ?? 0) + welcomeBonus;
+            await fetch(
+              `${SUPABASE_URL}/rest/v1/users?telegram_id=eq.${verifiedTgId}`,
+              {
+                method: 'PATCH',
+                headers: headers({ Prefer: 'return=minimal' }),
+                body: JSON.stringify({ bonus_balance: newBalance }),
+              },
+            );
+            user.bonus_balance = newBalance;
+            welcomeBonusGranted = true;
+          }
+        } catch (e) { console.warn('[upsert-user] welcome on attach failed:', e); }
+      }
+
+      res.status(200).json({ user, isNew: false, referrerJustAttached, welcomeBonusGranted });
       return;
     }
 
