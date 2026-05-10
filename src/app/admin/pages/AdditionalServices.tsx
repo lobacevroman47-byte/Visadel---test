@@ -9,19 +9,23 @@ import {
 import { auditLog } from '../lib/audit';
 import { useDialog } from '../../components/shared/BrandDialog';
 import { Button, Modal } from '../../components/ui/brand';
-import { BookingProductEditor, BOOKING_TYPES } from './FormBuilder';
+import { BookingProductEditor, VISA_ADDON_BOOKING_TYPES, STANDALONE_BOOKING_TYPES } from './FormBuilder';
 
-const BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
+// IDs для каждого scope (миграция 027 — split):
+//   * visa-аддоны (внутри визы):  hotel-booking, flight-booking
+//   * standalone (главное меню):  standalone-hotel-booking, standalone-flight-booking
+const VISA_ADDON_BOOKING_IDS = ['hotel-booking', 'flight-booking'] as const;
+const STANDALONE_BOOKING_IDS = ['standalone-hotel-booking', 'standalone-flight-booking'] as const;
 type Mode = 'addons' | 'bookings';
 
 // All services live in one list — visa addons (Подтверждение проживания /
 // Обратный билет / Срочное оформление) plus any custom rows the admin adds.
-// Hotel/flight rows here also feed the standalone HotelBookingForm /
-// FlightBookingForm prices via additional_services.
 //
-// `mode='bookings'` filters this list to the predefined hotel+flight entries
-// and locks down add/delete — the Каталог → Брони tab uses this view, while
-// keeping the same source of truth in the additional_services table.
+// Mode определяет:
+//   * 'addons'   — Конструктор → Доп. услуги (visa-аддоны: visa-аддон цены/полей)
+//   * 'bookings' — Каталог → Брони (standalone-брони: отдельный booking-flow)
+// Visa-аддоны и standalone-брони — независимые сущности (миграция 027),
+// изменения в одной не влияют на другую.
 export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' }) => {
   const dialog = useDialog();
   const [services, setServices] = useState<AdditionalService[]>([]);
@@ -43,16 +47,24 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
 
   useEffect(() => { load(); }, []);
 
-  // Если редактируется бронь (hotel-booking / flight-booking) — нужен
-  // расширенный редактор с полями анкеты, не упрощённый ServiceFormModal.
+  // Какой набор BOOKING_TYPES подсовывать BookingProductEditor'у — зависит
+  // от mode. В addons mode visa-aддоны, в bookings mode standalone.
+  // Это критично для split: открывая Бронь отеля в Доп. услугах редактируем
+  // hotel-booking, а в Брони — standalone-hotel-booking. Полностью разные
+  // записи в additional_services.
+  const bookingTypesForMode = isBookings ? STANDALONE_BOOKING_TYPES : VISA_ADDON_BOOKING_TYPES;
   const editingBookingType = useMemo(
-    () => editing ? BOOKING_TYPES.find(bt => bt.serviceId === editing.id) : null,
-    [editing],
+    () => editing ? bookingTypesForMode.find(bt => bt.serviceId === editing.id) : null,
+    [editing, bookingTypesForMode],
   );
 
+  // Список IDs для фильтрации списка в bookings mode (показываем только
+  // соответствующие записи).
+  const bookingIdsForMode = isBookings ? STANDALONE_BOOKING_IDS : VISA_ADDON_BOOKING_IDS;
+
   const visible = useMemo(
-    () => isBookings ? services.filter(s => (BOOKING_IDS as readonly string[]).includes(s.id)) : services,
-    [services, isBookings],
+    () => isBookings ? services.filter(s => (bookingIdsForMode as readonly string[]).includes(s.id)) : services,
+    [services, isBookings, bookingIdsForMode],
   );
   const totalEnabled = useMemo(() => visible.filter(s => s.enabled).length, [visible]);
   const HEADER_ICON = isBookings ? <Hotel className="w-5 h-5" /> : <Package className="w-5 h-5" />;
@@ -134,7 +146,7 @@ export const AdditionalServices: React.FC<{ mode?: Mode }> = ({ mode = 'addons' 
             🏨
           </div>
           <h3 className="text-[18px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Брони ещё не созданы</h3>
-          <p className="text-sm text-[#0F2A36]/60">Запусти SQL-миграцию или открой <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">Доп. услуги</code> и добавь записи с ID <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">hotel-booking</code> и <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">flight-booking</code>.</p>
+          <p className="text-sm text-[#0F2A36]/60">Запусти SQL-миграцию <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">027_split_standalone_bookings.sql</code> — она создаст записи <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">standalone-hotel-booking</code> и <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded">standalone-flight-booking</code>.</p>
         </div>
       )}
 

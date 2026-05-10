@@ -514,9 +514,18 @@ const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequ
 // Тот же id используется визовым калькулятором и stand-alone формами в
 // мини-аппе → клиент видит изменения сразу.
 
-// Экспорт чтобы AdditionalServices мог переиспользовать тот же редактор
-// (BookingProductEditor) когда админ кликает на hotel-booking /
-// flight-booking запись в каталоге Доп. услуг.
+// ── Архитектурный split (миграция 027) ──
+//
+// Раньше BOOKING_TYPES было одно — оно использовалось и в Брони (standalone),
+// и в Доп. услуги (visa-аддон). Из-за этого изменения цены/полей в одном
+// месте автоматически меняли их в другом — что НЕПРАВИЛЬНО, т.к. это
+// разные бизнес-сущности.
+//
+// Теперь два независимых набора:
+//   * VISA_ADDON_BOOKING_TYPES — рендерится в Конструктор → Доп. услуги
+//     (визовые аддоны, открываются из Step2AdditionalDocs внутри визовой формы)
+//   * STANDALONE_BOOKING_TYPES — рендерится в Конструктор → Брони
+//     (самостоятельные брони из главного меню, HotelBookingForm/FlightBookingForm)
 export interface BookingType {
   serviceId: string;          // additional_services.id
   kind: 'hotel' | 'flight';   // выбирает coreFields + ключ в app_settings
@@ -525,11 +534,16 @@ export interface BookingType {
   fallbackDescription: string;
   HeroIcon: typeof Hotel;
   coreFields: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }>;
-  extraFieldsKey: 'hotel_extra_fields' | 'flight_extra_fields';
-  overridesKey: 'hotel_core_overrides' | 'flight_core_overrides';
+  extraFieldsKey: keyof Pick<AppSettings,
+    'hotel_extra_fields' | 'flight_extra_fields' |
+    'standalone_hotel_extra_fields' | 'standalone_flight_extra_fields'>;
+  overridesKey: keyof Pick<AppSettings,
+    'hotel_core_overrides' | 'flight_core_overrides' |
+    'standalone_hotel_core_overrides' | 'standalone_flight_core_overrides'>;
 }
 
-export const BOOKING_TYPES: BookingType[] = [
+// Visa-аддоны — внутри визовой анкеты (Step2AdditionalDocs)
+export const VISA_ADDON_BOOKING_TYPES: BookingType[] = [
   {
     serviceId: 'hotel-booking',
     kind: 'hotel',
@@ -553,6 +567,37 @@ export const BOOKING_TYPES: BookingType[] = [
     overridesKey: 'flight_core_overrides',
   },
 ];
+
+// Standalone брони — самостоятельный flow в главном меню Mini App
+export const STANDALONE_BOOKING_TYPES: BookingType[] = [
+  {
+    serviceId: 'standalone-hotel-booking',
+    kind: 'hotel',
+    fallbackName: 'Бронь отеля',
+    fallbackIcon: '🏨',
+    fallbackDescription: 'Самостоятельная бронь отеля для путешествия',
+    HeroIcon: Hotel,
+    coreFields: HOTEL_CORE_FIELDS,
+    extraFieldsKey: 'standalone_hotel_extra_fields',
+    overridesKey: 'standalone_hotel_core_overrides',
+  },
+  {
+    serviceId: 'standalone-flight-booking',
+    kind: 'flight',
+    fallbackName: 'Бронь авиабилета',
+    fallbackIcon: '✈️',
+    fallbackDescription: 'Самостоятельная бронь авиабилета',
+    HeroIcon: Plane,
+    coreFields: FLIGHT_CORE_FIELDS,
+    extraFieldsKey: 'standalone_flight_extra_fields',
+    overridesKey: 'standalone_flight_core_overrides',
+  },
+];
+
+// Backwards-compat alias: в коде, который ещё не различает scope, BOOKING_TYPES
+// продолжает указывать на STANDALONE-набор (потому что Конструктор → Брони —
+// исторически основной use-case BookingsConstructor'а).
+export const BOOKING_TYPES = STANDALONE_BOOKING_TYPES;
 
 const BookingsConstructor: React.FC = () => {
   const dialog = useDialog();
