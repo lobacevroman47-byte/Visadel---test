@@ -111,9 +111,10 @@ SET bonus_balance    = 0,
     updated_at       = now()
 WHERE telegram_id IN (SELECT telegram_id FROM _keep_admins);
 
--- 3k. admin_audit_log — оставляем для compliance.
---     (Раскомментируй если хочешь стереть всю историю действий админов.)
--- DELETE FROM public.admin_audit_log;
+-- 3k. admin_audit_log — стираем всю историю действий админов.
+--     (10 мая 2026: явно запросили удалить логи; раньше был оставлен для
+--     compliance, но в тестовой среде он бесполезен.)
+DELETE FROM public.admin_audit_log;
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- 4. Counts AFTER — должно остаться 0 во всех data-таблицах,
