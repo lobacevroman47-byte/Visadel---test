@@ -21,7 +21,7 @@ export interface AdminApplication {
   paymentProofUrl?: string;
   visaFileUrl?: string;
   telegramId: number;
-  usdRateRub: number;
+  usdRateRub: number | null;
   taxPct: number;
 }
 
@@ -90,7 +90,7 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
     formData: fd,
     paymentProofUrl: row.payment_proof_url as string | undefined,
     visaFileUrl: row.visa_file_url as string | undefined,
-    usdRateRub: (row.usd_rate_rub as number) ?? 100,
+    usdRateRub: (row.usd_rate_rub as number | null) ?? null,
     taxPct: (row.tax_pct as number) ?? 4,
   };
 }
@@ -147,14 +147,14 @@ export function useAdminApplications() {
           date: (a.createdAt as string) ?? new Date().toISOString(),
           urgent: Boolean(a.urgent),
           formData: (a.formData as Record<string, unknown>) ?? {},
-          usdRateRub: 100,
+          usdRateRub: null,
           taxPct: 4,
         }));
-        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100, taxPct: 4 }))]);
+        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 }))]);
       }
     } catch (err) {
       console.error('Fetch applications error:', err);
-      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: 100, taxPct: 4 })));
+      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 })));
     } finally {
       setLoading(false);
     }
