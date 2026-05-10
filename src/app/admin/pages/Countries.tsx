@@ -411,7 +411,7 @@ const ProductFormModal: React.FC<{
                 type="text" value={form.id} onChange={e => set('id', e.target.value)}
                 disabled={!!product}
                 placeholder="india-evisa-30"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg disabled:bg-gray-100 disabled:text-gray-500"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm disabled:bg-gray-100 disabled:text-gray-500 focus:outline-none focus:border-[#5C7BFF]"
                 required
               />
               <p className="text-xs text-gray-400 mt-1">Уникальный (нельзя менять после создания)</p>
@@ -421,7 +421,7 @@ const ProductFormModal: React.FC<{
               <input
                 type="text" value={form.country} onChange={e => set('country', e.target.value)}
                 placeholder="Индия"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
               />
             </div>
           </div>
@@ -432,7 +432,7 @@ const ProductFormModal: React.FC<{
               <input
                 type="text" value={form.flag ?? ''} onChange={e => set('flag', e.target.value)}
                 placeholder="🇮🇳"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-2xl text-center"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-2xl text-center focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div className="md:col-span-2">
@@ -440,7 +440,7 @@ const ProductFormModal: React.FC<{
               <input
                 type="text" value={form.name} onChange={e => set('name', e.target.value)}
                 placeholder="E-VISA на 30 дней"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
               />
             </div>
           </div>
@@ -456,7 +456,7 @@ const ProductFormModal: React.FC<{
                   set('price', v === '' ? 0 : parseInt(v, 10));
                 }}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg" required
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]" required
               />
             </div>
             <div>
@@ -464,7 +464,7 @@ const ProductFormModal: React.FC<{
               <input
                 type="text" value={form.processing_time ?? ''} onChange={e => set('processing_time', e.target.value)}
                 placeholder="5-7 дней"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
             <div>
@@ -477,7 +477,7 @@ const ProductFormModal: React.FC<{
                   set('partner_commission_pct', v === '' ? 0 : parseFloat(v) || 0);
                 }}
                 placeholder="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
               />
             </div>
           </div>
@@ -487,11 +487,11 @@ const ProductFormModal: React.FC<{
             <textarea
               value={form.description ?? ''} onChange={e => set('description', e.target.value)}
               rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg resize-none"
+              className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
 
-          <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+          <div className="bg-gray-50 rounded-xl p-3 space-y-3">
             <p className="text-xs font-medium text-gray-600 uppercase tracking-wider">Себестоимость (для расчёта прибыли)</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -504,7 +504,7 @@ const ProductFormModal: React.FC<{
                     set('cost_usd_fee', v === '' ? 0 : parseFloat(v) || 0);
                   }}
                   placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
                 />
               </div>
               <div>
@@ -517,14 +517,14 @@ const ProductFormModal: React.FC<{
                     set('cost_usd_commission', v === '' ? 0 : parseFloat(v) || 0);
                   }}
                   placeholder="0"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#5C7BFF]"
                 />
               </div>
             </div>
             <p className="text-xs text-gray-400">Используется в разделе «Финансы» для расчёта прибыли (по курсу из bonus-config.ts).</p>
           </div>
 
-          <div className="flex items-center justify-between bg-gray-50 rounded-lg p-3">
+          <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3">
             <div>
               <p className="text-sm font-medium text-gray-700">Видимость</p>
               <p className="text-xs text-gray-500">Если выключена — пользователи не увидят эту визу</p>
