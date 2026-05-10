@@ -473,7 +473,10 @@ const VisaFormSection: React.FC = () => {
 // Hardcoded core fields of the booking forms — must mirror what's actually
 // rendered in HotelBookingForm/FlightBookingForm. Admin overrides label /
 // required / visibility per key.
-const HOTEL_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+//
+// Standalone — full set of 12 fields для самостоятельной формы Брони
+// в главном меню (HotelBookingForm). Включает контакты + паспорт.
+const HOTEL_STANDALONE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
   { key: 'firstName',     defaultLabel: 'Имя (как в загранпаспорте)',       defaultRequired: true },
   { key: 'lastName',      defaultLabel: 'Фамилия (как в загранпаспорте)',    defaultRequired: true },
   { key: 'country',       defaultLabel: 'Страна назначения',                  defaultRequired: true },
@@ -488,7 +491,22 @@ const HOTEL_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequi
   { key: 'passport',      defaultLabel: 'Загранпаспорт (файл)',               defaultRequired: true },
 ];
 
-const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+// Visa addon — только trip-specific подмножество. Контакты + паспорт уже
+// собраны на Step1 визовой формы — дублировать в Step2AdditionalDocs нет
+// смысла. Эти 6 полей точно такие же как HOTEL_ADDON_FIELDS в Step2.
+const HOTEL_VISA_ADDON_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+  { key: 'country',  defaultLabel: 'Страна назначения', defaultRequired: true },
+  { key: 'city',     defaultLabel: 'Город',             defaultRequired: true },
+  { key: 'checkIn',  defaultLabel: 'Дата заезда',       defaultRequired: true },
+  { key: 'checkOut', defaultLabel: 'Дата выезда',       defaultRequired: true },
+  { key: 'guests',   defaultLabel: 'Количество гостей', defaultRequired: true },
+  { key: 'children', defaultLabel: 'Есть ли дети?',     defaultRequired: false },
+];
+
+// Backwards-compat alias — старый код ссылается на HOTEL_CORE_FIELDS.
+const HOTEL_CORE_FIELDS = HOTEL_STANDALONE_FIELDS;
+
+const FLIGHT_STANDALONE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
   { key: 'firstName',     defaultLabel: 'Имя (латиницей)',                    defaultRequired: true },
   { key: 'lastName',      defaultLabel: 'Фамилия (латиницей)',                defaultRequired: true },
   { key: 'fromCity',      defaultLabel: 'Из какого города',                   defaultRequired: true },
@@ -499,6 +517,14 @@ const FLIGHT_CORE_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequ
   { key: 'telegramLogin', defaultLabel: 'Логин в Telegram',                   defaultRequired: true },
   { key: 'passport',      defaultLabel: 'Загранпаспорт (файл)',               defaultRequired: true },
 ];
+
+const FLIGHT_VISA_ADDON_FIELDS: Array<{ key: string; defaultLabel: string; defaultRequired: boolean }> = [
+  { key: 'fromCity',    defaultLabel: 'Из какого города', defaultRequired: true },
+  { key: 'toCity',      defaultLabel: 'В какой город',    defaultRequired: true },
+  { key: 'bookingDate', defaultLabel: 'Дата бронирования', defaultRequired: true },
+];
+
+const FLIGHT_CORE_FIELDS = FLIGHT_STANDALONE_FIELDS;
 
 // ─── Booking constructor ──────────────────────────────────────────────────────
 //
@@ -542,7 +568,10 @@ export interface BookingType {
     'standalone_hotel_core_overrides' | 'standalone_flight_core_overrides'>;
 }
 
-// Visa-аддоны — внутри визовой анкеты (Step2AdditionalDocs)
+// Visa-аддоны — внутри визовой анкеты (Step2AdditionalDocs).
+// coreFields = только trip-specific (страна/город/даты/гости/дети для отеля,
+// откуда/куда/дата для авиабилета). Контакты + паспорт уже собирает Step1
+// визовой формы — дублировать незачем.
 export const VISA_ADDON_BOOKING_TYPES: BookingType[] = [
   {
     serviceId: 'hotel-booking',
@@ -551,7 +580,7 @@ export const VISA_ADDON_BOOKING_TYPES: BookingType[] = [
     fallbackIcon: '🏨',
     fallbackDescription: 'Подтверждение проживания для визы и границы',
     HeroIcon: Hotel,
-    coreFields: HOTEL_CORE_FIELDS,
+    coreFields: HOTEL_VISA_ADDON_FIELDS,
     extraFieldsKey: 'hotel_extra_fields',
     overridesKey: 'hotel_core_overrides',
   },
@@ -562,7 +591,7 @@ export const VISA_ADDON_BOOKING_TYPES: BookingType[] = [
     fallbackIcon: '✈️',
     fallbackDescription: 'Подтверждение рейса для визы и границы',
     HeroIcon: Plane,
-    coreFields: FLIGHT_CORE_FIELDS,
+    coreFields: FLIGHT_VISA_ADDON_FIELDS,
     extraFieldsKey: 'flight_extra_fields',
     overridesKey: 'flight_core_overrides',
   },
