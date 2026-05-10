@@ -165,27 +165,43 @@ const FinanceSection: React.FC = () => {
               <p className="opacity-90">Выручка (визы + брони) <span className="float-right">{fmtRub(stats?.revenue ?? 0)}</span></p>
               <p className="opacity-80">− Себестоимость <span className="float-right">−{fmtRub(stats?.costOfGoods ?? 0)}</span></p>
               <p className="opacity-80">− Налог (УСН) <span className="float-right">−{fmtRub(stats?.taxes ?? 0)}</span></p>
-              <p className="opacity-80">− Партнёрам (профит-шеринг) <span className="float-right">−{fmtRub(stats?.commissionsPaid ?? 0)}</span></p>
+              <p className="opacity-80">− Выплачено партнёрам <span className="float-right">−{fmtRub(stats?.commissionsPaid ?? 0)}</span></p>
               <p className="font-semibold opacity-100 pt-1 border-t border-white/20">= Прибыль <span className="float-right">{fmtRub(stats?.profit ?? 0)}</span></p>
               <div className="font-sans opacity-75 pt-2 leading-snug space-y-1.5">
                 <p><span className="opacity-100 font-semibold">Себестоимость</span> состоит из:</p>
                 <p>• По визам: ($сбор + $комиссия посольства) × курс USD заявки + себестоимость доп. услуг (например, билет 780₽).</p>
                 <p>• По броням: себестоимость одного отеля и одного билета берётся из «Доп. услуги».</p>
                 <p>• Налог (УСН) — % от полной цены каждой позиции (визы + брони).</p>
-                <p>Бонусы, которые списали клиенты, уже учтены в выручке (выручка = цена − бонусы), поэтому отдельно из прибыли не вычитаются.</p>
+                <p><span className="opacity-100 font-semibold">Выплачено партнёрам</span> — реальные переводы на карту за период (логи partner_paid). Pending в hold и approved-к-выплате не вычитаются — это обязательства, а не cash-out, они в карточке «Долг компании».</p>
+                <p>Обычные бонусы (welcome / referral / админские начисления) НЕ вычитаются из прибыли — они увеличивают баланс юзера, реальный расход возникает когда юзер их применит (это уже в выручке через price − bonuses_used).</p>
               </div>
             </div>
           )}
         </div>
 
-        {/* Bonuses owed */}
+        {/* Долг компании — обычные бонусы + партнёрские (к выплате + в hold) */}
         <div className="bg-gradient-to-br from-amber-500 to-amber-700 p-5 rounded-xl text-white">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs uppercase tracking-wider opacity-80">Бонусы у юзеров</p>
+            <p className="text-xs uppercase tracking-wider opacity-80">Долг компании</p>
             <Coins size={16} className="opacity-70" />
           </div>
-          <p className="text-3xl font-bold leading-tight">{fmtRub(stats?.bonusesOutstanding ?? 0)}</p>
-          <p className="text-xs opacity-75 mt-1">текущий долг (на балансах юзеров)</p>
+          <p className="text-3xl font-bold leading-tight">
+            {fmtRub((stats?.bonusesOutstanding ?? 0) + (stats?.partnerOwedToPay ?? 0) + (stats?.partnerHoldOutstanding ?? 0))}
+          </p>
+          <div className="text-xs opacity-90 mt-2 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="opacity-80">Юзерам в бонусах</span>
+              <span className="font-mono">{fmtRub(stats?.bonusesOutstanding ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="opacity-80">Партнёрам к выплате</span>
+              <span className="font-mono">{fmtRub(stats?.partnerOwedToPay ?? 0)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="opacity-80">Партнёрам в hold (30д)</span>
+              <span className="font-mono">{fmtRub(stats?.partnerHoldOutstanding ?? 0)}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -200,8 +216,11 @@ const FinanceSection: React.FC = () => {
           <p className="text-xs text-red-600">Налог</p>
           <p className="text-lg font-semibold text-red-800">−{fmtRub(stats?.taxes ?? 0)}</p>
         </div>
-        <div className="bg-red-50 border border-red-100 p-3 rounded-lg">
-          <p className="text-xs text-red-600">Партнёрам (профит-шеринг)</p>
+        <div
+          className="bg-red-50 border border-red-100 p-3 rounded-lg cursor-help"
+          title="Реальные выплаты партнёрам на карту за период (логи partner_paid). Это и есть cash-out из кассы. Деньги в hold и к выплате — в карточке «Долг компании», они НЕ вычитаются из прибыли."
+        >
+          <p className="text-xs text-red-600">Выплачено партнёрам <span className="text-red-400">ⓘ</span></p>
           <p className="text-lg font-semibold text-red-800">−{fmtRub(stats?.commissionsPaid ?? 0)}</p>
         </div>
       </div>
@@ -216,10 +235,14 @@ const FinanceSection: React.FC = () => {
           (информация — не влияет на прибыль ⓘ)
         </span>
       </p>
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="bg-gray-50 p-3 rounded-lg">
-          <p className="text-xs text-[#0F2A36]/60">Welcome (+200₽ за реф.)</p>
+          <p className="text-xs text-[#0F2A36]/60">Welcome (новичкам)</p>
           <p className="text-lg font-semibold text-[#0F2A36]/80">+{fmtRub(stats?.welcomeBonusesPaid ?? 0)}</p>
+        </div>
+        <div className="bg-gray-50 p-3 rounded-lg">
+          <p className="text-xs text-[#0F2A36]/60">Реф-бонусы (обычным)</p>
+          <p className="text-lg font-semibold text-[#0F2A36]/80">+{fmtRub(stats?.referralBonusesIssued ?? 0)}</p>
         </div>
         <div className="bg-gray-50 p-3 rounded-lg">
           <p className="text-xs text-[#0F2A36]/60">Прочие (daily/admin/…)</p>
