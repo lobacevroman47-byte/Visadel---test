@@ -35,6 +35,73 @@ function generateReferralCode(telegramId) {
   return `USR_${telegramId.toString(36).toUpperCase()}`;
 }
 
+// Уведомление партнёру о новом реферале. Шлём через /api/notify-status
+// с типом partner_new_referral. Идёт ОДИН РАЗ на (партнёр, реферал) —
+// дедуп через bonus_logs (type=referral_register, dedupe_key=ref_register_<refereeTgId>).
+// Без bonus_logs можно было бы шлёпнуть push повторно при втором upsert юзера.
+async function notifyPartnerOfNewReferral({ partnerCode, refereeTgId, refereeName, baseUrl }) {
+  if (!partnerCode || !refereeTgId) return;
+  try {
+    // 1. Найти telegram_id партнёра по канон. реф-коду
+    const partnerRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/users?referral_code=eq.${encodeURIComponent(partnerCode)}&select=telegram_id&limit=1`,
+      { headers: headers() },
+    );
+    const rows = await partnerRes.json().catch(() => []);
+    const partnerTgId = rows?.[0]?.telegram_id;
+    if (!partnerTgId) {
+      console.warn(`[notifyPartnerOfNewReferral] partner not found by code ${partnerCode}`);
+      return;
+    }
+
+    // 2. Дедуп через bonus_logs: записываем «log-only» строку с уникальным
+    //    dedupe_key. Если уже есть — alreadyExists=true → не шлём.
+    const dedupeKey = `ref_register_${refereeTgId}`;
+    const dedupeRes = await fetch(
+      `${SUPABASE_URL}/rest/v1/bonus_logs?on_conflict=telegram_id,type,dedupe_key`,
+      {
+        method: 'POST',
+        headers: headers({ Prefer: 'return=representation,resolution=ignore-duplicates' }),
+        body: JSON.stringify({
+          telegram_id: partnerTgId,
+          type: 'referral_register',
+          amount: 0,
+          description: `Реферал ${refereeName || refereeTgId} зарегистрировался`,
+          dedupe_key: dedupeKey,
+        }),
+      },
+    );
+    if (!dedupeRes.ok) {
+      console.warn(`[notifyPartnerOfNewReferral] dedup log failed ${dedupeRes.status}`);
+      return;
+    }
+    const inserted = await dedupeRes.json().catch(() => []);
+    if (Array.isArray(inserted) && inserted.length === 0) {
+      // Дубликат — уже отправляли push для этого реферала
+      console.log(`[notifyPartnerOfNewReferral] dedup hit для ${dedupeKey}`);
+      return;
+    }
+
+    // 3. Шлём push через notify-status. Используем X-Service-Key чтобы
+    //    обойти Telegram-auth check.
+    await fetch(`${baseUrl}/api/notify-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Service-Key': SERVICE_KEY,
+      },
+      body: JSON.stringify({
+        telegram_id: partnerTgId,
+        status: 'partner_new_referral',
+        referee_name: refereeName || `ID ${refereeTgId}`,
+        application_id: dedupeKey, // для in-memory dedup в notify-status
+      }),
+    });
+  } catch (e) {
+    console.warn('[notifyPartnerOfNewReferral] failed:', e);
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -183,6 +250,16 @@ export default async function handler(req, res) {
         } catch (e) { console.warn('[upsert-user] welcome on attach failed:', e); }
       }
 
+      // Уведомление партнёру о новом реферале (только если referrerJustAttached
+      // — иначе при каждом переоткрытии апп бы шёл повторно, но дедуп всё равно
+      // блочит). Best-effort, не падаем если push fail.
+      if (referrerJustAttached && referred_by) {
+        const baseUrl = `https://${req.headers.host}`;
+        const refereeName = [first_name, last_name].filter(Boolean).join(' ').trim();
+        notifyPartnerOfNewReferral({ partnerCode: referred_by, refereeTgId: verifiedTgId, refereeName, baseUrl })
+          .catch(e => console.warn('[upsert-user] notify partner failed:', e));
+      }
+
       res.status(200).json({ user, isNew: false, referrerJustAttached, welcomeBonusGranted });
       return;
     }
@@ -243,6 +320,15 @@ export default async function handler(req, res) {
         );
         welcomeBonusGranted = true;
       } catch (e) { console.warn('[upsert-user] welcome log failed:', e); }
+    }
+
+    // Уведомление партнёру о новом реферале (для NEW user — самый частый кейс).
+    // Best-effort, не блокирует ответ юзеру.
+    if (referred_by) {
+      const baseUrl = `https://${req.headers.host}`;
+      const refereeName = [first_name, last_name].filter(Boolean).join(' ').trim();
+      notifyPartnerOfNewReferral({ partnerCode: referred_by, refereeTgId: verifiedTgId, refereeName, baseUrl })
+        .catch(e => console.warn('[upsert-user] notify partner failed:', e));
     }
 
     res.status(200).json({ user, isNew: true, welcomeBonusGranted });
