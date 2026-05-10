@@ -20,6 +20,7 @@ import {
 import { useTelegram } from '../App';
 import { useDialog } from './shared/BrandDialog';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiFetch } from '../lib/apiFetch';
 import { HeaderActions } from './HeaderActions';
 import { Button as BrandButton, Modal } from './ui/brand';
 
@@ -103,6 +104,28 @@ function serviceLabel(service: ServiceType): string {
   if (service === 'visa') return 'Виза';
   if (service === 'hotel_bookings') return 'Бронь отеля';
   return 'Авиабилет';
+}
+
+// Иконка по типу сервиса. Для виз — флаг страны (как было), для броней —
+// type-specific emoji 🏨/✈️ (раньше показывалось 🌍 G — fallback на флаг
+// "страны" которая на самом деле первая буква short city).
+function serviceIcon(service: ServiceType | undefined, country?: string | null): string {
+  if (service === 'hotel_bookings') return '🏨';
+  if (service === 'flight_bookings') return '✈️';
+  return countryFlag(country);
+}
+
+// Title для броней — фиксированная подпись (раньше тащило короткий мусор
+// типа "G" из city/country которые юзер ввёл одной буквой).
+function buildEarningTitleFixed(e: Enrichment | undefined, fallbackService?: ServiceType): string {
+  if (!e) return fallbackService ? serviceLabel(fallbackService) : 'Партнёрское начисление';
+  if (e.service === 'hotel_bookings') return 'Бронь отеля';
+  if (e.service === 'flight_bookings') {
+    if (e.from_city && e.to_city) return `${e.from_city} → ${e.to_city}`;
+    return 'Бронь авиабилета';
+  }
+  // Виза — оставляем country как title
+  return e.country || serviceLabel('visa');
 }
 
 // Заголовок строки (главная): "Южная Корея", "Бали", "Москва → Бали"
@@ -291,12 +314,20 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
       try {
         const myReferralCode = appUser?.referral_code ?? '';
         const myVanityCode   = (appUser?.vanity_code ?? '').toUpperCase();
-        // Коды по которым считаем клики — каноничный + vanity (если есть).
-        // referral_clicks хранит код AS-TYPED (без resolve), поэтому матчить
-        // нужно по обоим вариантам.
+        // Коды для clicks count — canonical + vanity (передаём в API).
         const codesToMatch = [myReferralCode, myVanityCode].filter(Boolean);
 
-        const [logsRes, payoutsRes, settingsRes, clicksRes, referredRes] = await Promise.all([
+        // ВАЖНО: clicks и registrations НЕ читаем напрямую из supabase.
+        // Миграция 004 включила RLS на referral_clicks и users без
+        // SELECT-политики для anon → запросы возвращали 0/[] даже когда
+        // данные были. Идём через /api/partner-stats который использует
+        // service_key (bypass RLS).
+        const partnerStatsPromise = apiFetch(
+          `/api/partner-stats?codes=${encodeURIComponent(codesToMatch.join(','))}`,
+        ).then(r => r.ok ? r.json() : { clicks: 0, registrations: [] })
+          .catch(e => { console.warn('[partner-stats] fetch failed:', e); return { clicks: 0, registrations: [] }; });
+
+        const [logsRes, payoutsRes, settingsRes, partnerStats] = await Promise.all([
           supabase.from('bonus_logs')
             .select('id, type, amount, description, dedupe_key, created_at')
             .eq('telegram_id', telegramId)
@@ -309,28 +340,13 @@ export default function PartnerDashboard({ onBack }: PartnerDashboardProps) {
             .order('created_at', { ascending: false })
             .limit(20),
           supabase.from('partner_settings').select('*').eq('telegram_id', telegramId).maybeSingle(),
-          // Клики: count через head=true + Prefer count=exact
-          codesToMatch.length > 0
-            ? supabase.from('referral_clicks')
-                .select('id', { count: 'exact', head: true })
-                .in('referral_code', codesToMatch)
-            : Promise.resolve({ count: 0 } as { count: number }),
-          // Зарегистрированные юзеры по канонической ссылке партнёра.
-          // users.referred_by всегда canonical (resolveReferralCode на signup).
-          // engaged_at — отделяем «остались» от «открыли и закрыли» (миграция 023).
-          myReferralCode
-            ? supabase.from('users')
-                .select('first_name, created_at, engaged_at')
-                .eq('referred_by', myReferralCode)
-                .order('created_at', { ascending: false })
-                .limit(100)
-            : Promise.resolve({ data: [] }),
+          partnerStatsPromise,
         ]);
         if (cancelled) return;
         setLogs((logsRes.data ?? []) as BonusLogEntry[]);
         setPayouts((payoutsRes.data ?? []) as PayoutEntry[]);
-        setClicksCount((clicksRes as { count: number | null }).count ?? 0);
-        setReferredUsers(((referredRes as { data: { first_name: string; created_at: string; engaged_at: string | null }[] | null }).data ?? []) as { first_name: string; created_at: string; engaged_at: string | null }[]);
+        setClicksCount(typeof (partnerStats as { clicks?: number }).clicks === 'number' ? (partnerStats as { clicks: number }).clicks : 0);
+        setReferredUsers(((partnerStats as { registrations?: { first_name: string; created_at: string; engaged_at: string | null }[] }).registrations ?? []));
         if (settingsRes.data) {
           const s = settingsRes.data as Partial<PartnerSettings> & { entity_type: string | null };
           setSettings({
@@ -1035,9 +1051,12 @@ function EarningRow({
   const isPending = log.type === 'partner_pending';
   const parsed = parseDedupe(log.dedupe_key);
   const fallbackService = parsed?.service;
-  const title = buildEarningTitle(enrichment, fallbackService);
+  // Используем fixed-title и type-specific icon чтобы брони показывали
+  // 🏨 «Бронь отеля» / ✈️ «Бронь авиабилета», а не 🌍 + мусор из city.
+  const effectiveService = enrichment?.service ?? fallbackService;
+  const title = buildEarningTitleFixed(enrichment, fallbackService);
   const subtitle = buildEarningSubtitle(enrichment);
-  const flag = countryFlag(enrichment?.country);
+  const icon = serviceIcon(effectiveService, enrichment?.country);
 
   return (
     <button
@@ -1045,7 +1064,7 @@ function EarningRow({
       className="w-full flex items-center justify-between py-3 first:pt-0 last:pb-0 hover:bg-gray-50/50 active:bg-gray-100/50 -mx-2 px-2 rounded-lg transition text-left gap-3"
     >
       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-        <span className="text-xl leading-none shrink-0" aria-hidden>{flag}</span>
+        <span className="text-xl leading-none shrink-0" aria-hidden>{icon}</span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-[#0F2A36] truncate">{title}</p>
           {subtitle && (
@@ -1074,9 +1093,10 @@ function EarningDetailModal({
   const willApproveAt = new Date(created.getTime() + HOLD_DAYS * 24 * 60 * 60 * 1000);
   const daysLeft = Math.max(0, HOLD_DAYS - Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24)));
 
-  const flag = countryFlag(enrichment?.country);
+  const effectiveService = enrichment?.service ?? sourceType ?? undefined;
+  const icon = serviceIcon(effectiveService, enrichment?.country);
   const sourceLabel = sourceType ? serviceLabel(sourceType) : 'Начисление';
-  const titleLine = buildEarningTitle(enrichment, sourceType ?? undefined);
+  const titleLine = buildEarningTitleFixed(enrichment, sourceType ?? undefined);
   const subtitleLine = buildEarningSubtitle(enrichment);
   const breakdown = parseCommissionBreakdown(log.description);
   const avgPct = enrichment?.price && enrichment.price > 0
@@ -1090,7 +1110,7 @@ function EarningDetailModal({
           <div className="min-w-0 flex-1">
             <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wider">{sourceLabel}</p>
             <p className="text-base font-bold text-[#0F2A36] truncate mt-0.5 flex items-center gap-2">
-              <span className="text-xl">{flag}</span>
+              <span className="text-xl">{icon}</span>
               {titleLine}
             </p>
             {subtitleLine && <p className="text-xs text-gray-500 mt-0.5">{subtitleLine}</p>}
