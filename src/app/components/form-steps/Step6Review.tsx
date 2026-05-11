@@ -335,7 +335,6 @@ const FIELD_LABELS: Record<string, string> = {
   addressInKenya: 'Адрес в Кении',
   kenyaAddress: 'Адрес в Кении',
   pakistanAddress: 'Адрес в Пакистане',
-  plannedAddress: 'Планируемый адрес проживания',
   hotelAddress: 'Адрес отеля',
   hotelInfo: 'Информация об отеле',
 
