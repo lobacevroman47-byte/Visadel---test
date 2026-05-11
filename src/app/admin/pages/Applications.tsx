@@ -600,6 +600,32 @@ const FIELD_LABELS: Record<string, string> = {
   lived2Years: 'Проживал 2+ лет в стране оформления',
   companions: 'Сопровождающие',
   howHeard: 'Откуда узнали о нас',
+
+  // ── Bookings: Hotel ──────────────────────────────────────────────────────
+  country: 'Страна',
+  city: 'Город',
+  checkIn: 'Дата заезда',
+  checkOut: 'Дата выезда',
+  guests: 'Количество гостей',
+  hasChildren: 'Есть дети',
+  children: 'Возраст детей',
+  childrenCount: 'Количество детей',
+
+  // ── Bookings: Flight ─────────────────────────────────────────────────────
+  fromCity: 'Город вылета',
+  toCity: 'Город прибытия',
+  bookingDate: 'Дата бронирования',
+
+  // ── Bookings: common files / contacts ────────────────────────────────────
+  passport: 'Скан паспорта',
+  passportPhoto: 'Фото загранпаспорта',
+  facePhoto: 'Фото лица',
+  paymentScreenshot: 'Скриншот оплаты',
+  telegramLogin: 'Telegram',
+
+  // ── Extension Sri Lanka ─────────────────────────────────────────────────
+  phoneRussia: 'Телефон в РФ',
+  phoneSriLanka: 'Телефон на Шри-Ланке',
 };
 
 const HOW_HEARD_LABELS: Record<string, string> = {
@@ -763,19 +789,20 @@ const FormDataView: React.FC<{ app: Application }> = ({ app }) => {
                 );
               }
 
-              // Then — any extras: prefer FIELD_LABELS (Russian), no English camelCase fallback
+              // Then — any extras: prefer FIELD_LABELS (Russian).
+              // Fallback humanizeKey() для незнакомых ключей —
+              // camelCase → «Camel case» (лучше чем raw camelCase).
               for (const [key, value] of Object.entries(basicData)) {
                 if (orderedKeys.has(key)) continue;
                 const formatted = formatValue(key, value);
                 if (formatted === '—') continue;
                 const russianLabel = FIELD_LABELS[key];
+                const humanized = !russianLabel
+                  ? key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase())
+                  : null;
                 rows.push(
                   <div key={key} className="p-2 bg-gray-50 rounded-lg">
-                    {russianLabel ? (
-                      <p className="text-xs text-gray-500">{russianLabel}</p>
-                    ) : (
-                      <p className="text-[10px] font-mono text-gray-400 uppercase tracking-wider">{key}</p>
-                    )}
+                    <p className="text-xs text-gray-500">{russianLabel ?? humanized}</p>
                     <p className="text-sm text-gray-800 whitespace-pre-wrap">{formatted}</p>
                   </div>,
                 );

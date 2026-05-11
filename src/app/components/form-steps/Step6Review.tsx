@@ -197,149 +197,200 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
   );
 }
 
-function getFieldLabel(key: string): string {
-  const labels: Record<string, string> = {
-    // ── Universal/identity fields (раньше не было — показывались как raw key) ──
-    firstName: 'Имя',
-    lastName: 'Фамилия',
-    middleName: 'Отчество',
-    patronymic: 'Отчество',
-    fullName: 'ФИО',
-    email: 'Email',
-    phone: 'Телефон',
-    telegram: 'Telegram',
-    birthDate: 'Дата рождения',
-    gender: 'Пол',
-    passportNumber: 'Номер паспорта',
-    passportSeries: 'Серия и номер паспорта',
-    homeAddress: 'Домашний адрес',
-    arrivalDate: 'Дата прилёта',
-    sriLankaAddress: 'Адрес на Шри-Ланке',
-    phoneRussia: 'Телефон в РФ',
-    phoneSriLanka: 'Телефон на Шри-Ланке',
-    // Aliases между Step1BasicData (новые ключи) и legacy data (старые ключи).
-    // Если в БД лежит старая запись с этими ключами — отображаем по-русски.
-    purpose: 'Цель поездки',
-    previousVisit: 'Были ранее в стране',
-    criminalRecord: 'Судимости',
-    diseases: 'Опасные заболевания',
-    contactsInKorea: 'Знакомые в Корее',
-    travelCompanions: 'Сопровождающие',
-    employment: 'Работа',
-    koreaAddress: 'Адрес в Корее',
-    dateRange: 'Даты поездки',
-    dateStart: 'Дата начала',
-    dateEnd: 'Дата окончания',
+// Универсальный словарь русских лейблов для всех ключей в form_data.
+// Покрывает: 9 визовых стран + продление + контакты + брони + динамические
+// поля визовых форм. Если в БД лежит запись со старыми/новыми именами ключей —
+// все мапируется здесь в одно место.
+//
+// Если ключа нет — fallback humanizeKey() пытается разбить camelCase на слова
+// (firstTimePhilippines → «First time philippines»). Это не идеально, но
+// лучше чем raw camelCase.
+const FIELD_LABELS: Record<string, string> = {
+  // ── Universal / identity ────────────────────────────────────────────────
+  firstName: 'Имя',
+  lastName: 'Фамилия',
+  middleName: 'Отчество',
+  patronymic: 'Отчество',
+  fullName: 'ФИО',
+  email: 'Email',
+  phone: 'Телефон',
+  phoneRussia: 'Телефон в РФ',
+  phoneSriLanka: 'Телефон на Шри-Ланке',
+  telegram: 'Telegram',
+  telegramLogin: 'Telegram',
+  birthDate: 'Дата рождения',
+  gender: 'Пол',
+  passportNumber: 'Номер паспорта',
+  passportSeries: 'Серия и номер паспорта',
+  homeAddress: 'Домашний адрес',
+  registrationAddress: 'Адрес регистрации',
+  residenceAddress: 'Адрес проживания',
+  currentAddress: 'Текущий адрес',
+  plannedAddress: 'Планируемый адрес',
+  citizenship: 'Гражданство',
+  secondCitizenship: 'Второе гражданство',
+  hasSecondCitizenship: 'Второе гражданство',
+  previousCitizenship: 'Предыдущее гражданство',
+  dualCitizenship: 'Двойное гражданство',
+  birthCountry: 'Страна рождения',
+  birthCity: 'Город рождения',
+  maritalStatus: 'Семейное положение',
+  spouseInfo: 'Информация о супруге',
+  fatherData: 'Данные отца',
+  motherData: 'Данные матери',
+  parentsData: 'Данные родителей',
+  childInfo: 'Информация о ребёнке',
+  workplace: 'Место работы',
+  workInfo: 'Информация о работе',
+  workOrStudy: 'Работа / учёба',
+  working: 'Работаете',
+  employment: 'Работа',
+  profession: 'Профессия',
+  previousName: 'Предыдущие Ф.И.О',
+  internalPassport: 'Серия и номер внутреннего паспорта',
+  isBiometric: 'Биометрический паспорт',
+  countriesVisited: 'Посещённые страны',
+  emergencyContact: 'Экстренный контакт',
+  howHeard: 'Откуда узнали о нас',
+  militaryService: 'Служба в армии/полиции',
+  oldPassport: 'Старый паспорт',
+  expectedExpenses: 'Ожидаемые расходы',
+  insuranceInfo: 'Страховка',
+  bringCurrency: 'Ввоз валюты',
 
-    // Common
-    citizenship: 'Гражданство',
-    birthCountry: 'Страна рождения',
-    birthCity: 'Город рождения',
-    
-    // India
-    airport: 'Аэропорт прилёта',
-    arrivalDate: 'Дата прилёта',
-    previousName: 'Предыдущие Ф.И.О',
-    previousCitizenship: 'Предыдущее гражданство',
-    internalPassport: 'Внутренний паспорт',
-    residedTwoYears: 'Прожили 2 года в стране',
-    registrationAddress: 'Адрес регистрации',
-    residenceAddress: 'Адрес проживания',
-    fatherData: 'Данные отца',
-    motherData: 'Данные матери',
-    maritalStatus: 'Семейное положение',
-    spouseInfo: 'Информация о супруге',
-    workplace: 'Место работы',
-    militaryService: 'Служба в армии/полиции',
-    visaRefusal: 'Отказы в визе',
-    citiesInIndia: 'Города в Индии',
-    countriesVisited: 'Посещённые страны',
-    visitedIndiaBefore: 'Были в Индии',
-    southAsiaVisits: 'Визиты в Южную Азию',
-    hotelInfo: 'Информация об отеле',
-    contactInIndia: 'Контакт в Индии',
-    emergencyContact: 'Экстренный контакт',
-    
-    // Vietnam
-    secondCitizenship: 'Второе гражданство',
-    vietnamViolations: 'Нарушения во Вьетнаме',
-    oldPassport: 'Старый паспорт',
-    plannedDates: 'Планируемые даты',
-    plannedDateFrom: 'Дата начала',
-    plannedDateTo: 'Дата окончания',
-    currentAddress: 'Текущий адрес',
-    workOrStudy: 'Работа/учёба',
-    visitPurpose: 'Цель визита',
-    contactsInVietnam: 'Контакты во Вьетнаме',
-    arrivalAirport: 'Аэропорт прилёта',
-    departureAirport: 'Аэропорт вылета',
-    addressInVietnam: 'Адрес во Вьетнаме',
-    previousVietnamVisits: 'Предыдущие визиты',
-    childInfo: 'Информация о ребёнке',
-    insuranceInfo: 'Страховка',
-    expectedExpenses: 'Ожидаемые расходы',
-    
-    // Sri Lanka
-    lastCountry: 'Последняя страна',
-    airline: 'Авиакомпания',
-    addressInSriLanka: 'Адрес в Шри-Ланке',
-    hasResidentVisa: 'Резидентская виза',
-    hasExtension: 'Продление',
-    hasMultipleVisa: 'Многократная виза',
-    
-    // Korea
-    tripPurpose: 'Цель поездки',
-    beenToKorea: 'Были в Корее',
-    dualCitizenship: 'Двойное гражданство',
-    hasCriminalRecord: 'Судимости',
-    hasDiseases: 'Опасные заболевания',
-    hasContacts: 'Знакомые в Корее',
-    traveling: 'Сопровождающие',
-    working: 'Работа',
-    tripDates: 'Даты поездки',
-    tripDateFrom: 'Дата начала',
-    tripDateTo: 'Дата окончания',
-    addressInKorea: 'Адрес в Корее',
-    
-    // Israel — arrivalAirport реюзится из Vietnam-секции выше (тот же label).
-    isBiometric: 'Биометрический паспорт',
-    hasSecondCitizenship: 'Второе гражданство',
-    homeAddress: 'Домашний адрес',
-    
-    // Pakistan
-    daysInPakistan: 'Дней в Пакистане',
-    entryPort: 'Порт въезда',
-    exitPort: 'Порт выезда',
-    stayDates: 'Даты пребывания',
-    stayDateFrom: 'Дата начала',
-    stayDateTo: 'Дата окончания',
-    parentsData: 'Данные родителей',
-    workInfo: 'Информация о работе',
-    plannedAddress: 'Планируемый адрес',
-    
-    // Cambodia
-    expectedEntryDate: 'Дата въезда',
-    addressInCambodia: 'Адрес в Камбодже',
-    
-    // Kenya
-    profession: 'Профессия',
-    travelDates: 'Даты поездки',
-    fromCountry: 'Страна вылета',
-    exitAirline: 'Авиакомпания (вылет)',
-    toCountry: 'Страна назначения',
-    addressInKenya: 'Адрес в Кении',
-    convicted: 'Судимости',
-    deniedEntry: 'Отказы во въезде',
-    beenToKenya: 'Были в Кении',
-    bringCurrency: 'Ввоз валюты',
-    
-    // Photos
-    previousVisa: 'Предыдущая виза',
-    indiaStamps: 'Штампы Индии',
-    secondPassport: 'Второй паспорт',
-    hotelFile: 'Бронь отеля',
-    ticketFile: 'Билет',
-  };
-  
-  return labels[key] || key;
+  // ── Dates / travel logistics ───────────────────────────────────────────
+  arrivalDate: 'Дата прилёта',
+  departureDate: 'Дата вылета',
+  arrivalAirport: 'Аэропорт прилёта',
+  departureAirport: 'Аэропорт вылета',
+  airline: 'Авиакомпания',
+  exitAirline: 'Авиакомпания (вылет)',
+  flightNumber: 'Номер рейса',
+  airport: 'Аэропорт прилёта',
+  entryPort: 'Порт въезда',
+  exitPort: 'Порт выезда',
+  fromCountry: 'Страна, откуда прилетаете',
+  toCountry: 'Страна назначения',
+  transit: 'Транзит (страна / аэропорт)',
+  travelDates: 'Даты поездки',
+  plannedDates: 'Планируемые даты',
+  plannedDateFrom: 'Дата начала',
+  plannedDateTo: 'Дата окончания',
+  stayDates: 'Даты пребывания',
+  stayDateFrom: 'Дата начала пребывания',
+  stayDateTo: 'Дата окончания пребывания',
+  tripDates: 'Даты поездки',
+  tripDateFrom: 'Дата начала поездки',
+  tripDateTo: 'Дата окончания поездки',
+  expectedEntryDate: 'Ожидаемая дата въезда',
+  dateRange: 'Даты поездки',
+  dateStart: 'Дата начала',
+  dateEnd: 'Дата окончания',
+  daysInPakistan: 'Дней в Пакистане',
+  residedTwoYears: 'Прожили 2 года в стране',
+
+  // ── Trip purpose / visit ────────────────────────────────────────────────
+  purpose: 'Цель поездки',
+  visitPurpose: 'Цель визита',
+  tripPurpose: 'Цель поездки',
+  previousVisit: 'Были ранее в стране',
+  visaRefusal: 'Отказы в визе',
+  prevVisaType: 'Тип предыдущей визы',
+  prevVisaNumber: 'Номер предыдущей визы',
+  prevEntryAirport: 'Аэропорт предыдущего въезда',
+  prevVisitDate: 'Дата предыдущего визита',
+
+  // ── Country-specific addresses ─────────────────────────────────────────
+  addressInVietnam: 'Адрес во Вьетнаме',
+  addressInSriLanka: 'Адрес на Шри-Ланке',
+  sriLankaAddress: 'Адрес на Шри-Ланке',
+  addressInKorea: 'Адрес в Корее',
+  koreaAddress: 'Адрес в Корее',
+  addressInCambodia: 'Адрес в Камбодже',
+  addressInKenya: 'Адрес в Кении',
+  hotelAddress: 'Адрес отеля',
+  hotelInfo: 'Информация об отеле',
+
+  // ── India ──────────────────────────────────────────────────────────────
+  citiesInIndia: 'Города в Индии',
+  visitedIndiaBefore: 'Были в Индии',
+  southAsiaVisits: 'Визиты в Южную Азию',
+  contactInIndia: 'Контакт в Индии',
+  indiaStamps: 'Штампы Индии',
+
+  // ── Vietnam ────────────────────────────────────────────────────────────
+  vietnamViolations: 'Нарушения во Вьетнаме',
+  contactsInVietnam: 'Контакты во Вьетнаме',
+  previousVietnamVisits: 'Предыдущие визиты во Вьетнам',
+
+  // ── Sri Lanka ──────────────────────────────────────────────────────────
+  lastCountry: 'Последняя страна',
+  last14DaysCountry: 'Страны посещения за 14 дней',
+  hasResidentVisa: 'Резидентская виза',
+  residentVisa: 'Резидентская виза',
+  hasExtension: 'Продление получено',
+  hasMultipleVisa: 'Многократная виза',
+  multipleVisa: 'Многократная виза',
+  onSriLanka: 'Сейчас на Шри-Ланке',
+
+  // ── Korea ──────────────────────────────────────────────────────────────
+  beenToKorea: 'Были в Корее',
+  hasCriminalRecord: 'Судимости',
+  criminalRecord: 'Судимости',
+  convicted: 'Судимости',
+  hasDiseases: 'Опасные заболевания',
+  diseases: 'Опасные заболевания',
+  hasContacts: 'Знакомые в Корее',
+  contactsInKorea: 'Знакомые в Корее',
+  traveling: 'Сопровождающие',
+  travelCompanions: 'Сопровождающие',
+  companions: 'Сопровождающие',
+
+  // ── Kenya ──────────────────────────────────────────────────────────────
+  deniedEntry: 'Отказы во въезде в Кению',
+  beenToKenya: 'Были в Кении',
+
+  // ── Philippines ────────────────────────────────────────────────────────
+  firstTimePhilippines: 'Впервые на Филиппинах',
+
+  // ── Bookings: Hotel ────────────────────────────────────────────────────
+  country: 'Страна назначения',
+  city: 'Город',
+  checkIn: 'Дата заезда',
+  checkOut: 'Дата выезда',
+  guests: 'Количество гостей',
+  hasChildren: 'Есть дети',
+  children: 'Возраст детей',
+  childrenCount: 'Количество детей',
+
+  // ── Bookings: Flight ───────────────────────────────────────────────────
+  fromCity: 'Город вылета',
+  toCity: 'Город прибытия',
+  bookingDate: 'Дата бронирования',
+
+  // ── Files / photos ─────────────────────────────────────────────────────
+  passport: 'Скан паспорта',
+  passportPhoto: 'Фото загранпаспорта',
+  facePhoto: 'Фото лица',
+  paymentScreenshot: 'Скриншот оплаты',
+  previousVisa: 'Предыдущая виза',
+  secondPassport: 'Второй паспорт',
+  hotelFile: 'Бронь отеля',
+  ticketFile: 'Билет',
+
+  // ── Extension-specific ─────────────────────────────────────────────────
+  // (Большинство overlap с universal — firstName, homeAddress, arrivalDate)
+};
+
+// Fallback: если ключа нет в словаре — преобразовать camelCase в нормальный
+// текст (например `firstTimePhilippines` → «First time philippines»).
+// Не идеально, но лучше чем raw camelCase.
+function humanizeKey(key: string): string {
+  // camelCase → split words → lowercase, capitalize first
+  const split = key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').trim();
+  return split.charAt(0).toUpperCase() + split.slice(1).toLowerCase();
+}
+
+function getFieldLabel(key: string): string {
+  return FIELD_LABELS[key] || humanizeKey(key);
 }
