@@ -231,6 +231,20 @@ function getFieldLabel(key: string): string {
     dateStart: 'Дата начала',
     dateEnd: 'Дата окончания',
 
+    // ── Филиппины ───────────────────────────────────────────────────────
+    flightNumber: 'Номер рейса',
+    transit: 'Транзит (страна / аэропорт)',
+    hotelAddress: 'Адрес отеля',
+    companions: 'Сопровождающие лица',
+    firstTimePhilippines: 'Впервые на Филиппинах?',
+    visitPurpose: 'Цель приезда',
+
+    // ── Шри-Ланка (legacy & dynamic) ────────────────────────────────────
+    last14DaysCountry: 'Страны посещения за 14 дней',
+    residentVisa: 'Есть резидентская виза',
+    onSriLanka: 'Сейчас на Шри-Ланке',
+    multipleVisa: 'Многократная виза',
+
     // Common
     citizenship: 'Гражданство',
     birthCountry: 'Страна рождения',
