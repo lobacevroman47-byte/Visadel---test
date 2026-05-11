@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, Upload, CheckCircle2, CreditCard, User, Coins, Save, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, CheckCircle2, CreditCard, User, Phone, Camera, Coins, Save, AlertTriangle } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 import SuccessScreen from './shared/SuccessScreen';
@@ -536,247 +536,245 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
       {/* ── Step content ─────────────────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto p-4">
         {currentStep === 0 && (
-          <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
-            <div className="mb-2">
-              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 1</p>
-              <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Продление визы</h2>
-              <p className="text-sm text-[#0F2A36]/60 mt-1">{visa.type}</p>
-            </div>
-
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <User className="w-5 h-5 text-[#3B5BFF]" />
-                <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
-              </div>
-              <LatinNotice />
-            </div>
-
-            {/* Имя */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Имя (латиницей, как в паспорте)
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.firstName || ''}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value.toUpperCase() })}
-                className={`form-input ${errors.firstName ? 'border-red-500' : ''}`}
-                placeholder="IVAN"
-                autoComplete="off"
-              />
-              {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
-            </div>
-
-            {/* Фамилия */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Фамилия (латиницей, как в паспорте)
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.lastName || ''}
-                onChange={(e) => setFormData({ ...formData, lastName: e.target.value.toUpperCase() })}
-                className={`form-input ${errors.lastName ? 'border-red-500' : ''}`}
-                placeholder="IVANOV"
-                autoComplete="off"
-              />
-              {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
-            </div>
-
-            {/* Домашний адрес */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Домашний адрес (прописка / последнее место проживания)
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.homeAddress || ''}
-                onChange={(e) => setFormData({ ...formData, homeAddress: e.target.value })}
-                className={`form-input ${errors.homeAddress ? 'border-red-500' : ''}`}
-                placeholder="Россия, г. Москва, ул. Примерная, д. 1, кв. 1"
-              />
-              {errors.homeAddress && <p className="text-red-500 text-xs mt-1">{errors.homeAddress}</p>}
-            </div>
-
-            {/* Дата прилёта — используем shared/DateInput (тот же что в визовой
-                форме): видимый «дд.мм.гггг» с numeric-клавиатурой + 📅 иконка
-                для открытия iOS-picker. */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Дата прилёта на Шри-Ланку
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <DateInput
-                value={formData.arrivalDate}
-                onChange={(v) => setFormData({ ...formData, arrivalDate: v })}
-                placeholder="дд.мм.гггг"
-                inputClassName={`form-input pr-12 ${errors.arrivalDate ? 'border-red-500' : ''}`}
-              />
-              {errors.arrivalDate && <p className="text-red-500 text-xs mt-1">{errors.arrivalDate}</p>}
-            </div>
-
-            {/* Адрес ШЛ */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Адрес проживания на Шри-Ланке
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="text"
-                value={formData.sriLankaAddress || ''}
-                onChange={(e) => setFormData({ ...formData, sriLankaAddress: e.target.value })}
-                className={`form-input ${errors.sriLankaAddress ? 'border-red-500' : ''}`}
-                placeholder="Отель или адрес проживания"
-              />
-              {errors.sriLankaAddress && <p className="text-red-500 text-xs mt-1">{errors.sriLankaAddress}</p>}
-            </div>
-
-            {/* Телефон РФ */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Мобильный номер телефона в РФ
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="tel"
-                value={formData.phoneRussia || ''}
-                onChange={(e) => setFormData({ ...formData, phoneRussia: e.target.value })}
-                className={`form-input ${errors.phoneRussia ? 'border-red-500' : ''}`}
-                placeholder="+7 (999) 123-45-67"
-              />
-              {errors.phoneRussia && <p className="text-red-500 text-xs mt-1">{errors.phoneRussia}</p>}
-            </div>
-
-            {/* Телефон ШЛ */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Мобильный номер телефона на Шри-Ланке
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              <input
-                type="tel"
-                value={formData.phoneSriLanka || ''}
-                onChange={(e) => setFormData({ ...formData, phoneSriLanka: e.target.value })}
-                className={`form-input ${errors.phoneSriLanka ? 'border-red-500' : ''}`}
-                placeholder="+94 XX XXX XXXX"
-              />
-              {errors.phoneSriLanka && <p className="text-red-500 text-xs mt-1">{errors.phoneSriLanka}</p>}
-            </div>
-
-            {/* Фото паспорта */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Фото загранпаспорта (без бликов, пальцев)
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              {!formData.passportPhoto ? (
-                <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#EAF1FF] transition ${
-                  errors.passportPhoto ? 'border-red-500' : 'border-gray-300'
-                }`}>
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="w-8 h-8 text-gray-400" />
-                    <p className="text-sm text-gray-600">Нажмите для загрузки фото паспорта</p>
-                    <p className="text-xs text-gray-400">JPG, PNG · макс. 10MB</p>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={(e) => handleFileUpload('passportPhoto', e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </label>
-              ) : (
-                <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                      <div>
-                        <p className="text-sm text-gray-800">{formData.passportPhoto.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {(formData.passportPhoto.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleFileUpload('passportPhoto', null)}
-                      className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
-                    >
-                      Изменить
-                    </button>
-                  </div>
+          /* Шаг 1 — три отдельные карточки (Личные / Контакты / Фото)
+             зеркалят визовый flow (Step1BasicData → Step4ContactInfo →
+             Step5PhotoUpload). Раньше всё было в одной монолитной карточке
+             с лишним заголовком «Шаг 1 / Продление визы». */
+          <div className="space-y-4">
+            {/* ── Карточка 1: Личные данные ───────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <User className="w-5 h-5 text-[#3B5BFF]" />
+                  <h3 className="text-sm font-bold text-[#0F2A36]">Личные данные</h3>
                 </div>
-              )}
-              {errors.passportPhoto && <p className="text-red-500 text-xs mt-1">{errors.passportPhoto}</p>}
-            </div>
-
-            {/* Фото лица */}
-            <div>
-              <label className="block mb-2 text-[#212121]">
-                Фото Ваше на светлом фоне (как на паспорт)
-                <span className="text-red-500 ml-1">*</span>
-              </label>
-              {!formData.facePhoto ? (
-                <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#EAF1FF] transition ${
-                  errors.facePhoto ? 'border-red-500' : 'border-gray-300'
-                }`}>
-                  <div className="flex flex-col items-center gap-2">
-                    <Upload className="w-8 h-8 text-gray-400" />
-                    <p className="text-sm text-gray-600">Нажмите для загрузки вашего фото</p>
-                    <p className="text-xs text-gray-400">JPG, PNG · макс. 10MB</p>
-                  </div>
-                  <input
-                    type="file"
-                    accept=".jpg,.jpeg,.png"
-                    onChange={(e) => handleFileUpload('facePhoto', e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </label>
-              ) : (
-                <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-600" />
-                      <div>
-                        <p className="text-sm text-gray-800">{formData.facePhoto.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {(formData.facePhoto.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleFileUpload('facePhoto', null)}
-                      className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
-                    >
-                      Изменить
-                    </button>
-                  </div>
-                </div>
-              )}
-              {errors.facePhoto && <p className="text-red-500 text-xs mt-1">{errors.facePhoto}</p>}
-            </div>
-
-            {/* Стоимость */}
-            <div className="vd-grad-soft rounded-xl p-4 border border-blue-100/60">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[#212121]">Стоимость продления:</span>
-                <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{visa.price.toLocaleString('ru-RU')}₽</span>
+                <LatinNotice />
               </div>
-              <p className="text-sm text-[#0F2A36]/60">После проверки заявки вы перейдёте к оплате</p>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Имя (латиницей, как в паспорте)
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.firstName || ''}
+                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value.toUpperCase() })}
+                  className={`form-input ${errors.firstName ? 'border-red-500' : ''}`}
+                  placeholder="IVAN"
+                  autoComplete="off"
+                />
+                {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Фамилия (латиницей, как в паспорте)
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.lastName || ''}
+                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value.toUpperCase() })}
+                  className={`form-input ${errors.lastName ? 'border-red-500' : ''}`}
+                  placeholder="IVANOV"
+                  autoComplete="off"
+                />
+                {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Домашний адрес (прописка / последнее место проживания)
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.homeAddress || ''}
+                  onChange={(e) => setFormData({ ...formData, homeAddress: e.target.value })}
+                  className={`form-input ${errors.homeAddress ? 'border-red-500' : ''}`}
+                  placeholder="Россия, г. Москва, ул. Примерная, д. 1, кв. 1"
+                />
+                {errors.homeAddress && <p className="text-red-500 text-xs mt-1">{errors.homeAddress}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Дата прилёта на Шри-Ланку
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <DateInput
+                  value={formData.arrivalDate}
+                  onChange={(v) => setFormData({ ...formData, arrivalDate: v })}
+                  placeholder="дд.мм.гггг"
+                  inputClassName={`form-input pr-12 ${errors.arrivalDate ? 'border-red-500' : ''}`}
+                />
+                {errors.arrivalDate && <p className="text-red-500 text-xs mt-1">{errors.arrivalDate}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Адрес проживания на Шри-Ланке
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.sriLankaAddress || ''}
+                  onChange={(e) => setFormData({ ...formData, sriLankaAddress: e.target.value })}
+                  className={`form-input ${errors.sriLankaAddress ? 'border-red-500' : ''}`}
+                  placeholder="Отель или адрес проживания"
+                />
+                {errors.sriLankaAddress && <p className="text-red-500 text-xs mt-1">{errors.sriLankaAddress}</p>}
+              </div>
             </div>
 
-            {/* Кнопки */}
-            <div className="space-y-3">
+            {/* ── Карточка 2: Контактные данные ──────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+              <div className="flex items-center gap-2">
+                <Phone className="w-5 h-5 text-[#3B5BFF]" />
+                <h3 className="text-sm font-bold text-[#0F2A36]">Контактные данные</h3>
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Мобильный номер телефона в РФ
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phoneRussia || ''}
+                  onChange={(e) => setFormData({ ...formData, phoneRussia: e.target.value })}
+                  className={`form-input ${errors.phoneRussia ? 'border-red-500' : ''}`}
+                  placeholder="+7 (999) 123-45-67"
+                />
+                {errors.phoneRussia && <p className="text-red-500 text-xs mt-1">{errors.phoneRussia}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Мобильный номер телефона на Шри-Ланке
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phoneSriLanka || ''}
+                  onChange={(e) => setFormData({ ...formData, phoneSriLanka: e.target.value })}
+                  className={`form-input ${errors.phoneSriLanka ? 'border-red-500' : ''}`}
+                  placeholder="+94 XX XXX XXXX"
+                />
+                {errors.phoneSriLanka && <p className="text-red-500 text-xs mt-1">{errors.phoneSriLanka}</p>}
+              </div>
+            </div>
+
+            {/* ── Карточка 3: Загрузка фото ──────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
+              <div className="flex items-center gap-2">
+                <Camera className="w-5 h-5 text-[#3B5BFF]" />
+                <h3 className="text-sm font-bold text-[#0F2A36]">Загрузка фото</h3>
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Фото загранпаспорта (без бликов, пальцев)
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {!formData.passportPhoto ? (
+                  <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#EAF1FF] transition ${
+                    errors.passportPhoto ? 'border-red-500' : 'border-gray-300'
+                  }`}>
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <p className="text-sm text-gray-600">Нажмите для загрузки фото паспорта</p>
+                      <p className="text-xs text-gray-400">JPG, PNG · макс. 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      onChange={(e) => handleFileUpload('passportPhoto', e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                        <div>
+                          <p className="text-sm text-gray-800">{formData.passportPhoto.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(formData.passportPhoto.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleFileUpload('passportPhoto', null)}
+                        className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
+                      >
+                        Изменить
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {errors.passportPhoto && <p className="text-red-500 text-xs mt-1">{errors.passportPhoto}</p>}
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Фото Ваше на светлом фоне (как на паспорт)
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                {!formData.facePhoto ? (
+                  <label className={`block border-2 border-dashed rounded-xl p-6 cursor-pointer hover:border-[#3B5BFF] hover:bg-[#EAF1FF] transition ${
+                    errors.facePhoto ? 'border-red-500' : 'border-gray-300'
+                  }`}>
+                    <div className="flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <p className="text-sm text-gray-600">Нажмите для загрузки вашего фото</p>
+                      <p className="text-xs text-gray-400">JPG, PNG · макс. 10MB</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".jpg,.jpeg,.png"
+                      onChange={(e) => handleFileUpload('facePhoto', e.target.files?.[0] || null)}
+                      className="hidden"
+                    />
+                  </label>
+                ) : (
+                  <div className="border-2 border-emerald-500 bg-emerald-50 rounded-xl p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+                        <div>
+                          <p className="text-sm text-gray-800">{formData.facePhoto.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {(formData.facePhoto.size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleFileUpload('facePhoto', null)}
+                        className="text-sm text-[#3B5BFF] hover:text-[#4F2FE6]"
+                      >
+                        Изменить
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {errors.facePhoto && <p className="text-red-500 text-xs mt-1">{errors.facePhoto}</p>}
+              </div>
+            </div>
+
+            {/* ── Кнопки внизу страницы ──────────────────────────────── */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-3">
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
                 className="!py-4 !rounded-2xl !font-bold"
                 onClick={handleGoToReview}
+                rightIcon={<ChevronRight className="w-5 h-5" />}
               >
-                Далее — проверка данных
+                Далее
               </Button>
 
               <Button

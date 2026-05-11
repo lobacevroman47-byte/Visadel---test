@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { mockApplications, mockUsers } from '../data/mockData';
 
@@ -225,7 +226,12 @@ export async function updateApplicationStatus(
       });
       if (logError) {
         console.error('[status_log] insert failed:', logError);
-        alert(`⚠️ Запись в истории не создалась:\n${logError.message}\nКод: ${logError.code}\n\nЗапусти: ALTER TABLE status_log DISABLE ROW LEVEL SECURITY;`);
+        // Раньше тут был native alert() — он зависает Telegram WebView и
+        // приводит к белому экрану (см. enterprise-аудит P0). Заменено на
+        // toast — статус-update в applications прошёл успешно, история в
+        // status_log просто не записалась (не критично для юзера, важно
+        // только для compliance).
+        toast.warning(`История изменений не сохранена: ${logError.message ?? 'RLS блок'}`);
       }
     }
   }
