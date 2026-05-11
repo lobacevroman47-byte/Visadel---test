@@ -306,12 +306,14 @@ function App() {
     setCurrentScreen('application');
   };
 
-  const handleContinueDraft = (draft: { id?: string; visa: VisaOption; urgent: boolean }) => {
+  const handleContinueDraft = (draft: { id?: string; visa: VisaOption; urgent: boolean; application_type?: 'visa' | 'extension' }) => {
     setSelectedVisa(draft.visa);
     setUrgentVisa(draft.urgent);
     setPrefilledAddons(undefined);
     setActiveDraftId(draft.id);
-    setCurrentScreen('application');
+    // Черновики продления визы открываются в SriLankaExtensionForm,
+    // а не в ApplicationForm — у них своя структура form_data.
+    setCurrentScreen(draft.application_type === 'extension' ? 'extension' : 'application');
   };
 
   // DraftPicker callbacks
@@ -457,6 +459,8 @@ function App() {
               visa={selectedVisa}
               onBack={handleBackToHome}
               onComplete={handleBackToHome}
+              onGoToProfile={() => { setInitialProfileTab('applications'); setMainTab('profile'); setCurrentScreen('profile'); }}
+              draftId={activeDraftId}
             />
           </Suspense>
         )}

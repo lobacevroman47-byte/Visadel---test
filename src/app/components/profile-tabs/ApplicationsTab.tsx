@@ -46,6 +46,10 @@ interface Draft {
   savedAt: string;
   formData: unknown;
   draftKey: string;
+  // 'extension' — черновик продления визы (SriLankaExtensionForm).
+  // undefined/'visa' — обычная визовая анкета (ApplicationForm).
+  // Используется в handleContinueDraft чтобы открыть нужный экран.
+  application_type?: 'visa' | 'extension';
 }
 
 interface ApplicationsTabProps {
@@ -92,11 +96,19 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 };
 
 // ── Status Progress Bar ───────────────────────────────────────────────────────
-const PROGRESS_STEPS = [
+// Лейбл шага 2 («Виза оформляется» / «Продление оформляется») выбирается
+// динамически по application_type. Все остальные шаги идентичны.
+const PROGRESS_STEPS_VISA = [
   { id: 'pending_confirmation', label: 'Заявка\nподана',    icon: '📋' },
   { id: 'in_progress',         label: 'Проверка\nоплаты',  icon: '✅' },
   { id: 'working',             label: 'Виза\nоформляется', icon: '⚙️' },
   { id: 'ready',               label: 'Готово',             icon: '🎉' },
+];
+const PROGRESS_STEPS_EXTENSION = [
+  { id: 'pending_confirmation', label: 'Заявка\nподана',         icon: '📋' },
+  { id: 'in_progress',         label: 'Проверка\nоплаты',       icon: '✅' },
+  { id: 'working',             label: 'Продление\nоформляется', icon: '⚙️' },
+  { id: 'ready',               label: 'Готово',                  icon: '🎉' },
 ];
 
 // Mapping реальных DB-статусов на step-index:
@@ -115,14 +127,16 @@ function getProgressIndex(status: string): number {
   return -1;
 }
 
-function StatusProgress({ status }: { status: string }) {
+function StatusProgress({ status, applicationType }: { status: string; applicationType?: 'visa' | 'extension' }) {
   const activeIdx = getProgressIndex(status);
   if (activeIdx < 0) return null;
+
+  const steps = applicationType === 'extension' ? PROGRESS_STEPS_EXTENSION : PROGRESS_STEPS_VISA;
 
   return (
     <div className="mt-3 mb-1 px-1">
       <div className="flex items-start">
-        {PROGRESS_STEPS.map((step, idx) => {
+        {steps.map((step, idx) => {
           const done = idx < activeIdx;
           const active = idx === activeIdx;
           return (
@@ -143,7 +157,7 @@ function StatusProgress({ status }: { status: string }) {
                 </span>
               </div>
               {/* Connector line */}
-              {idx < PROGRESS_STEPS.length - 1 && (
+              {idx < steps.length - 1 && (
                 <div className={`flex-1 h-0.5 mt-4 mx-0.5 rounded-full transition-colors ${
                   done ? 'bg-[#3B5BFF]' : 'bg-gray-200'
                 }`} />
@@ -373,11 +387,18 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
           // (любой статус, кроме 'draft'), черновик пропадает автоматически.
           // Закрывает дыру: до фикса Step7Payment удалял только одиночный
           // localStorage-ключ, но запись в visa_drafts оставалась навсегда.
-          const submittedKeys = new Set(
-            apps
-              .filter(a => a.status !== 'draft')
-              .map(a => `draft_${a.visa_id}_${a.urgent ? 'urgent' : 'normal'}`)
-          );
+          // Сабмитнутые заявки → ключи их черновиков (чтобы исчезли
+          // из списка незавершённых). У виз ключ `draft_<id>_<urgent>`,
+          // у продлений `draft_extension_<id>` — оба варианта в фильтре.
+          const submittedKeys = new Set<string>();
+          for (const a of apps) {
+            if (a.status === 'draft') continue;
+            if (a.application_type === 'extension') {
+              submittedKeys.add(`draft_extension_${a.visa_id}`);
+            } else {
+              submittedKeys.add(`draft_${a.visa_id}_${a.urgent ? 'urgent' : 'normal'}`);
+            }
+          }
           const valid = parsed
             .filter(d => now - new Date(d.savedAt).getTime() < 30 * 24 * 60 * 60 * 1000)
             .filter(d => !submittedKeys.has(d.id))
@@ -616,18 +637,28 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
               <FileText className="w-5 h-5" /> Незавершённые заявки
             </h3>
             <div className="space-y-3">
-              {drafts.map(draft => (
+              {drafts.map(draft => {
+                const isExtensionDraft = draft.application_type === 'extension';
+                return (
                 <div key={draft.draftKey} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-400">
                   <div className="flex items-start justify-between mb-2">
-                    <div>
-                      <h4 className="text-gray-800">{draft.visa.country}</h4>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-gray-800 flex items-center gap-1.5">
+                        <span className="truncate">{draft.visa.country}</span>
+                        {isExtensionDraft && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF] shrink-0">
+                            Продление
+                          </span>
+                        )}
+                      </h4>
                       <p className="text-sm text-gray-600">{draft.visa.type}</p>
                     </div>
-                    <span className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full">📝 Черновик</span>
+                    <span className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full shrink-0">📝 Черновик</span>
                   </div>
                   <div className="flex justify-between text-sm text-gray-500 mb-3">
-                    <span>Шаг {draft.step + 1} из 6</span>
-                    <span>{new Date(draft.savedAt).toLocaleDateString('ru-RU')}</span>
+                    {/* Для extension flow всего 1 шаг (форма) — не показываем «Шаг X из 6». */}
+                    {!isExtensionDraft && <span>Шаг {draft.step + 1} из 6</span>}
+                    <span className="ml-auto">{new Date(draft.savedAt).toLocaleDateString('ru-RU')}</span>
                   </div>
 
                   {deletingDraftKey === draft.draftKey ? (
@@ -662,7 +693,8 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                     </div>
                   )}
                 </div>
-              ))}
+              );
+              })}
 
               {bookingDrafts.map(bd => {
                 const isHotel = bd.type === 'hotel';
@@ -730,6 +762,8 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                 const basicData = (app.form_data as { basicData?: { firstName?: string; lastName?: string; fullName?: string } } | undefined)?.basicData ?? {};
                 const fullName = [basicData.firstName, basicData.lastName].filter(Boolean).join(' ').trim() || basicData.fullName || '';
 
+                const isExtension = app.application_type === 'extension';
+
                 return (
                   <div key={app.id} className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -737,6 +771,11 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                         <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
                           <span aria-hidden>{countryFlag(app.country)}</span>
                           <span className="truncate">{app.country}</span>
+                          {isExtension && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF] shrink-0">
+                              Продление
+                            </span>
+                          )}
                         </h4>
                         <p className="text-sm text-gray-500 mt-0.5">{app.visa_type}</p>
                         {fullName && <p className="text-sm font-semibold text-[#0F2A36]/80 mt-0.5 truncate">{fullName}</p>}
@@ -746,9 +785,11 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                       </span>
                     </div>
 
-                    {/* Progress bar for active applications */}
+                    {/* Progress bar for active applications.
+                        Лейбл шага 2 («Виза оформляется» / «Продление оформляется»)
+                        выбирается по application_type. */}
                     {['pending_confirmation', 'in_progress', 'ready'].includes(app.status) && (
-                      <StatusProgress status={app.status} />
+                      <StatusProgress status={app.status} applicationType={app.application_type} />
                     )}
 
                     <div className="space-y-1 text-sm text-gray-500 mb-3 mt-2">
