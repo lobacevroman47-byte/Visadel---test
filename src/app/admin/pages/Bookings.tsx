@@ -1217,18 +1217,23 @@ function BookingDetailModal({
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Доп. поля</p>
                 <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-                  {Object.entries(b.extra_fields).map(([k, v]) => (
-                    <div key={k}>
-                      <p className="text-xs text-gray-500">{k}</p>
-                      {/^https?:\/\//.test(String(v)) ? (
-                        <a href={String(v)} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline break-all">
-                          Открыть файл ↗
-                        </a>
-                      ) : (
-                        <p className="text-sm font-medium whitespace-pre-wrap">{String(v) || '—'}</p>
-                      )}
-                    </div>
-                  ))}
+                  {Object.entries(b.extra_fields).map(([k, v]) => {
+                    // Humanize key: camelCase → «Camel case» (если ключ —
+                    // raw camelCase от FormBuilder, показываем читабельно).
+                    const label = k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+                    return (
+                      <div key={k}>
+                        <p className="text-xs text-gray-500">{label}</p>
+                        {/^https?:\/\//.test(String(v)) ? (
+                          <a href={String(v)} target="_blank" rel="noreferrer" className="text-sm text-blue-600 hover:underline break-all">
+                            Открыть файл ↗
+                          </a>
+                        ) : (
+                          <p className="text-sm font-medium whitespace-pre-wrap">{String(v) || '—'}</p>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
