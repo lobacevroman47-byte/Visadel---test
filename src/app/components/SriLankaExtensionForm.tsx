@@ -49,10 +49,13 @@ interface ExtensionFormData {
   facePhoto: File | null;
 }
 
-// 3 шага — как у визового flow (Данные → Проверка → Оплата).
-// Раньше было 2 шага без «Проверки», юзер шёл сразу с формы в оплату —
-// в визовой анкете это шаг Step6Review между загрузкой фото и оплатой.
-const STEPS = ['Данные', 'Проверка', 'Оплата'];
+// 5 шагов — единая структура с визовой анкетой:
+//   0. Личные      — имя/фамилия/адрес/дата прилёта/адрес на ШЛ/телефон ШЛ
+//   1. Контакты    — email, телефон РФ, Telegram (= Step4ContactInfo у виз)
+//   2. Фото        — паспорт + лицо (= Step5PhotoUpload)
+//   3. Проверка    — readonly-сводка (= Step6Review)
+//   4. Оплата      — реквизиты, бонусы, скрин (= Step7Payment)
+const STEPS = ['Личные', 'Контакты', 'Фото', 'Проверка', 'Оплата'];
 
 // dd.MM.yyyy — формат даты единый со всем mini-app. Использует тот же
 // shared/DateInput компонент что и Step1BasicData.
@@ -199,64 +202,75 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
   }, [formData, persistDraft]);
 
   // ── Validation ──────────────────────────────────────────────────────────────
-  const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.firstName.trim()) newErrors.firstName = 'Укажите имя латиницей';
-    if (!formData.lastName.trim()) newErrors.lastName = 'Укажите фамилию латиницей';
-    if (!formData.homeAddress.trim()) newErrors.homeAddress = 'Укажите домашний адрес';
-    if (!formData.arrivalDate) newErrors.arrivalDate = 'Укажите дату прилёта';
-    if (!formData.sriLankaAddress.trim()) newErrors.sriLankaAddress = 'Укажите адрес проживания на Шри-Ланке';
-    // Контактные данные — формат как у виз (Step4ContactInfo)
-    if (!formData.email.trim()) newErrors.email = 'Укажите email';
-    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) newErrors.email = 'Некорректный email';
-    if (!formData.phoneRussia.trim()) newErrors.phoneRussia = 'Укажите телефон в РФ';
-    else if (formData.phoneRussia.replace(/\D/g, '').length < 10) newErrors.phoneRussia = 'Минимум 10 цифр';
-    if (!formData.phoneSriLanka.trim()) newErrors.phoneSriLanka = 'Укажите телефон на Шри-Ланке';
-    if (!formData.telegram.trim()) newErrors.telegram = 'Укажите Telegram';
-    if (!formData.passportPhoto) newErrors.passportPhoto = 'Загрузите фото паспорта';
-    if (!formData.facePhoto) newErrors.facePhoto = 'Загрузите ваше фото';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  // ── Пошаговая валидация — проверяем только поля текущего шага ────────────
+  const validateStep0Personal = () => {
+    const e: Record<string, string> = {};
+    if (!formData.firstName.trim()) e.firstName = 'Укажите имя латиницей';
+    if (!formData.lastName.trim()) e.lastName = 'Укажите фамилию латиницей';
+    if (!formData.homeAddress.trim()) e.homeAddress = 'Укажите домашний адрес';
+    if (!formData.arrivalDate) e.arrivalDate = 'Укажите дату прилёта';
+    if (!formData.sriLankaAddress.trim()) e.sriLankaAddress = 'Укажите адрес проживания на Шри-Ланке';
+    if (!formData.phoneSriLanka.trim()) e.phoneSriLanka = 'Укажите телефон на Шри-Ланке';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const validateStep1Contact = () => {
+    const e: Record<string, string> = {};
+    if (!formData.email.trim()) e.email = 'Укажите email';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) e.email = 'Некорректный email';
+    if (!formData.phoneRussia.trim()) e.phoneRussia = 'Укажите телефон в РФ';
+    else if (formData.phoneRussia.replace(/\D/g, '').length < 10) e.phoneRussia = 'Минимум 10 цифр';
+    if (!formData.telegram.trim()) e.telegram = 'Укажите Telegram';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const validateStep2Photos = () => {
+    const e: Record<string, string> = {};
+    if (!formData.passportPhoto) e.passportPhoto = 'Загрузите фото паспорта';
+    if (!formData.facePhoto) e.facePhoto = 'Загрузите ваше фото';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
   const goToPrevStep = () => {
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1);
+      setErrors({});
       window.scrollTo(0, 0);
     }
   };
 
-  // Step 0 → Step 1 (Проверка). Шаг проверки — копия Step6Review для визового
-  // flow: юзер видит сводку всех введённых данных и подтверждает что они
-  // корректны прежде чем перейти к оплате.
-  const handleGoToReview = async () => {
-    if (!validateForm()) {
+  // Универсальный «Далее» — валидирует поля текущего шага и переключает на
+  // следующий. На шаге Фото (2) → Проверка (3) также ставит cron-напоминание
+  // об оплате (юзер уже далеко, заявка ценная). При успешной оплате отменим.
+  const handleGoNext = async () => {
+    let ok = true;
+    if (currentStep === 0) ok = validateStep0Personal();
+    else if (currentStep === 1) ok = validateStep1Contact();
+    else if (currentStep === 2) ok = validateStep2Photos();
+    if (!ok) {
       await dialog.warning('Заполните все обязательные поля');
       return;
     }
-    setCurrentStep(1);
-    window.scrollTo(0, 0);
-  };
-
-  // Step 1 (Проверка) → Step 2 (Оплата). Из Review кнопка «Перейти к оплате»
-  // ведёт сюда. Валидация уже была на step 0 → review.
-  const handleGoToPayment = () => {
-    // Cron-напоминания: ставим их когда юзер дошёл до экрана оплаты.
-    // Если он за 1/6/24 часа не оплатит — придут push'и
-    // «Осталось оплатить продление». При успешной оплате отменим в
-    // handlePaymentComplete.
-    const key = draftId || `draft_extension_${visa.id}`;
-    apiFetch('/api/schedule-reminders', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        draft_key: key,
-        country: visa.country,
-        visa_type: visa.type,
-        type: 'payment',
-      }),
-    }).catch(console.error);
-    setCurrentStep(2);
+    // При переходе с Фото на Проверку — расписываем cron-напоминания
+    // об оплате (1ч / 6ч / 24ч). См. handlePaymentComplete для cancel.
+    if (currentStep === 2) {
+      const key = draftId || `draft_extension_${visa.id}`;
+      apiFetch('/api/schedule-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draft_key: key,
+          country: visa.country,
+          visa_type: visa.type,
+          type: 'payment',
+        }),
+      }).catch(console.error);
+    }
+    setCurrentStep(currentStep + 1);
+    setErrors({});
     window.scrollTo(0, 0);
   };
 
@@ -706,6 +720,35 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               </div>
             </div>
 
+            {/* Кнопки шага «Личные» */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-3">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="!py-4 !rounded-2xl !font-bold"
+                onClick={handleGoNext}
+                rightIcon={<ChevronRight className="w-5 h-5" />}
+              >
+                Далее
+              </Button>
+              <Button
+                variant="soft"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl"
+                onClick={handleSaveDraft}
+                leftIcon={<Save className="w-4 h-4" />}
+              >
+                Сохранить черновик
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1 — Контактные данные (email / phone / telegram) */}
+        {currentStep === 1 && (
+          <div className="space-y-4">
             {/* ── Карточка 2: Контактные данные — единый паттерн со Step4ContactInfo
                 визовой анкеты (email + phone + telegram). Эти 3 поля идут
                 в form_data.contactInfo и видны в админке в табе «Основное». */}
@@ -763,6 +806,45 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               </div>
             </div>
 
+            {/* Кнопки шага «Контакты» */}
+            <div className="bg-white rounded-2xl shadow-lg p-6 space-y-3">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="!py-4 !rounded-2xl !font-bold"
+                onClick={handleGoNext}
+                rightIcon={<ChevronRight className="w-5 h-5" />}
+              >
+                Далее
+              </Button>
+              <Button
+                variant="soft"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl"
+                onClick={handleSaveDraft}
+                leftIcon={<Save className="w-4 h-4" />}
+              >
+                Сохранить черновик
+              </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl !bg-gray-100 !border-0 !text-[#0F2A36]/70 hover:!bg-gray-200"
+                onClick={goToPrevStep}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                Назад
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 2 — Загрузка фото (паспорт + лицо) */}
+        {currentStep === 2 && (
+          <div className="space-y-4">
             {/* ── Карточка 3: Загрузка фото ──────────────────────────── */}
             <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
               <div className="flex items-center gap-2">
@@ -861,19 +943,18 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               </div>
             </div>
 
-            {/* ── Кнопки внизу страницы ──────────────────────────────── */}
+            {/* Кнопки шага «Фото» */}
             <div className="bg-white rounded-2xl shadow-lg p-6 space-y-3">
               <Button
                 variant="primary"
                 size="lg"
                 fullWidth
                 className="!py-4 !rounded-2xl !font-bold"
-                onClick={handleGoToReview}
+                onClick={handleGoNext}
                 rightIcon={<ChevronRight className="w-5 h-5" />}
               >
                 Далее
               </Button>
-
               <Button
                 variant="soft"
                 size="md"
@@ -884,15 +965,25 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               >
                 Сохранить черновик
               </Button>
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl !bg-gray-100 !border-0 !text-[#0F2A36]/70 hover:!bg-gray-200"
+                onClick={goToPrevStep}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                Назад
+              </Button>
             </div>
           </div>
         )}
 
-        {/* Step 1 — Проверка данных (зеркалит Step6Review для визового flow) */}
-        {currentStep === 1 && (
+        {/* Step 3 — Проверка данных (зеркалит Step6Review для визового flow) */}
+        {currentStep === 3 && (
           <div className="bg-white rounded-2xl shadow-lg p-6">
             <div className="mb-6">
-              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 2</p>
+              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 4</p>
               <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Проверка данных</h2>
               <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -998,7 +1089,8 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 size="lg"
                 fullWidth
                 className="!py-4 !rounded-2xl !font-bold"
-                onClick={handleGoToPayment}
+                onClick={handleGoNext}
+                rightIcon={<ChevronRight className="w-5 h-5" />}
               >
                 Перейти к оплате
               </Button>
@@ -1022,13 +1114,13 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 onClick={goToPrevStep}
                 leftIcon={<ChevronLeft className="w-4 h-4" />}
               >
-                Назад к данным
+                Назад
               </Button>
             </div>
           </div>
         )}
 
-        {currentStep === 2 && (
+        {currentStep === 4 && (
           <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
             <div className="mb-6">
               <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Финал</p>
