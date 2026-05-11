@@ -47,6 +47,9 @@ export default function Step6Review({ formData, visa, totalPrice, addonPrices, o
   const additionalPhotoKeys = Object.keys(formData.photos.additionalPhotos)
     .filter(key => formData.photos.additionalPhotos[key]);
 
+  // Срочные Вьетнамские визы — аддон не суммируется (уже в цене).
+  const isVietnamUrgentVisa = visa.country === 'Вьетнам' && /^vietnam-(3d|2d|1d|4h|2h)-/.test(visa.id);
+
   return (
     <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
       {/* Header — единый шапочный шаблон с Step7Payment */}
@@ -146,7 +149,7 @@ export default function Step6Review({ formData, visa, totalPrice, addonPrices, o
             <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Стоимость визы</span>
             <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">{visa.price.toLocaleString('ru-RU')} ₽</span>
           </div>
-          {formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам' && (
+          {formData.additionalDocs.urgentProcessing && !isVietnamUrgentVisa && (
             <div className="flex items-start justify-between gap-3 text-sm">
               <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Срочное оформление</span>
               <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">+{addonPrices.urgent.toLocaleString('ru-RU')} ₽</span>

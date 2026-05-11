@@ -65,7 +65,7 @@ export default function CountryCard({ country, onSelect }: CountryCardProps) {
                       <span className="text-red-900">🚨 Срочное оформление</span>
                       <span className="text-red-600">+1000₽</span>
                     </div>
-                    <p className="text-red-600 text-sm">Ускоренная обработка заявки</p>
+                    <p className="text-red-600 text-sm">Приоритетная обработка вашей заявки</p>
                   </div>
                 </button>
               )}

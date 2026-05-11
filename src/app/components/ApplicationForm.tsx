@@ -385,9 +385,13 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
     }
   };
 
+  // Срочные Вьетнамские визы (vietnam-3d/2d/1d/4h/2h-*) уже содержат
+  // приоритетность в цене — для них аддон urgentProcessing не суммируется.
+  const isVietnamUrgentVisa = visa.country === 'Вьетнам' && /^vietnam-(3d|2d|1d|4h|2h)-/.test(visa.id);
+
   const calculateTotal = () => {
     let total = visa.price;
-    if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') {
+    if (formData.additionalDocs.urgentProcessing && !isVietnamUrgentVisa) {
       total += addonPrices.urgent;
     }
     if (formData.additionalDocs.hotelBooking) {
@@ -520,6 +524,7 @@ export default function ApplicationForm({ visa, urgent, prefilledAddons, onBack,
           {currentStep === 1 && (
             <Step2AdditionalDocs
               country={visa.country}
+              visaId={visa.id}
               data={formData.additionalDocs}
               onChange={(data) => updateFormData('additionalDocs', data)}
               onNext={goToNextStep}

@@ -14,7 +14,7 @@ export const defaultAdditionalServices: AdditionalService[] = [
     id: 'urgent-processing',
     name: 'Срочное оформление',
     icon: '⚡',
-    description: 'Ускоренная обработка вашей заявки',
+    description: 'Приоритетная обработка вашей заявки',
     price: 2000,
     enabled: true
   },

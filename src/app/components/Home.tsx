@@ -184,10 +184,13 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
   const [hotel, setHotel] = useState(false);
   const [ticket, setTicket] = useState(false);
 
-  // Vietnam already has dedicated urgent options, so no urgent toggle there.
-  // Each addon is also gated by admin-configured per-country availability.
-  const isVietnam = visa.country === 'Вьетнам';
-  const showUrgent = !isVietnam && isAddonForCountry(addonAvailability.urgent, visa.country);
+  // У Вьетнама срочность реализована как отдельные visa types
+  // (vietnam-3d / 2d / 1d / 4h / 2h — те что начинаются с «Срочная»).
+  // Для НИХ аддон «Срочное оформление» был бы двойным счётом — скрываем.
+  // Для обычных Вьетнамских (vietnam-90d-single и т.д.) аддон работает
+  // как у остальных стран — это про приоритет обработки внутри агентства.
+  const isVietnamUrgentVisa = visa.country === 'Вьетнам' && /^vietnam-(3d|2d|1d|4h|2h)-/.test(visa.id);
+  const showUrgent = !isVietnamUrgentVisa && isAddonForCountry(addonAvailability.urgent, visa.country);
   const showHotel  = isAddonForCountry(addonAvailability.hotel, visa.country);
   const showTicket = isAddonForCountry(addonAvailability.ticket, visa.country);
   const urgentApplied = urgent && showUrgent;
@@ -293,7 +296,7 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
                 <AddonToggle
                   icon="⚡"
                   label="Срочное оформление"
-                  hint="Приоритетная обработка заявки"
+                  hint="Приоритетная обработка вашей заявки"
                   price={addonPrices.urgent}
                   active={urgent}
                   onToggle={() => setUrgent(!urgent)}
