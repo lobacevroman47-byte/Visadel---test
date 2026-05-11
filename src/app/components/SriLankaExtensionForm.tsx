@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, ChevronRight, Upload, CheckCircle2, CreditCard, User, Phone, Camera, Coins, Save, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, CheckCircle2, CreditCard, User, Phone, Camera, Coins, Save, AlertTriangle, FileText, Mail } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 import SuccessScreen from './shared/SuccessScreen';
@@ -979,107 +979,138 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
           </div>
         )}
 
-        {/* Step 3 — Проверка данных (зеркалит Step6Review для визового flow) */}
+        {/* Step 3 — Проверка данных (единый дизайн со Step6Review визового flow) */}
         {currentStep === 3 && (
-          <div className="bg-white rounded-2xl shadow-lg p-6">
+          <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
             <div className="mb-6">
-              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 4</p>
-              <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Проверка данных</h2>
-              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-yellow-800">
-                  Пожалуйста, внимательно проверьте все данные. Любые ошибки могут привести к отказу в продлении визы.
-                </p>
-              </div>
+              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Финал · Шаг 4 из 5</p>
+              <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Проверка</h2>
+              <p className="text-sm text-[#0F2A36]/60 mt-1">Проверьте данные перед оплатой</p>
             </div>
 
-            <div className="space-y-6 mb-6">
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-amber-900 leading-relaxed">
+                Внимательно проверьте все данные. Любые ошибки могут привести к отказу в продлении визы.
+              </p>
+            </div>
+
+            <div className="space-y-3 mb-4">
               {/* Информация о продлении */}
-              <div className="border-b pb-4">
-                <h3 className="text-gray-700 mb-3 font-semibold">Информация о продлении</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between gap-3">
-                    <span className="text-gray-600">Страна:</span>
-                    <span className="text-gray-800 text-right">{visa.country}</span>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+                    <FileText className="w-5 h-5" />
                   </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-gray-600">Тип:</span>
-                    <span className="text-gray-800 text-right">{visa.type}</span>
+                  <h3 className="text-[#0F2A36] font-bold text-sm pt-2.5">Информация о продлении</h3>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Страна</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{visa.country}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Тип</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{visa.type}</span>
                   </div>
                 </div>
               </div>
 
               {/* Личные данные */}
-              <div className="border-b pb-4">
-                <h3 className="text-gray-700 mb-3 font-semibold">Личные данные</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Имя:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.firstName}</span>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+                    <User className="w-5 h-5" />
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Фамилия:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.lastName}</span>
+                  <h3 className="text-[#0F2A36] font-bold text-sm pt-2.5">Личные данные</h3>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Имя</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.firstName || '—'}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Адрес в РФ:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.homeAddress}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Фамилия</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.lastName || '—'}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Дата прилёта:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formatDateRu(formData.arrivalDate)}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Адрес в РФ</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.homeAddress || '—'}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Адрес на ШЛ:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.sriLankaAddress}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Дата прилёта</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formatDateRu(formData.arrivalDate)}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Телефон ШЛ:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneSriLanka}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Адрес на Шри-Ланке</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.sriLankaAddress || '—'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Телефон на Шри-Ланке</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.phoneSriLanka || '—'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Контактные данные */}
-              <div className="border-b pb-4">
-                <h3 className="text-gray-700 mb-3 font-semibold">Контактные данные</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Email:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.email}</span>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+                    <Mail className="w-5 h-5" />
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Телефон:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneRussia}</span>
+                  <h3 className="text-[#0F2A36] font-bold text-sm pt-2.5">Контактные данные</h3>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Email</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.email || '—'}</span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Telegram:</span>
-                    <span className="text-gray-800 col-span-2 break-words">@{formData.telegram.replace(/^@/, '')}</span>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Телефон</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.phoneRussia || '—'}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <span className="text-[#0F2A36]/60 min-w-0 break-words">Telegram</span>
+                    <span className="text-[#0F2A36] font-medium min-w-0 break-words">{formData.telegram ? `@${formData.telegram.replace(/^@/, '')}` : '—'}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Фото */}
-              <div className="border-b pb-4">
-                <h3 className="text-gray-700 mb-3 font-semibold">Загруженные фото</h3>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-gray-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Фото загранпаспорта {formData.passportPhoto && `(${formData.passportPhoto.name})`}
+              {/* Загруженные фото */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+                    <Camera className="w-5 h-5" />
                   </div>
-                  <div className="flex items-center gap-2 text-gray-800">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                    Фото лица {formData.facePhoto && `(${formData.facePhoto.name})`}
+                  <h3 className="text-[#0F2A36] font-bold text-sm pt-2.5">Загруженные фото</h3>
+                </div>
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>Фото загранпаспорта{formData.passportPhoto ? <span className="text-[#0F2A36]/60"> ({formData.passportPhoto.name})</span> : null}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <span>Фото лица{formData.facePhoto ? <span className="text-[#0F2A36]/60"> ({formData.facePhoto.name})</span> : null}</span>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Итого */}
-              <div className="vd-grad-soft rounded-xl p-4 border border-blue-100/60">
-                <div className="flex justify-between items-center">
-                  <span className="text-[#0F2A36] font-bold">Итого к оплате:</span>
-                  <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{visa.price.toLocaleString('ru-RU')}₽</span>
+            {/* Итого — той же визуальной природы что и в Step6Review/Step7Payment */}
+            <div className="vd-grad-soft rounded-2xl p-5 mb-4 border border-blue-100/60">
+              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mb-3">Детали оплаты</p>
+              <div className="space-y-2.5 mb-3">
+                <div className="flex items-start justify-between gap-3 text-sm">
+                  <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Стоимость продления</span>
+                  <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">{visa.price.toLocaleString('ru-RU')} ₽</span>
                 </div>
+              </div>
+              <div className="border-t border-blue-200/60 pt-3 flex items-baseline justify-between gap-3">
+                <span className="text-[#0F2A36] font-bold">Итого</span>
+                <span className="text-2xl vd-grad-text font-extrabold tracking-tight whitespace-nowrap shrink-0 tabular-nums">
+                  {visa.price.toLocaleString('ru-RU')} ₽
+                </span>
               </div>
             </div>
 
@@ -1092,7 +1123,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 onClick={handleGoNext}
                 rightIcon={<ChevronRight className="w-5 h-5" />}
               >
-                Перейти к оплате
+                К оплате
               </Button>
 
               <Button
