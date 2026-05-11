@@ -293,7 +293,7 @@ function VisaCard({ visa, addonPrices, addonAvailability, onSelect, isUrgent = f
                 <AddonToggle
                   icon="⚡"
                   label="Срочное оформление"
-                  hint="Приоритетная обработка заявки"
+                  hint="Приоритетная обработка вашей заявки"
                   price={addonPrices.urgent}
                   active={urgent}
                   onToggle={() => setUrgent(!urgent)}

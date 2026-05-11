@@ -225,7 +225,7 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
               icon={<Zap className="w-5 h-5" />}
               emoji="⚡"
               title="Срочное оформление"
-              description="Приоритетная обработка в течение 2 рабочих дней"
+              description="Приоритетная обработка вашей заявки"
               price={prices.urgent}
               checked={formData.urgentProcessing}
               onToggle={() => toggleAddon('urgentProcessing')}

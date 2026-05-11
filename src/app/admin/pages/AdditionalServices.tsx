@@ -402,7 +402,7 @@ const ServiceFormModal: React.FC<{
             <textarea
               value={form.description ?? ''} onChange={e => set('description', e.target.value)}
               rows={2}
-              placeholder="Приоритетная обработка заявки"
+              placeholder="Приоритетная обработка вашей заявки"
               className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:border-[#5C7BFF]"
             />
           </div>
