@@ -77,6 +77,7 @@ const ANKETA_BY_COUNTRY: Record<string, Array<{ key: string; label: string }>> =
   'Шри-Ланка': [
     { key: 'citizenship', label: 'Гражданство' },
     { key: 'birthCountry', label: 'Страна рождения' },
+    { key: 'last14DaysCountry', label: 'Страна нахождения в последние 14 дней перед вылетом в Шри-Ланку' },
     { key: 'arrivalDate', label: 'Предполагаемая дата прибытия' },
     { key: 'departureAirport', label: 'Аэропорт вылета (если пока не знаете, оставляйте пустым)' },
     { key: 'airline', label: 'Авиакомпания/судно (если пока не знаете, оставляйте пустым)' },
@@ -630,7 +631,7 @@ const FIELD_LABELS: Record<string, string> = {
 
 const HOW_HEARD_LABELS: Record<string, string> = {
   telegram: 'Telegram', youtube: 'YouTube', instagram: 'Instagram',
-  tiktok: 'TikTok', vk: 'VK', rutube: 'RuTube',
+  tiktok: 'TikTok', vk: 'ВКонтакте', rutube: 'RuTube',
   friends: 'Посоветовали друзья', repeat: 'Оформлял(-а) ранее',
 };
 
