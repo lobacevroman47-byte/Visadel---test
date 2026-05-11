@@ -11,7 +11,7 @@
 // =======================================================================
 
 import React, { useState } from 'react';
-import { Beaker, Trash2 } from 'lucide-react';
+import { Sparkles, Trash2 } from 'lucide-react';
 import { Card } from '../../components/ui/brand';
 import type { VisaOption } from '../../App';
 
@@ -239,7 +239,7 @@ export const DevSeedDrafts: React.FC = () => {
     <Card variant="flat" padding="lg" radius="xl" className="mb-8 border-2 border-dashed border-amber-400">
       <div className="flex items-center gap-3 mb-3">
         <div className="p-2 rounded-lg bg-amber-100">
-          <Beaker size={20} className="text-amber-600" />
+          <Sparkles size={20} className="text-amber-600" />
         </div>
         <div className="flex-1">
           <h3 className="text-base font-bold text-[#0F2A36]">🚧 DEV: Тестовые черновики</h3>
