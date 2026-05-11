@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { ChevronLeft, Upload, CheckCircle2, CreditCard, User, Coins, Save, AlertTriangle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Upload, CheckCircle2, CreditCard, User, Coins, Save, AlertTriangle } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 import SuccessScreen from './shared/SuccessScreen';
@@ -759,7 +759,9 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
             </div>
 
             {/* Кнопки. Блок «Стоимость продления» убран с первого шага —
-                цена показывается в шапке (progress-bar) и на шаге «Оплата». */}
+                цена показывается в шапке (progress-bar) и на шаге «Оплата».
+                Кнопка «Далее» с ChevronRight — единый паттерн с визовым
+                Step1BasicData. */}
             <div className="space-y-3">
               <Button
                 variant="primary"
@@ -767,8 +769,9 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 fullWidth
                 className="!py-4 !rounded-2xl !font-bold"
                 onClick={handleGoToReview}
+                rightIcon={<ChevronRight className="w-5 h-5" />}
               >
-                Далее — проверка данных
+                Далее
               </Button>
 
               <Button
