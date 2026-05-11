@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { apiFetch } from '../../lib/apiFetch';
 import { mockApplications, mockUsers } from '../data/mockData';
 
 export interface AdminApplication {
@@ -344,27 +345,28 @@ export function useAdminUsers() {
 }
 
 export async function updateUserBonuses(telegramId: number, amount: number, add: boolean) {
-  if (!isSupabaseConfigured()) return;
-  const { data } = await supabase.from('users').select('bonus_balance').eq('telegram_id', telegramId).single();
-  const current = (data as { bonus_balance: number } | null)?.bonus_balance ?? 0;
-  const newBalance = add ? current + amount : Math.max(0, current - amount);
-  await supabase.from('users').update({ bonus_balance: newBalance }).eq('telegram_id', telegramId);
-
-  // Audit trail — log every manual change so the bonus journal & finance dashboard
-  // reflect reality. Signed amount: positive = grant, negative = revoke.
-  try {
-    const signed = add ? amount : -amount;
-    await supabase.from('bonus_logs').insert({
-      telegram_id: telegramId,
-      type: add ? 'admin_grant' : 'admin_revoke',
-      amount: signed,
-      description: add
-        ? `Админ начислил +${amount}₽ через панель`
-        : `Админ снял −${amount}₽ через панель`,
-    });
-  } catch (e) {
-    console.warn('admin bonus log insert failed', e);
+  // Раньше делали `supabase.from('users').update(...)` напрямую через anon-key.
+  // Миграция 004_rls_telegram_id.sql блокирует UPDATE на public.users для
+  // anon → запрос молча проваливался, баланс не менялся.
+  //
+  // Теперь идём через /api/admin-grant-bonus — он проверяет initData админа
+  // и через service_key делает UPDATE + audit-log в одной транзакции.
+  const res = await apiFetch('/api/admin-grant-bonus', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      target_telegram_id: telegramId,
+      amount,
+      add,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error('[updateUserBonuses] API failed:', res.status, errText);
+    throw new Error(`Не удалось обновить бонусы: ${res.status} ${errText}`);
   }
+  const data = await res.json().catch(() => ({} as { newBalance?: number }));
+  return data.newBalance ?? 0;
 }
 
 export async function updateUserStatus(telegramId: number, isInfluencer: boolean) {
