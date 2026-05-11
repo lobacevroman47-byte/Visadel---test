@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -75,6 +75,8 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
 
   // Auto-save draft to localStorage с debounce 1s + lastSavedAt трекинг.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  // Cron-напоминания расписываем один раз за сессию (как у отеля).
+  const remindersScheduled = useRef(false);
   useEffect(() => {
     const anyContent = !!(firstName || lastName || fromCity || toCity || bookingDate ||
       email || phone || telegramLogin);
@@ -87,6 +89,19 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
           savedAt: new Date().toISOString(),
         }));
         setLastSavedAt(Date.now());
+        if (!remindersScheduled.current) {
+          remindersScheduled.current = true;
+          apiFetch('/api/schedule-reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              draft_key: 'flight_booking_draft',
+              country: '',
+              visa_type: '',
+              type: 'draft',
+            }),
+          }).catch(console.error);
+        }
       } catch { /* no-op */ }
     }, 1000);
     return () => clearTimeout(timer);
@@ -194,6 +209,13 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
       } catch { /* no-op */ }
 
       try { localStorage.removeItem('flight_booking_draft'); } catch { /* no-op */ }
+
+      // Cancel any pending cron-reminders — юзер успешно оплатил.
+      apiFetch('/api/cancel-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_key: 'flight_booking_draft' }),
+      }).catch(console.error);
 
       haptic('success');
       setSubmitted(true);

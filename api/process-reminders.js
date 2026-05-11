@@ -7,24 +7,53 @@ const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 const BOT_TOKEN    = process.env.TELEGRAM_BOT_TOKEN;
 const APP_URL      = process.env.TELEGRAM_APP_URL ?? process.env.TELEGRAM_MINI_APP_URL;
 
+// 3 шаблона на 1ч → 6ч → 24ч. Категория определяется по префиксу
+// draft_key: extension_ / hotel_ / flight_ / иначе виза.
 const MESSAGES = {
   draft: [
-    { emoji: '📝', title: 'Незавершённая заявка', body: 'Вы начали оформлять визу, но не завершили. Продолжите — это займёт пару минут!' },
-    { emoji: '⏰', title: 'Не забудьте про визу', body: 'Ваша заявка ждёт! Завершите оформление прямо сейчас.' },
-    { emoji: '🌍', title: 'Поездка под угрозой?', body: 'Без визы поездка невозможна. Завершите заявку — мы оформим быстро.' },
-    { emoji: '💙', title: 'Мы всё ещё ждём вас', body: 'Ваши данные сохранены. Продолжите оформление в пару кликов.' },
-    { emoji: '🚀', title: 'Последнее напоминание', body: 'Заявка на визу ждёт завершения. Не откладывайте путешествие!' },
-    { emoji: '✈️', title: 'Пора оформить визу!', body: 'Осталось совсем немного до вашей поездки. Завершите заявку сегодня.' },
+    { emoji: '📝', title: 'Незавершённая заявка на визу', body: 'Вы начали оформлять визу, но не завершили. Продолжите — это займёт пару минут!' },
+    { emoji: '⏰', title: 'Не забудьте про визу', body: 'Ваша заявка ждёт! Завершите оформление, чтобы мы взяли визу в работу.' },
+    { emoji: '🌍', title: 'Последнее напоминание о визе', body: 'Без визы поездка невозможна. Завершите заявку — мы оформим быстро.' },
   ],
   payment: [
-    { emoji: '💳', title: 'Осталось только оплатить', body: 'Ваша заявка заполнена — осталось загрузить скриншот оплаты!' },
-    { emoji: '💰', title: 'Заявка ждёт оплаты', body: 'Переведите оплату и загрузите скриншот, чтобы мы взяли визу в работу.' },
-    { emoji: '⚡', title: 'Не потеряйте заявку', body: 'Заявка заполнена, но оплата ещё не поступила. Завершите за пару минут!' },
-    { emoji: '🎯', title: 'Один шаг до визы', body: 'Оплатите заявку и мы сразу возьмём её в работу.' },
-    { emoji: '📱', title: 'Ваша заявка почти готова', body: 'Загрузите скриншот оплаты — и мы начнём оформление визы.' },
-    { emoji: '🌟', title: 'Напоминаем об оплате', body: 'Завершите оплату, чтобы не потерять своё место в очереди.' },
+    { emoji: '💳', title: 'Осталось оплатить визу', body: 'Ваша заявка заполнена — осталось загрузить скриншот оплаты.' },
+    { emoji: '💰', title: 'Заявка на визу ждёт оплаты', body: 'Переведите оплату и загрузите скриншот, чтобы мы взяли визу в работу.' },
+    { emoji: '⚡', title: 'Заявка скоро удалится', body: 'Оплата ещё не поступила. Завершите оплату — заявка сохранена.' },
+  ],
+  extension_draft: [
+    { emoji: '📝', title: 'Незавершённая заявка на продление', body: 'Вы начали оформлять продление визы, но не завершили. Продолжите за пару минут!' },
+    { emoji: '⏰', title: 'Не забудьте про продление', body: 'Заявка на продление визы ждёт. Завершите оформление, чтобы мы взяли её в работу.' },
+    { emoji: '🌍', title: 'Последнее напоминание о продлении', body: 'Без продления виза может истечь. Завершите заявку — мы оформим быстро.' },
+  ],
+  extension_payment: [
+    { emoji: '💳', title: 'Осталось оплатить продление', body: 'Заявка на продление заполнена — осталось загрузить скриншот оплаты.' },
+    { emoji: '💰', title: 'Продление ждёт оплаты', body: 'Переведите оплату и загрузите скриншот, чтобы мы взяли продление в работу.' },
+    { emoji: '⚡', title: 'Продление скоро удалится', body: 'Оплата ещё не поступила. Завершите оплату — заявка сохранена.' },
+  ],
+  hotel: [
+    { emoji: '🏨', title: 'Незавершённая бронь отеля', body: 'Вы начали оформлять бронь отеля, но не завершили. Продолжите за пару минут!' },
+    { emoji: '⏰', title: 'Не забудьте про бронь отеля', body: 'Заявка на бронь отеля ждёт. Завершите оформление, чтобы мы взяли её в работу.' },
+    { emoji: '🛎️', title: 'Последнее напоминание о броне', body: 'Без подтверждения отеля виза может быть отклонена. Завершите оформление сейчас.' },
+  ],
+  flight: [
+    { emoji: '✈️', title: 'Незавершённая бронь авиабилета', body: 'Вы начали оформлять бронь билета, но не завершили. Продолжите за пару минут!' },
+    { emoji: '⏰', title: 'Не забудьте про авиабилет', body: 'Заявка на бронь билета ждёт. Завершите оформление, чтобы мы взяли её в работу.' },
+    { emoji: '🛫', title: 'Последнее напоминание', body: 'Завершите бронь авиабилета — без неё виза может быть отклонена.' },
   ],
 };
+
+// Определяем категорию по префиксу draft_key. SriLankaExtensionForm пишет
+// draft_extension_*, HotelBookingForm — hotel_booking_draft, аналогично flight.
+function pickCategory(draftKey, type) {
+  if (typeof draftKey === 'string') {
+    if (draftKey.startsWith('draft_extension_') || draftKey.includes('extension')) {
+      return type === 'payment' ? 'extension_payment' : 'extension_draft';
+    }
+    if (draftKey.startsWith('hotel_booking') || draftKey === 'hotel_booking_draft') return 'hotel';
+    if (draftKey.startsWith('flight_booking') || draftKey === 'flight_booking_draft') return 'flight';
+  }
+  return type === 'payment' ? 'payment' : 'draft';
+}
 
 function headers(extra = {}) {
   return {
@@ -35,10 +64,11 @@ function headers(extra = {}) {
   };
 }
 
-async function sendTelegramMessage(telegram_id, text, buttonText) {
+async function sendTelegramMessage(telegram_id, text, buttonText, tabKey) {
+  // tabKey — applications (визы/продления/брони все в Мои заявки таб).
   const reply_markup = APP_URL ? {
     inline_keyboard: [[
-      { text: buttonText, web_app: { url: `${APP_URL}?tab=applications` } }
+      { text: buttonText, web_app: { url: `${APP_URL}?tab=${tabKey || 'applications'}` } }
     ]]
   } : undefined;
 
@@ -109,15 +139,34 @@ export default async function handler(req, res) {
 
     for (const reminder of reminders) {
       try {
-        // Стале-проверка: если у юзера уже есть заявка по этой стране и типу
-        // визы, которая прошла стадию оплаты — не шлём напоминание про оплату/
-        // черновик. Иначе ловим "Один шаг до визы" про визу которая уже в
-        // работе. Скипаем и помечаем sent=true.
-        if (reminder.telegram_id && reminder.country) {
+        // Стале-проверка: если юзер уже подал заявку/бронь по этому черновику —
+        // не шлём напоминание. Скипаем и помечаем sent=true. Проверяем все
+        // 3 таблицы по типу draft_key (applications / hotel_bookings / flight_bookings).
+        const category = pickCategory(reminder.draft_key, reminder.type);
+        let stale = false;
+
+        if ((category === 'hotel' || category === 'flight') && reminder.telegram_id) {
+          // Бронь: смотрим в hotel_bookings / flight_bookings — если есть
+          // запись юзера с любым активным статусом, draft уже завершён.
+          const table = category === 'hotel' ? 'hotel_bookings' : 'flight_bookings';
+          const filters = [
+            `telegram_id=eq.${reminder.telegram_id}`,
+            `status=in.(pending_confirmation,in_progress,confirmed,completed)`,
+            'select=id',
+            'limit=1',
+          ];
+          const checkRes = await fetch(
+            `${SUPABASE_URL}/rest/v1/${table}?${filters.join('&')}`,
+            { headers: headers() }
+          );
+          const rows = await checkRes.json().catch(() => []);
+          if (Array.isArray(rows) && rows.length > 0) stale = true;
+        } else if (reminder.telegram_id && reminder.country) {
+          // Виза / продление: смотрим в applications по стране+типу.
+          // Активные пост-оплатные статусы — заявка уже принята/в работе/готова.
           const filters = [
             `user_telegram_id=eq.${reminder.telegram_id}`,
             `country=eq.${encodeURIComponent(reminder.country)}`,
-            // Активные пост-оплатные статусы — заявка уже принята/в работе/готова
             `status=in.(pending_confirmation,in_progress,ready,completed)`,
             'select=id',
             'limit=1',
@@ -130,12 +179,14 @@ export default async function handler(req, res) {
             { headers: headers() }
           );
           const apps = await checkRes.json().catch(() => []);
-          if (Array.isArray(apps) && apps.length > 0) {
-            console.log(`[process-reminders] skip stale reminder ${reminder.id} — application already past payment for ${reminder.country}`);
-            await markSent(reminder.id);
-            skipped++;
-            continue;
-          }
+          if (Array.isArray(apps) && apps.length > 0) stale = true;
+        }
+
+        if (stale) {
+          console.log(`[process-reminders] skip stale reminder ${reminder.id} — entry already submitted (${category})`);
+          await markSent(reminder.id);
+          skipped++;
+          continue;
         }
 
         // Pick message variant based on position in sequence (index of this reminder among same draft_key)
@@ -145,12 +196,19 @@ export default async function handler(req, res) {
         );
         const seq = await fetchSeqRes.json();
         const idx = Array.isArray(seq) ? seq.findIndex(r => r.id === reminder.id) : 0;
-        const msgList = MESSAGES[reminder.type] ?? MESSAGES.draft;
+        // Категория = тип контента + стадия (draft/payment). Visa → MESSAGES.draft/payment,
+        // продление → extension_draft/extension_payment, отель/билет — свои наборы.
+        const category = pickCategory(reminder.draft_key, reminder.type);
+        const msgList = MESSAGES[category] ?? MESSAGES.draft;
         const msg = msgList[Math.min(idx, msgList.length - 1)];
 
         const countryLine = reminder.country ? `\n🌍 <b>${reminder.country}</b>` : '';
         const text = `${msg.emoji} <b>${msg.title}</b>${countryLine}\n\n${msg.body}`;
-        const btnText = reminder.type === 'payment' ? '💳 Оплатить заявку' : '📝 Продолжить заявку';
+        // Кнопка в зависимости от стадии (заполнение / оплата).
+        const isPaymentStage = reminder.type === 'payment';
+        const btnText = isPaymentStage
+          ? (category === 'hotel' ? '💳 Оплатить бронь' : category === 'flight' ? '💳 Оплатить билет' : category.startsWith('extension') ? '💳 Оплатить продление' : '💳 Оплатить заявку')
+          : (category === 'hotel' ? '🏨 Продолжить бронь' : category === 'flight' ? '✈️ Продолжить бронь' : category.startsWith('extension') ? '📝 Продолжить продление' : '📝 Продолжить заявку');
 
         await sendTelegramMessage(reminder.telegram_id, text, btnText);
 

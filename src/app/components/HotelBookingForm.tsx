@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -85,6 +85,9 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
   // keystroke (10+ writes/сек при быстром вводе). С debounce: один write в конце
   // паузы. Также трекаем lastSavedAt чтобы показать индикатор.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
+  // Расписали ли уже cron-напоминания — чтобы не дёргать API при каждом
+  // изменении формы. Один schedule-вызов на сессию, пока юзер не оплатит.
+  const remindersScheduled = useRef(false);
   useEffect(() => {
     const anyContent = !!(firstName || lastName || country || city || checkIn || checkOut ||
       hasChildren === 'yes' || email || phone || telegramLogin);
@@ -98,6 +101,21 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
           savedAt: new Date().toISOString(),
         }));
         setLastSavedAt(Date.now());
+        // Cron-напоминания: 1ч / 6ч / 24ч после старта оформления.
+        // Если юзер оплатит — отменим в handleSubmit. Расписываем один раз.
+        if (!remindersScheduled.current) {
+          remindersScheduled.current = true;
+          apiFetch('/api/schedule-reminders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              draft_key: 'hotel_booking_draft',
+              country: country || '',
+              visa_type: '',
+              type: 'draft',
+            }),
+          }).catch(console.error);
+        }
       } catch { /* quota or json error — ignore */ }
     }, 1000);
     return () => clearTimeout(timer);
@@ -241,6 +259,13 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
 
       // Clear draft now that the booking is successfully submitted
       try { localStorage.removeItem('hotel_booking_draft'); } catch { /* no-op */ }
+
+      // Cancel any pending reminders — юзер успешно оплатил, спам не нужен.
+      apiFetch('/api/cancel-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_key: 'hotel_booking_draft' }),
+      }).catch(console.error);
 
       haptic('success');
       setSubmitted(true);
