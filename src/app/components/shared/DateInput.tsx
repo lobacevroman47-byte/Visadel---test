@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Единый компонент даты для всего mini-app:
 //  - видимый текстовый инпут «дд.мм.гггг» + numeric клавиатура,
@@ -29,6 +29,24 @@ export default function DateInput({
   value, onChange, placeholder, min, className = 'relative', inputClassName = 'form-input pr-12',
 }: Props) {
   const [display, setDisplay] = useState(() => toDisplay(value));
+  // Ref на скрытый <input type="date"> — нужен для программного открытия
+  // picker при клике на text-поле или иконку 📅 (в Chrome desktop без
+  // showPicker() календарь не открывается, потому что overlay date-input
+  // занимает только 12px справа).
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  const openPicker = () => {
+    const el = dateRef.current;
+    if (!el) return;
+    // showPicker() в Chrome 99+, требует user-gesture (мы внутри onClick — ок).
+    // Fallback для старых браузеров — fокус, тогда некоторые показывают picker.
+    if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
+      try { (el as HTMLInputElement & { showPicker: () => void }).showPicker(); return; }
+      catch { /* ignore — fallback to focus */ }
+    }
+    el.focus();
+    el.click();
+  };
 
   useEffect(() => {
     const converted = toDisplay(value);
@@ -67,10 +85,21 @@ export default function DateInput({
         maxLength={10}
         className={inputClassName}
       />
-      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-base pointer-events-none select-none z-10">
+      {/* 📅 кнопка-иконка — клик открывает picker через showPicker() API.
+          На iOS Safari clickable, на Android Chrome тоже. */}
+      <button
+        type="button"
+        onClick={openPicker}
+        aria-label="Открыть календарь"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-base z-20 px-1 cursor-pointer select-none"
+      >
         📅
-      </span>
+      </button>
+      {/* Скрытый native date-input: используется для programmatic showPicker() и
+          fallback при тапе по иконке. На iOS — нативный picker, на Chrome desktop —
+          встроенный date popover. opacity:0, position absolute чтобы не мешать UI. */}
       <input
+        ref={dateRef}
         type="date"
         value={dateIsoValue}
         min={min}
@@ -79,8 +108,9 @@ export default function DateInput({
           onChange(iso);
           setDisplay(toDisplay(iso));
         }}
-        aria-label="Календарь"
-        className="absolute right-0 top-0 bottom-0 w-12 opacity-0 cursor-pointer z-20"
+        aria-hidden="true"
+        tabIndex={-1}
+        className="absolute right-0 top-0 bottom-0 w-12 opacity-0 pointer-events-none"
         style={{ WebkitAppearance: 'none', appearance: 'none' }}
       />
     </div>

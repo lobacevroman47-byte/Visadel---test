@@ -199,6 +199,38 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
 
 function getFieldLabel(key: string): string {
   const labels: Record<string, string> = {
+    // ── Universal/identity fields (раньше не было — показывались как raw key) ──
+    firstName: 'Имя',
+    lastName: 'Фамилия',
+    middleName: 'Отчество',
+    patronymic: 'Отчество',
+    fullName: 'ФИО',
+    email: 'Email',
+    phone: 'Телефон',
+    telegram: 'Telegram',
+    birthDate: 'Дата рождения',
+    gender: 'Пол',
+    passportNumber: 'Номер паспорта',
+    passportSeries: 'Серия и номер паспорта',
+    homeAddress: 'Домашний адрес',
+    arrivalDate: 'Дата прилёта',
+    sriLankaAddress: 'Адрес на Шри-Ланке',
+    phoneRussia: 'Телефон в РФ',
+    phoneSriLanka: 'Телефон на Шри-Ланке',
+    // Aliases между Step1BasicData (новые ключи) и legacy data (старые ключи).
+    // Если в БД лежит старая запись с этими ключами — отображаем по-русски.
+    purpose: 'Цель поездки',
+    previousVisit: 'Были ранее в стране',
+    criminalRecord: 'Судимости',
+    diseases: 'Опасные заболевания',
+    contactsInKorea: 'Знакомые в Корее',
+    travelCompanions: 'Сопровождающие',
+    employment: 'Работа',
+    koreaAddress: 'Адрес в Корее',
+    dateRange: 'Даты поездки',
+    dateStart: 'Дата начала',
+    dateEnd: 'Дата окончания',
+
     // Common
     citizenship: 'Гражданство',
     birthCountry: 'Страна рождения',
