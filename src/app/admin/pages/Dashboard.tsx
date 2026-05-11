@@ -6,6 +6,8 @@ import {
 import { useAdminApplications, useAdminUsers } from '../hooks/useAdminData';
 import { getFinanceStats, type FinanceStats } from '../../lib/db';
 import { Card } from '../../components/ui/brand';
+// TEMP: REMOVE — test seed drafts button (см. _DevSeedDrafts.tsx)
+import DevSeedDrafts from './_DevSeedDrafts';
 
 const StatCard: React.FC<{
   icon: React.ReactNode;
@@ -317,6 +319,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   return (
     <div className="p-8">
       <h1 className="text-[22px] font-extrabold tracking-tight text-[#0F2A36] mb-8">Dashboard</h1>
+
+      {/* TEMP: REMOVE — test seed drafts button */}
+      <DevSeedDrafts />
 
       {/* Top stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
