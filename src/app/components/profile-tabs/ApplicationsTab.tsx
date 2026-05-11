@@ -643,14 +643,10 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                 <div key={draft.draftKey} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-400">
                   <div className="flex items-start justify-between mb-2">
                     <div className="min-w-0 flex-1">
-                      <h4 className="text-gray-800 flex items-center gap-1.5">
+                      <h4 className="text-gray-800">
                         <span className="truncate">{draft.visa.country}</span>
-                        {isExtensionDraft && (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF] shrink-0">
-                            Продление
-                          </span>
-                        )}
                       </h4>
+                      {/* Тип уже видно из draft.visa.type — отдельный бэдж убран. */}
                       <p className="text-sm text-gray-600">{draft.visa.type}</p>
                     </div>
                     <span className="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full shrink-0">📝 Черновик</span>
@@ -762,8 +758,6 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                 const basicData = (app.form_data as { basicData?: { firstName?: string; lastName?: string; fullName?: string } } | undefined)?.basicData ?? {};
                 const fullName = [basicData.firstName, basicData.lastName].filter(Boolean).join(' ').trim() || basicData.fullName || '';
 
-                const isExtension = app.application_type === 'extension';
-
                 return (
                   <div key={app.id} className="bg-white rounded-xl shadow-md p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -771,12 +765,9 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
                         <h4 className="text-base font-bold text-[#0F2A36] flex items-center gap-1.5 leading-tight">
                           <span aria-hidden>{countryFlag(app.country)}</span>
                           <span className="truncate">{app.country}</span>
-                          {isExtension && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF] shrink-0">
-                              Продление
-                            </span>
-                          )}
                         </h4>
+                        {/* Тип заявки уже видно из visa_type («Первое продление на 60 дней») —
+                            отдельный бэдж «Продление» убран по UX-фидбеку. */}
                         <p className="text-sm text-gray-500 mt-0.5">{app.visa_type}</p>
                         {fullName && <p className="text-sm font-semibold text-[#0F2A36]/80 mt-0.5 truncate">{fullName}</p>}
                       </div>
