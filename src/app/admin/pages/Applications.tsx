@@ -1243,7 +1243,7 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
               {/* Клиент */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <p className="text-xs text-[#0F2A36]/60">ФИО / имя</p>
+                  <p className="text-xs text-[#0F2A36]/60">Заявитель</p>
                   <p className="text-sm font-semibold text-[#0F2A36]">{application.clientName || '—'}</p>
                 </div>
                 <div>

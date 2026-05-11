@@ -1149,7 +1149,7 @@ function BookingDetailModal({
             {/* Контактная сетка как у визы */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-[#0F2A36]/60">ФИО / имя</p>
+                <p className="text-xs text-[#0F2A36]/60">Заявитель</p>
                 <p className="text-sm font-semibold text-[#0F2A36]">{[b.first_name, b.last_name].filter(Boolean).join(' ') || '—'}</p>
               </div>
               <div>
