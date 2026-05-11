@@ -291,12 +291,13 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
           </div>
           <LatinNotice className="mb-4" />
           <div className="space-y-3">
-            {(() => { const f = ov('firstName', 'Имя', true); return f.visible && (
+            {/* firstName/lastName — критичные, всегда отображаются. */}
+            {(() => { const f = ov('firstName', 'Имя', true); return (
               <Field label={f.label} required={f.required}>
                 <input type="text" value={firstName} onChange={e => setFirstName(e.target.value.toUpperCase())} placeholder="IVAN" className="form-input" />
               </Field>
             ); })()}
-            {(() => { const f = ov('lastName', 'Фамилия', true); return f.visible && (
+            {(() => { const f = ov('lastName', 'Фамилия', true); return (
               <Field label={f.label} required={f.required}>
                 <input type="text" value={lastName} onChange={e => setLastName(e.target.value.toUpperCase())} placeholder="IVANOV" className="form-input" />
               </Field>
@@ -337,17 +338,18 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
           </div>
           <p className="text-xs text-[#0F2A36]/60 mb-4">Свяжемся для уточнения деталей и отправки подтверждения</p>
           <div className="space-y-3">
-            {(() => { const f = ov('email', 'E-mail', true); return f.visible && (
+            {/* email/phone/telegramLogin — критичные контакты, всегда отображаются. */}
+            {(() => { const f = ov('email', 'E-mail', true); return (
               <Field label={f.label} required={f.required} icon={<Mail className="w-3.5 h-3.5" />}>
                 <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@mail.com" className="form-input" />
               </Field>
             ); })()}
-            {(() => { const f = ov('phone', 'Номер телефона', true); return f.visible && (
+            {(() => { const f = ov('phone', 'Номер телефона', true); return (
               <Field label={f.label} required={f.required} icon={<Phone className="w-3.5 h-3.5" />}>
                 <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+7 (999) 123-45-67" className="form-input" />
               </Field>
             ); })()}
-            {(() => { const f = ov('telegramLogin', 'Логин в Telegram', true); return f.visible && (
+            {(() => { const f = ov('telegramLogin', 'Логин в Telegram', true); return (
               <Field label={f.label} required={f.required} icon={<Send className="w-3.5 h-3.5" />}>
                 <input type="text" value={telegramLogin} onChange={e => setTelegramLogin(e.target.value)} placeholder="@username" className="form-input" />
               </Field>

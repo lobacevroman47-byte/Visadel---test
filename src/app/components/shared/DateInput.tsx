@@ -29,24 +29,9 @@ export default function DateInput({
   value, onChange, placeholder, min, className = 'relative', inputClassName = 'form-input pr-12',
 }: Props) {
   const [display, setDisplay] = useState(() => toDisplay(value));
-  // Ref на скрытый <input type="date"> — нужен для программного открытия
-  // picker при клике на text-поле или иконку 📅 (в Chrome desktop без
-  // showPicker() календарь не открывается, потому что overlay date-input
-  // занимает только 12px справа).
+  // Ref на native <input type="date"> — для showPicker() на desktop Chrome
+  // (на mobile тап по самому input открывает picker напрямую).
   const dateRef = useRef<HTMLInputElement>(null);
-
-  const openPicker = () => {
-    const el = dateRef.current;
-    if (!el) return;
-    // showPicker() в Chrome 99+, требует user-gesture (мы внутри onClick — ок).
-    // Fallback для старых браузеров — fокус, тогда некоторые показывают picker.
-    if (typeof (el as HTMLInputElement & { showPicker?: () => void }).showPicker === 'function') {
-      try { (el as HTMLInputElement & { showPicker: () => void }).showPicker(); return; }
-      catch { /* ignore — fallback to focus */ }
-    }
-    el.focus();
-    el.click();
-  };
 
   useEffect(() => {
     const converted = toDisplay(value);
@@ -85,19 +70,10 @@ export default function DateInput({
         maxLength={10}
         className={inputClassName}
       />
-      {/* 📅 кнопка-иконка — клик открывает picker через showPicker() API.
-          На iOS Safari clickable, на Android Chrome тоже. */}
-      <button
-        type="button"
-        onClick={openPicker}
-        aria-label="Открыть календарь"
-        className="absolute right-2 top-1/2 -translate-y-1/2 text-base z-20 px-1 cursor-pointer select-none"
-      >
-        📅
-      </button>
-      {/* Скрытый native date-input: используется для programmatic showPicker() и
-          fallback при тапе по иконке. На iOS — нативный picker, на Chrome desktop —
-          встроенный date popover. opacity:0, position absolute чтобы не мешать UI. */}
+      {/* Native date input — лежит ПОВЕРХ правого края (где иконка 📅).
+          Тап по нему открывает нативный picker на iOS/Android, без необходимости
+          ручного showPicker() (который ломается, если elem скрыт через
+          pointer-events:none). opacity:0 — невидим, но интерактивен. */}
       <input
         ref={dateRef}
         type="date"
@@ -108,11 +84,26 @@ export default function DateInput({
           onChange(iso);
           setDisplay(toDisplay(iso));
         }}
-        aria-hidden="true"
-        tabIndex={-1}
-        className="absolute right-0 top-0 bottom-0 w-12 opacity-0 pointer-events-none"
+        onClick={(e) => {
+          // Chrome desktop: showPicker() forces popover open even если
+          // клик пришёлся в text-area внутри date input.
+          const el = e.currentTarget as HTMLInputElement & { showPicker?: () => void };
+          if (typeof el.showPicker === 'function') {
+            try { el.showPicker(); } catch { /* ignore */ }
+          }
+        }}
+        aria-label="Открыть календарь"
+        className="absolute right-0 top-0 bottom-0 w-12 opacity-0 cursor-pointer z-20"
         style={{ WebkitAppearance: 'none', appearance: 'none' }}
       />
+      {/* 📅 иконка — чисто визуальная подсказка. pointer-events:none чтобы
+          клик уходил в date input под ней. */}
+      <span
+        aria-hidden="true"
+        className="absolute right-2 top-1/2 -translate-y-1/2 text-base z-10 px-1 pointer-events-none select-none"
+      >
+        📅
+      </span>
     </div>
   );
 }
