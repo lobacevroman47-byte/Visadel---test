@@ -299,8 +299,10 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
     }
   };
 
+  // Срочные Вьетнамские визы — приоритет уже в цене, аддон не суммируется.
+  const isVietnamUrgentVisa = visa.country === 'Вьетнам' && /^vietnam-(3d|2d|1d|4h|2h)-/.test(visa.id);
   const breakdown = [{ label: visa.type, amount: visa.price }];
-  if (formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам') breakdown.push({ label: 'Срочное оформление', amount: addonPrices.urgent });
+  if (formData.additionalDocs.urgentProcessing && !isVietnamUrgentVisa) breakdown.push({ label: 'Срочное оформление', amount: addonPrices.urgent });
   if (formData.additionalDocs.hotelBooking) breakdown.push({ label: 'Подтверждение бронирования', amount: addonPrices.hotel });
   if (formData.additionalDocs.returnTicket) breakdown.push({ label: 'Бронирование авиабилета', amount: addonPrices.ticket });
 

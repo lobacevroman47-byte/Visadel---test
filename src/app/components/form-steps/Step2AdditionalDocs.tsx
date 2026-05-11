@@ -53,13 +53,16 @@ interface Step2Data {
 
 interface Step2Props {
   country: string;
+  /** ID визы — нужен чтобы отличать обычные Вьетнамские от срочных
+   *  (у срочных аддон «Срочное оформление» прячется, см. ниже). */
+  visaId?: string;
   data: Step2Data;
   onChange: (data: Step2Data) => void;
   onNext: () => void;
   onPrev: () => void;
 }
 
-export default function Step2AdditionalDocs({ country, data, onChange, onNext, onPrev }: Step2Props) {
+export default function Step2AdditionalDocs({ country, visaId, data, onChange, onNext, onPrev }: Step2Props) {
   const [formData, setFormData] = useState<Step2Data>(data);
   const [hotelOverrides, setHotelOverrides] = useState<CoreFieldOverrides>({});
   const [flightOverrides, setFlightOverrides] = useState<CoreFieldOverrides>({});
@@ -202,30 +205,32 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
     });
   };
 
-  const showOptions = country !== 'Вьетнам';
+  // У Вьетнама срочность реализована как отдельные visa types
+  // (vietnam-3d/2d/1d/4h/2h). Для них аддон «Срочное оформление» был бы
+  // двойным счётом → скрываем. Для обычных Вьетнамских (vietnam-90d-…)
+  // аддон работает как у остальных стран — это про приоритет внутри
+  // агентства, не про срок выдачи визы консульством.
+  const isVietnamUrgentVisa = country === 'Вьетнам' && /^vietnam-(3d|2d|1d|4h|2h)-/.test(visaId ?? '');
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
       <div className="mb-5">
         <h2 className="text-[20px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Усиление заявки</h2>
         <p className="text-sm text-[#0F2A36]/60">
-          {showOptions
-            ? 'Опционально — добавь услуги, которые увеличат шанс одобрения визы'
-            : 'Для Вьетнама дополнительные опции уже включены в стоимость'}
+          Опционально — добавь услуги, которые увеличат шанс одобрения визы
         </p>
       </div>
 
-      {showOptions && (
-        <div className="space-y-3 mb-5">
+      <div className="space-y-3 mb-5">
           {/* Каждый аддон рендерим только если он enabled в админке.
              Если админ вернёт галочку «Активна» в Каталог → Брони —
              карточка появится автоматически при следующем открытии Step2. */}
-          {addonAvail.urgent && (
+          {addonAvail.urgent && !isVietnamUrgentVisa && (
             <AddonCard
               icon={<Zap className="w-5 h-5" />}
               emoji="⚡"
               title="Срочное оформление"
-              description="Приоритетная обработка в течение 2 рабочих дней"
+              description="Приоритетная обработка вашей заявки"
               price={prices.urgent}
               checked={formData.urgentProcessing}
               onToggle={() => toggleAddon('urgentProcessing')}
@@ -440,7 +445,6 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
           </AddonCard>
           )}
         </div>
-      )}
 
       <div className="flex gap-3">
         <Button
