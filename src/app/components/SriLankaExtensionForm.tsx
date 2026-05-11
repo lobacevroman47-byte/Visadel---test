@@ -758,16 +758,8 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               {errors.facePhoto && <p className="text-red-500 text-xs mt-1">{errors.facePhoto}</p>}
             </div>
 
-            {/* Стоимость */}
-            <div className="vd-grad-soft rounded-xl p-4 border border-blue-100/60">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[#212121]">Стоимость продления:</span>
-                <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{visa.price.toLocaleString('ru-RU')}₽</span>
-              </div>
-              <p className="text-sm text-[#0F2A36]/60">После проверки заявки вы перейдёте к оплате</p>
-            </div>
-
-            {/* Кнопки */}
+            {/* Кнопки. Блок «Стоимость продления» убран с первого шага —
+                цена показывается в шапке (progress-bar) и на шаге «Оплата». */}
             <div className="space-y-3">
               <Button
                 variant="primary"
