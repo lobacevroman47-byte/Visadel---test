@@ -38,6 +38,11 @@ export interface Application {
   price: number;
   urgent: boolean;
   status: 'draft' | 'pending_payment' | 'pending_confirmation' | 'in_progress' | 'ready';
+  // Тип заявки: 'visa' = первичное оформление визы (Step1..Step7),
+  // 'extension' = продление визы (Шри-Ланка и в будущем другие страны).
+  // Влияет на лейблы в UI (Виза/Продление оформляется) и текст уведомлений.
+  // См. supabase/029_application_type.sql.
+  application_type?: 'visa' | 'extension';
   form_data: Record<string, unknown>;
   payment_proof_url?: string;
   visa_file_url?: string;
@@ -336,6 +341,9 @@ export async function saveApplication(app: Application): Promise<Application> {
         price: app.price,
         urgent: app.urgent,
         status: app.status,
+        // 'visa' по умолчанию — все старые вызовы (Step7Payment) работают
+        // без изменений; SriLankaExtensionForm передаёт 'extension' явно.
+        application_type: app.application_type ?? 'visa',
         form_data: app.form_data,
         payment_proof_url: app.payment_proof_url ?? null,
         bonuses_used: app.bonuses_used,

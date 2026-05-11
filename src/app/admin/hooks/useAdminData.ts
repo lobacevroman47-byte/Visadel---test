@@ -17,6 +17,9 @@ export interface AdminApplication {
   status: 'draft' | 'pending_payment' | 'pending_confirmation' | 'in_progress' | 'completed';
   date: string;
   urgent: boolean;
+  // 'extension' — заявка на продление визы (Шри-Ланка). Влияет на UI-бэдж
+  // в админке и текст уведомлений. См. supabase/029_application_type.sql.
+  applicationType: 'visa' | 'extension';
   formData: Record<string, unknown>;
   paymentProofUrl?: string;
   visaFileUrl?: string;
@@ -87,6 +90,7 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
     status: STATUS_MAP[row.status as string] ?? 'draft',
     date: row.created_at as string,
     urgent: row.urgent as boolean,
+    applicationType: (row.application_type as 'visa' | 'extension') ?? 'visa',
     formData: fd,
     paymentProofUrl: row.payment_proof_url as string | undefined,
     visaFileUrl: row.visa_file_url as string | undefined,
@@ -146,15 +150,16 @@ export function useAdminApplications() {
           status: 'pending_confirmation',
           date: (a.createdAt as string) ?? new Date().toISOString(),
           urgent: Boolean(a.urgent),
+          applicationType: (a.application_type as 'visa' | 'extension') ?? (a.isExtension ? 'extension' : 'visa'),
           formData: (a.formData as Record<string, unknown>) ?? {},
           usdRateRub: null,
           taxPct: 4,
         }));
-        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 }))]);
+        setApplications([...lsMapped, ...mockApplications.map(m => ({ ...m, telegramId: 0, applicationType: 'visa' as const, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 }))]);
       }
     } catch (err) {
       console.error('Fetch applications error:', err);
-      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 })));
+      setApplications(mockApplications.map(m => ({ ...m, telegramId: 0, applicationType: 'visa' as const, formData: {}, visaId: '', usdRateRub: null, taxPct: 4 })));
     } finally {
       setLoading(false);
     }

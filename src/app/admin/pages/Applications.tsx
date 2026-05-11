@@ -1781,6 +1781,11 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>
                         {statusLabels[app.status]}
                       </span>
+                      {app.applicationType === 'extension' && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF]">
+                          Продление
+                        </span>
+                      )}
                       {app.urgent && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
                           <Flame className="w-3 h-3" /> Срочно
