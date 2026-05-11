@@ -1047,6 +1047,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         country: application.country,
         visa_type: application.visaType,
         application_id: application.id,
+        // application_type='extension' → бэкенд использует STATUS_MESSAGES.ext_*
+        // («Продление в работе» вместо «Виза оформляется» и т.д.).
+        application_type: application.applicationType,
       }),
     });
     const data = await res.json();

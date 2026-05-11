@@ -362,7 +362,9 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
         return;
       }
 
-      // 3b. Уведомление юзеру.
+      // 3b. Уведомление юзеру. application_type='extension' → бэкенд
+      // подставит текст «Заявка на продление получена!» вместо общего
+      // визового шаблона.
       if (telegramId) {
         apiFetch('/api/notify-status', {
           method: 'POST',
@@ -373,6 +375,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
             country: visa.country,
             visa_type: visa.type,
             application_id: savedApp?.id,
+            application_type: 'extension',
           }),
         }).catch(console.error);
       }
