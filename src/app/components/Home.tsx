@@ -678,11 +678,13 @@ export default function Home({ onVisaSelect, onOpenProfile, onOpenReferrals, onO
                   />
                 ))}
 
-                {/* Extension Button for Sri Lanka */}
+                {/* Extension Button for Sri Lanka — brand vd-grad (раньше был
+                    Material Green from-[#10B981] to-[#00E676] — legacy, не
+                    вписывался в общую палитру мини-аппа). */}
                 {selectedCountry.extensionOptions && (
                   <button
                     onClick={() => setShowExtensions(true)}
-                    className="w-full bg-gradient-to-r from-[#10B981] to-[#00E676] text-white py-4 rounded-[16px] hover:shadow-lg transition flex items-center justify-center gap-2"
+                    className="w-full vd-grad text-white font-bold py-4 rounded-2xl shadow-md vd-shadow-cta hover:shadow-lg transition-all active:scale-[0.99] flex items-center justify-center gap-2"
                   >
                     Продление визы
                     <ChevronRight className="w-5 h-5" />
