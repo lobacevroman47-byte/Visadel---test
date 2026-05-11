@@ -17,6 +17,7 @@ const FlightBookingForm      = lazy(() => import('./components/FlightBookingForm
 const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
 const Flights                = lazy(() => import('./components/Flights'));
 const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
+const LoginScreen            = lazy(() => import('./components/LoginScreen'));
 import {
   getTelegramUser,
   initTelegramApp,
@@ -25,6 +26,7 @@ import {
   type TelegramUser,
 } from './lib/telegram';
 import { upsertUser, resolveReferralCode, getAdminRole, markUserEngaged, type AppUser, type AdminRole } from './lib/db';
+import { getCurrentSession, upsertWebUser } from './lib/web-auth';
 import { getDraftsForVisa, type VisaDraft } from './lib/visaDrafts';
 import DraftPickerModal from './components/DraftPickerModal';
 import { AppCatalogProvider } from './contexts/AppCatalogContext';
@@ -71,6 +73,7 @@ export function useTelegram() {
 
 type Screen =
   | 'splash'
+  | 'login'  // веб-юзеры без Telegram WebApp — экран Email/Password входа
   | 'home'
   | 'application'
   | 'profile'
@@ -159,15 +162,71 @@ function App() {
       return;
     }
 
-    // Get Telegram user (or mock for local dev)
-    const tg = isTelegramWebApp() ? getTelegramUser() : getMockUser();
+    // Identification flow — три пути:
+    //   1. Telegram WebApp (initData) — TG mini-app, есть tg user
+    //   2. Supabase Auth session — веб-юзер уже залогинен (повторное открытие сайта)
+    //   3. Нет ни TG ни session — показываем LoginScreen (только для веб, не для TG)
+    const isInTelegram = isTelegramWebApp();
+    const tg = isInTelegram ? getTelegramUser() : null;
     setTgUser(tg);
 
     // Initialize legacy localStorage (for components that still read it)
     initializeUserData();
 
+    // Если веб (не Telegram) — проверяем существующую Supabase Auth session.
+    // Если session есть → upsertWebUser, грузим юзера, переходим в home.
+    // Если нет session → показываем LoginScreen.
+    if (!isInTelegram) {
+      (async () => {
+        try {
+          const session = await getCurrentSession();
+          if (session) {
+            // Уже залогинен — подтягиваем запись из users
+            const webUser = await upsertWebUser({
+              firstName: session.email.split('@')[0],
+              signupSource: 'email',
+            });
+            if (webUser) {
+              setAppUser(webUser);
+              localStorage.setItem('vd_user', JSON.stringify(webUser));
+              const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
+              localStorage.setItem('userData', JSON.stringify({
+                ...existing,
+                bonusBalance: webUser.bonus_balance,
+                isInfluencer: webUser.is_influencer,
+                name: existing.name || webUser.first_name,
+                phone: existing.phone || webUser.phone || '',
+                email: webUser.email ?? existing.email ?? '',
+                telegramId: webUser.telegram_id ?? null,
+                referralCode: webUser.referral_code,
+                authId: webUser.auth_id,
+              }));
+              setCurrentScreen('home');
+            } else {
+              // Session есть, но upsert упал — на LoginScreen
+              setCurrentScreen('login');
+            }
+          } else {
+            // Нет session — показываем экран входа
+            setCurrentScreen('login');
+          }
+        } catch (e) {
+          console.error('[App] web session check failed:', e);
+          setCurrentScreen('login');
+        } finally {
+          setIsLoading(false);
+        }
+      })();
+      return; // Telegram-flow ниже не нужен
+    }
+
+    // Если в Telegram, но почему-то не получили tg user — fallback на mock (dev mode).
+    // Дальше в коде используется `tg` — переопределяем чтобы не править остальное.
+    const tgFinal: TelegramUser | null = tg ?? getMockUser();
+    if (!tg && tgFinal) setTgUser(tgFinal);
+
     // Upsert user in Supabase / localStorage
-    if (tg) {
+    if (tgFinal) {
       const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;
 
       // Deeplink-команды: t.me/<bot>/app?startapp=<param>
@@ -204,7 +263,7 @@ function App() {
         fetch('/api/track-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ referral_code: codeToTrack, telegram_id: tg.id }),
+          body: JSON.stringify({ referral_code: codeToTrack, telegram_id: tgFinal.id }),
         })
           .then(async (r) => {
             if (!r.ok) {
@@ -218,7 +277,7 @@ function App() {
       // Передаём в upsertUser RAW код если резолв на фронте не сработал
       // (RLS блокирует anon SELECT users — resolveReferralCode возвращает null).
       // API на сервере сам резолвит canonical через service_key.
-      return upsertUser(tg, resolvedRefCode ?? referralCode ?? undefined);
+      return upsertUser(tgFinal, resolvedRefCode ?? referralCode ?? undefined);
       })
         .then(async u => {
           setAppUser(u);
@@ -241,8 +300,10 @@ function App() {
             consecutiveDays: u.bonus_streak ?? existing.consecutiveDays ?? 0,
             lastCheckIn: u.last_bonus_date ?? existing.lastCheckIn ?? '',
           }));
-          const role = await getAdminRole(u.telegram_id);
-          setAdminRole(role);
+          if (u.telegram_id) {
+            const role = await getAdminRole(u.telegram_id);
+            setAdminRole(role);
+          }
         })
         .catch(console.error)
         .finally(() => setIsLoading(false));
@@ -364,6 +425,32 @@ function App() {
       <AppCatalogProvider>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
         {currentScreen === 'splash' && <SplashScreen />}
+        {currentScreen === 'login' && (
+          <Suspense fallback={<SplashScreen />}>
+            <LoginScreen
+              onAuthenticated={(user) => {
+                // Web-юзер успешно вошёл — сохраняем и переходим в home.
+                setAppUser(user);
+                localStorage.setItem('vd_user', JSON.stringify(user));
+                const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
+                localStorage.setItem('userData', JSON.stringify({
+                  ...existing,
+                  bonusBalance: user.bonus_balance,
+                  isInfluencer: user.is_influencer,
+                  name: existing.name || user.first_name,
+                  phone: existing.phone || user.phone || '',
+                  email: user.email ?? existing.email ?? '',
+                  telegramId: user.telegram_id ?? null,
+                  referralCode: user.referral_code,
+                  authId: user.auth_id,
+                }));
+                setCurrentScreen('home');
+              }}
+              referredBy={new URLSearchParams(window.location.search).get('ref') ?? undefined}
+              telegramBotUsername={import.meta.env.VITE_TG_BOT_USERNAME ?? 'Visadel_test_bot'}
+            />
+          </Suspense>
+        )}
         {currentScreen === 'home' && (
           <>
             {mainTab === 'visas' && (

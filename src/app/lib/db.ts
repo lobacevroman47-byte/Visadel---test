@@ -7,7 +7,13 @@ import { apiFetch } from './apiFetch';
 
 export interface AppUser {
   id?: string;
-  telegram_id: number;
+  // Dual-auth: либо telegram_id (юзер пришёл через TG mini-app), либо auth_id
+  // (юзер зарегистрировался на сайте через email/OAuth). Хотя бы один должен
+  // быть. См. supabase/030_users_dual_auth.sql.
+  telegram_id?: number | null;
+  auth_id?: string | null;
+  // Откуда юзер пришёл (для UX и аналитики).
+  signup_source?: 'telegram' | 'email' | 'google' | 'vk' | 'yandex' | 'apple' | 'phone';
   first_name: string;
   last_name?: string;
   username?: string;
