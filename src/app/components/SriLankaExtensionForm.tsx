@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
-import { toast } from 'sonner';
-import { ChevronLeft, Upload, CheckCircle2, CreditCard, User, Coins, Save } from 'lucide-react';
+import { ChevronLeft, Upload, CheckCircle2, CreditCard, User, Coins, Save, AlertTriangle } from 'lucide-react';
 import type { VisaOption } from '../App';
 import LatinNotice from './shared/LatinNotice';
 import SuccessScreen from './shared/SuccessScreen';
+import DateInput from './shared/DateInput';
 import { useDialog } from './shared/BrandDialog';
 import { Button } from './ui/brand';
 import { saveApplication, uploadFile, getAppSettings } from '../lib/db';
@@ -44,8 +44,13 @@ interface ExtensionFormData {
   facePhoto: File | null;
 }
 
-const STEPS = ['Данные', 'Оплата'];
+// 3 шага — как у визового flow (Данные → Проверка → Оплата).
+// Раньше было 2 шага без «Проверки», юзер шёл сразу с формы в оплату —
+// в визовой анкете это шаг Step6Review между загрузкой фото и оплатой.
+const STEPS = ['Данные', 'Проверка', 'Оплата'];
 
+// dd.MM.yyyy — формат даты единый со всем mini-app. Использует тот же
+// shared/DateInput компонент что и Step1BasicData.
 function formatDateRu(iso: string): string {
   if (!iso) return '';
   const [y, m, d] = iso.split('-');
@@ -208,12 +213,22 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
     }
   };
 
-  const handleGoToPayment = async () => {
+  // Step 0 → Step 1 (Проверка). Шаг проверки — копия Step6Review для визового
+  // flow: юзер видит сводку всех введённых данных и подтверждает что они
+  // корректны прежде чем перейти к оплате.
+  const handleGoToReview = async () => {
     if (!validateForm()) {
       await dialog.warning('Заполните все обязательные поля');
       return;
     }
     setCurrentStep(1);
+    window.scrollTo(0, 0);
+  };
+
+  // Step 1 (Проверка) → Step 2 (Оплата). Из Review кнопка «Перейти к оплате»
+  // ведёт сюда. Валидация уже была на step 0 → review.
+  const handleGoToPayment = () => {
+    setCurrentStep(2);
     window.scrollTo(0, 0);
   };
 
@@ -396,7 +411,15 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
     } catch (err) {
       console.error('Extension submit error:', err);
       haptic('error');
-      toast.error('Не удалось отправить заявку. Попробуй ещё раз или сохрани черновик.');
+      // Показываем реальную причину если есть — раньше юзер видел только
+      // generic «не удалось отправить» и не понимал что делать. Типичные
+      // причины: миграция 029 не накатана, Storage RLS-policy блокирует
+      // upload, размер файла, сеть.
+      const errMsg = err instanceof Error ? err.message : String(err);
+      await dialog.error(
+        'Не удалось отправить заявку',
+        errMsg.slice(0, 200) || 'Попробуй ещё раз или сохрани черновик и напиши в поддержку.',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -578,23 +601,20 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
               {errors.homeAddress && <p className="text-red-500 text-xs mt-1">{errors.homeAddress}</p>}
             </div>
 
-            {/* Дата прилёта */}
+            {/* Дата прилёта — используем shared/DateInput (тот же что в визовой
+                форме): видимый «дд.мм.гггг» с numeric-клавиатурой + 📅 иконка
+                для открытия iOS-picker. */}
             <div>
               <label className="block mb-2 text-[#212121]">
                 Дата прилёта на Шри-Ланку
                 <span className="text-red-500 ml-1">*</span>
               </label>
-              <input
-                type="date"
-                value={formData.arrivalDate || ''}
-                onChange={(e) => setFormData({ ...formData, arrivalDate: e.target.value })}
-                className={`form-input ${errors.arrivalDate ? 'border-red-500' : ''}`}
+              <DateInput
+                value={formData.arrivalDate}
+                onChange={(v) => setFormData({ ...formData, arrivalDate: v })}
+                placeholder="дд.мм.гггг"
+                inputClassName={`form-input pr-12 ${errors.arrivalDate ? 'border-red-500' : ''}`}
               />
-              {formData.arrivalDate && (
-                <p className="text-xs text-[#0F2A36]/60 mt-1">
-                  Дата: <span className="font-semibold text-[#0F2A36]">{formatDateRu(formData.arrivalDate)}</span>
-                </p>
-              )}
               {errors.arrivalDate && <p className="text-red-500 text-xs mt-1">{errors.arrivalDate}</p>}
             </div>
 
@@ -754,9 +774,9 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 size="lg"
                 fullWidth
                 className="!py-4 !rounded-2xl !font-bold"
-                onClick={handleGoToPayment}
+                onClick={handleGoToReview}
               >
-                Перейти к оплате
+                Далее — проверка данных
               </Button>
 
               <Button
@@ -773,7 +793,132 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
           </div>
         )}
 
+        {/* Step 1 — Проверка данных (зеркалит Step6Review для визового flow) */}
         {currentStep === 1 && (
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="mb-6">
+              <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Шаг 2</p>
+              <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Проверка данных</h2>
+              <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
+                <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-yellow-800">
+                  Пожалуйста, внимательно проверьте все данные. Любые ошибки могут привести к отказу в продлении визы.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6 mb-6">
+              {/* Информация о продлении */}
+              <div className="border-b pb-4">
+                <h3 className="text-gray-700 mb-3 font-semibold">Информация о продлении</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-600">Страна:</span>
+                    <span className="text-gray-800 text-right">{visa.country}</span>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-600">Тип:</span>
+                    <span className="text-gray-800 text-right">{visa.type}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Личные данные */}
+              <div className="border-b pb-4">
+                <h3 className="text-gray-700 mb-3 font-semibold">Личные данные</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Имя:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.firstName}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Фамилия:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.lastName}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Адрес в РФ:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.homeAddress}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Дата прилёта:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formatDateRu(formData.arrivalDate)}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Адрес на ШЛ:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.sriLankaAddress}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Телефон РФ:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneRussia}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Телефон ШЛ:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneSriLanka}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Фото */}
+              <div className="border-b pb-4">
+                <h3 className="text-gray-700 mb-3 font-semibold">Загруженные фото</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-gray-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Фото загранпаспорта {formData.passportPhoto && `(${formData.passportPhoto.name})`}
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-800">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                    Фото лица {formData.facePhoto && `(${formData.facePhoto.name})`}
+                  </div>
+                </div>
+              </div>
+
+              {/* Итого */}
+              <div className="vd-grad-soft rounded-xl p-4 border border-blue-100/60">
+                <div className="flex justify-between items-center">
+                  <span className="text-[#0F2A36] font-bold">Итого к оплате:</span>
+                  <span className="text-2xl vd-grad-text font-extrabold tracking-tight">{visa.price.toLocaleString('ru-RU')}₽</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
+                className="!py-4 !rounded-2xl !font-bold"
+                onClick={handleGoToPayment}
+              >
+                Перейти к оплате
+              </Button>
+
+              <Button
+                variant="soft"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl"
+                onClick={handleSaveDraft}
+                leftIcon={<Save className="w-4 h-4" />}
+              >
+                Сохранить черновик
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="md"
+                fullWidth
+                className="!py-3 !rounded-2xl !bg-gray-100 !border-0 !text-[#0F2A36]/70 hover:!bg-gray-200"
+                onClick={goToPrevStep}
+                leftIcon={<ChevronLeft className="w-4 h-4" />}
+              >
+                Назад к данным
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {currentStep === 2 && (
           <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
             <div className="mb-6">
               <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Финал</p>

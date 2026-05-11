@@ -331,27 +331,49 @@ export async function saveApplication(app: Application): Promise<Application> {
       return (data as Application) ?? app;
     }
 
-    const { data, error } = await supabase
+    // Базовый payload — поля которые точно существовали ДО миграции 029.
+    const basePayload: Record<string, unknown> = {
+      user_telegram_id: app.user_telegram_id,
+      country: app.country,
+      visa_type: app.visa_type,
+      visa_id: app.visa_id,
+      price: app.price,
+      urgent: app.urgent,
+      status: app.status,
+      form_data: app.form_data,
+      payment_proof_url: app.payment_proof_url ?? null,
+      bonuses_used: app.bonuses_used,
+      usd_rate_rub: app.usd_rate_rub ?? null,
+      tax_pct: app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT,
+    };
+    // application_type — добавили миграцией 029. Если миграция ещё не
+    // накатана в БД (типичная ситуация в dev/staging), Supabase вернёт
+    // PGRST204 / 42703. Тогда повторяем insert без этого поля.
+    const fullPayload = {
+      ...basePayload,
+      application_type: app.application_type ?? 'visa',
+    };
+
+    let { data, error } = await supabase
       .from('applications')
-      .insert({
-        user_telegram_id: app.user_telegram_id,
-        country: app.country,
-        visa_type: app.visa_type,
-        visa_id: app.visa_id,
-        price: app.price,
-        urgent: app.urgent,
-        status: app.status,
-        // 'visa' по умолчанию — все старые вызовы (Step7Payment) работают
-        // без изменений; SriLankaExtensionForm передаёт 'extension' явно.
-        application_type: app.application_type ?? 'visa',
-        form_data: app.form_data,
-        payment_proof_url: app.payment_proof_url ?? null,
-        bonuses_used: app.bonuses_used,
-        usd_rate_rub: app.usd_rate_rub ?? null,
-        tax_pct: app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT,
-      })
+      .insert(fullPayload)
       .select()
       .single();
+
+    if (error && (
+      error.code === 'PGRST204' ||
+      error.code === '42703' ||
+      /application_type/i.test(error.message ?? '')
+    )) {
+      console.warn('[saveApplication] application_type column missing — retrying without it. Run migration supabase/029_application_type.sql to enable extension flow.');
+      const retry = await supabase
+        .from('applications')
+        .insert(basePayload)
+        .select()
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error('saveApplication Supabase error:', JSON.stringify(error));
