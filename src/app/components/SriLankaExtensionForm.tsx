@@ -33,13 +33,18 @@ interface SriLankaExtensionFormProps {
 }
 
 interface ExtensionFormData {
+  // ── Личные данные (попадают в form_data.basicData → таб «Анкета» в админке) ──
   firstName: string;
   lastName: string;
   homeAddress: string;
   arrivalDate: string;      // ISO 'YYYY-MM-DD'
   sriLankaAddress: string;
-  phoneRussia: string;
   phoneSriLanka: string;
+  // ── Контактные данные (form_data.contactInfo → таб «Основное» в админке) ──
+  email: string;
+  phoneRussia: string;
+  telegram: string;
+  // ── Фото ────────────────────────────────────────────────────────────────────
   passportPhoto: File | null;
   facePhoto: File | null;
 }
@@ -64,8 +69,10 @@ const EMPTY_FORM: ExtensionFormData = {
   homeAddress: '',
   arrivalDate: '',
   sriLankaAddress: '',
-  phoneRussia: '',
   phoneSriLanka: '',
+  email: '',
+  phoneRussia: '',
+  telegram: '',
   passportPhoto: null,
   facePhoto: null,
 };
@@ -181,6 +188,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
     const isEmpty = !formData.firstName && !formData.lastName && !formData.homeAddress
       && !formData.arrivalDate && !formData.sriLankaAddress
       && !formData.phoneRussia && !formData.phoneSriLanka
+      && !formData.email && !formData.telegram
       && !formData.passportPhoto && !formData.facePhoto;
     if (isEmpty) return;
 
@@ -198,8 +206,13 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
     if (!formData.homeAddress.trim()) newErrors.homeAddress = 'Укажите домашний адрес';
     if (!formData.arrivalDate) newErrors.arrivalDate = 'Укажите дату прилёта';
     if (!formData.sriLankaAddress.trim()) newErrors.sriLankaAddress = 'Укажите адрес проживания на Шри-Ланке';
+    // Контактные данные — формат как у виз (Step4ContactInfo)
+    if (!formData.email.trim()) newErrors.email = 'Укажите email';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(formData.email.trim())) newErrors.email = 'Некорректный email';
     if (!formData.phoneRussia.trim()) newErrors.phoneRussia = 'Укажите телефон в РФ';
+    else if (formData.phoneRussia.replace(/\D/g, '').length < 10) newErrors.phoneRussia = 'Минимум 10 цифр';
     if (!formData.phoneSriLanka.trim()) newErrors.phoneSriLanka = 'Укажите телефон на Шри-Ланке';
+    if (!formData.telegram.trim()) newErrors.telegram = 'Укажите Telegram';
     if (!formData.passportPhoto) newErrors.passportPhoto = 'Загрузите фото паспорта';
     if (!formData.facePhoto) newErrors.facePhoto = 'Загрузите ваше фото';
     setErrors(newErrors);
@@ -316,7 +329,12 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
         return;
       }
 
-      // 3. Сохраняем в Supabase с application_type='extension'.
+      // 3. Сохраняем в Supabase. Структура form_data зеркалит визовый
+      // flow (Step7Payment) — админка в Applications.tsx читает basicData
+      // для таба «Анкета» (показывает каждое поле через FIELD_LABELS) и
+      // contactInfo для таба «Основное» (email/phone/telegram).
+      // Раньше специфика продления лежала в form_data.extensionData —
+      // админка её не видела, табы были пустые.
       const savedApp = await saveApplication({
         user_telegram_id: telegramId,
         country: visa.country,
@@ -330,13 +348,15 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
           basicData: {
             firstName: formData.firstName.trim(),
             lastName: formData.lastName.trim(),
-          },
-          extensionData: {
             homeAddress: formData.homeAddress.trim(),
             arrivalDate: formData.arrivalDate,
             sriLankaAddress: formData.sriLankaAddress.trim(),
-            phoneRussia: formData.phoneRussia.trim(),
             phoneSriLanka: formData.phoneSriLanka.trim(),
+          },
+          contactInfo: {
+            email: formData.email.trim(),
+            phone: formData.phoneRussia.trim(),
+            telegram: formData.telegram.trim().replace(/^@/, ''),
           },
           photoUrls,
         },
@@ -666,13 +686,49 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                 />
                 {errors.sriLankaAddress && <p className="text-red-500 text-xs mt-1">{errors.sriLankaAddress}</p>}
               </div>
+
+              {/* Местный телефон на ШЛ — часть анкетных данных (попадает в
+                  basicData → таб «Анкета» в админке). Стандартный РФ телефон
+                  в карточке «Контактные данные» ниже (попадает в contactInfo). */}
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  Мобильный номер телефона на Шри-Ланке
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={formData.phoneSriLanka || ''}
+                  onChange={(e) => setFormData({ ...formData, phoneSriLanka: e.target.value })}
+                  className={`form-input ${errors.phoneSriLanka ? 'border-red-500' : ''}`}
+                  placeholder="+94 XX XXX XXXX"
+                />
+                {errors.phoneSriLanka && <p className="text-red-500 text-xs mt-1">{errors.phoneSriLanka}</p>}
+              </div>
             </div>
 
-            {/* ── Карточка 2: Контактные данные ──────────────────────── */}
+            {/* ── Карточка 2: Контактные данные — единый паттерн со Step4ContactInfo
+                визовой анкеты (email + phone + telegram). Эти 3 поля идут
+                в form_data.contactInfo и видны в админке в табе «Основное». */}
             <div className="bg-white rounded-2xl shadow-lg p-6 space-y-6">
               <div className="flex items-center gap-2">
                 <Phone className="w-5 h-5 text-[#3B5BFF]" />
                 <h3 className="text-sm font-bold text-[#0F2A36]">Контактные данные</h3>
+              </div>
+
+              <div>
+                <label className="block mb-2 text-[#212121]">
+                  E-mail
+                  <span className="text-red-500 ml-1">*</span>
+                </label>
+                <input
+                  type="email"
+                  value={formData.email || ''}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  className={`form-input ${errors.email ? 'border-red-500' : ''}`}
+                  placeholder="example@email.com"
+                  autoComplete="email"
+                />
+                {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
               </div>
 
               <div>
@@ -692,17 +748,18 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
 
               <div>
                 <label className="block mb-2 text-[#212121]">
-                  Мобильный номер телефона на Шри-Ланке
+                  Telegram
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 <input
-                  type="tel"
-                  value={formData.phoneSriLanka || ''}
-                  onChange={(e) => setFormData({ ...formData, phoneSriLanka: e.target.value })}
-                  className={`form-input ${errors.phoneSriLanka ? 'border-red-500' : ''}`}
-                  placeholder="+94 XX XXX XXXX"
+                  type="text"
+                  value={formData.telegram || ''}
+                  onChange={(e) => setFormData({ ...formData, telegram: e.target.value })}
+                  className={`form-input ${errors.telegram ? 'border-red-500' : ''}`}
+                  placeholder="username"
+                  autoComplete="off"
                 />
-                {errors.phoneSriLanka && <p className="text-red-500 text-xs mt-1">{errors.phoneSriLanka}</p>}
+                {errors.telegram && <p className="text-red-500 text-xs mt-1">{errors.telegram}</p>}
               </div>
             </div>
 
@@ -886,12 +943,27 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
                     <span className="text-gray-800 col-span-2 break-words">{formData.sriLankaAddress}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Телефон РФ:</span>
+                    <span className="text-gray-600">Телефон ШЛ:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneSriLanka}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Контактные данные */}
+              <div className="border-b pb-4">
+                <h3 className="text-gray-700 mb-3 font-semibold">Контактные данные</h3>
+                <div className="space-y-2 text-sm">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Email:</span>
+                    <span className="text-gray-800 col-span-2 break-words">{formData.email}</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-gray-600">Телефон:</span>
                     <span className="text-gray-800 col-span-2 break-words">{formData.phoneRussia}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600">Телефон ШЛ:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{formData.phoneSriLanka}</span>
+                    <span className="text-gray-600">Telegram:</span>
+                    <span className="text-gray-800 col-span-2 break-words">@{formData.telegram.replace(/^@/, '')}</span>
                   </div>
                 </div>
               </div>
