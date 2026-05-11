@@ -1,4 +1,4 @@
-import { ChevronRight, ChevronLeft, AlertTriangle } from 'lucide-react';
+import { ChevronRight, ChevronLeft, AlertTriangle, FileText, User, Sparkles, Megaphone, Mail, Camera, CheckCircle2 } from 'lucide-react';
 import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { Button } from '../ui/brand';
@@ -13,175 +13,168 @@ interface Step6Props {
   onPrev: () => void;
 }
 
-export default function Step6Review({ formData, visa, urgent, totalPrice, addonPrices, onNext, onPrev }: Step6Props) {
+// Карточка-секция в стиле Step7Payment: белый фон, иконка с brand-градиентом
+// в квадрате слева, заголовок справа, контент ниже.
+function SectionCard({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-2xl shadow-lg p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl mb-2 text-gray-800">Проверка данных</h2>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 flex gap-3">
-          <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-          <p className="text-sm text-yellow-800">
-            Пожалуйста, внимательно проверьте все данные. Фото должно быть свежим. Любые ошибки могут привести к отказу в выдаче визы.
-          </p>
+    <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-11 h-11 rounded-xl vd-grad flex items-center justify-center text-white shadow-md flex-shrink-0">
+          {icon}
         </div>
+        <h3 className="text-[#0F2A36] font-bold text-sm pt-2.5">{title}</h3>
+      </div>
+      <div className="space-y-2.5">{children}</div>
+    </div>
+  );
+}
+
+// Одна строка «Лейбл / Значение» внутри SectionCard — grid 50/50 с переносом
+// длинных строк (min-w-0 break-words не даёт label наезжать на value).
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="grid grid-cols-2 gap-3 text-sm">
+      <span className="text-[#0F2A36]/60 min-w-0 break-words">{label}</span>
+      <span className="text-[#0F2A36] font-medium min-w-0 break-words">{value}</span>
+    </div>
+  );
+}
+
+export default function Step6Review({ formData, visa, totalPrice, addonPrices, onNext, onPrev }: Step6Props) {
+  const howHeardValue = formData.basicData.howHeard || formData.howHeard[0];
+  const howHeardLabel = howHeardValue ? (HOW_HEARD_LABELS[String(howHeardValue)] ?? String(howHeardValue)) : null;
+
+  const additionalPhotoKeys = Object.keys(formData.photos.additionalPhotos)
+    .filter(key => formData.photos.additionalPhotos[key]);
+
+  return (
+    <div className="bg-[#F5F7FA] rounded-2xl shadow-lg p-6">
+      {/* Header — единый шапочный шаблон с Step7Payment */}
+      <div className="mb-6">
+        <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold">Финал · Шаг 5 из 6</p>
+        <h2 className="text-[26px] font-extrabold tracking-tight text-[#0F2A36] mt-1">Проверка</h2>
+        <p className="text-sm text-[#0F2A36]/60 mt-1">Проверьте данные перед оплатой</p>
       </div>
 
-      <div className="space-y-6 mb-6">
-        {/* Visa Info */}
-        <div className="border-b pb-4">
-          <h3 className="text-gray-700 mb-3">Информация о визе</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Страна:</span>
-              <span className="text-gray-800">{visa.country}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Тип визы:</span>
-              <span className="text-gray-800">{visa.type}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Срочное оформление:</span>
-              <span className="text-gray-800">{formData.additionalDocs.urgentProcessing ? 'Да' : 'Нет'}</span>
-            </div>
-          </div>
-        </div>
+      {/* Warning — мягче чем раньше: тот же тон что в Step7 trust-strip */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex gap-3">
+        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-900 leading-relaxed">
+          Внимательно проверьте все данные. Фото должно быть свежим. Любые ошибки могут привести к отказу в выдаче визы.
+        </p>
+      </div>
 
-        {/* Basic Data - Country Specific */}
+      <div className="space-y-3 mb-4">
+        {/* Информация о визе */}
+        <SectionCard icon={<FileText className="w-5 h-5" />} title="Информация о визе">
+          <Row label="Страна" value={visa.country} />
+          <Row label="Тип визы" value={visa.type} />
+          <Row label="Срочное оформление" value={formData.additionalDocs.urgentProcessing ? 'Да' : 'Нет'} />
+        </SectionCard>
+
+        {/* Основные данные (country-specific) */}
         {Object.keys(formData.basicData).length > 0 && (
-          <div className="border-b pb-4">
-            <h3 className="text-gray-700 mb-3">Основные данные</h3>
-            <div className="space-y-2 text-sm">
-              {Object.entries(formData.basicData).map(([key, value]) => {
-                if (!value || value === '') return null;
-                if (key === 'howHeard') return null;
-                const label = getFieldLabel(key);
-                const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
-                return (
-                  <div key={key} className="grid grid-cols-2 gap-3">
-                    <span className="text-gray-600 min-w-0 break-words">{label}:</span>
-                    <span className="text-gray-800 min-w-0 break-words">{displayValue}</span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
+          <SectionCard icon={<User className="w-5 h-5" />} title="Основные данные">
+            {Object.entries(formData.basicData).map(([key, value]) => {
+              if (!value || value === '') return null;
+              if (key === 'howHeard') return null;
+              const label = getFieldLabel(key);
+              const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
+              return <Row key={key} label={label} value={displayValue} />;
+            })}
+          </SectionCard>
         )}
 
-        {/* Additional Docs */}
+        {/* Усиление заявки */}
         {(formData.additionalDocs.hotelBooking || formData.additionalDocs.returnTicket) && (
-          <div className="border-b pb-4">
-            <h3 className="text-gray-700 mb-3">Усиление заявки</h3>
-            <div className="space-y-2 text-sm">
-              {formData.additionalDocs.hotelBooking && (
-                <div className="flex items-center gap-2 text-gray-800">
-                  <span className="text-green-600">✓</span>
-                  Подтверждение проживания (+{addonPrices.hotel}₽)
-                </div>
-              )}
-              {formData.additionalDocs.returnTicket && (
-                <div className="flex items-center gap-2 text-gray-800">
-                  <span className="text-green-600">✓</span>
-                  Подтверждение обратного билета (+{addonPrices.ticket}₽)
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* How Heard */}
-        {(formData.basicData.howHeard || formData.howHeard.length > 0) && (
-          <div className="border-b pb-4">
-            <h3 className="text-gray-700 mb-3">Как узнали о нас</h3>
-            <span className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
-              {HOW_HEARD_LABELS[String(formData.basicData.howHeard || formData.howHeard[0])] ?? (formData.basicData.howHeard || formData.howHeard[0])}
-            </span>
-          </div>
-        )}
-
-        {/* Contact Info */}
-        <div className="border-b pb-4">
-          <h3 className="text-gray-700 mb-3">Контактные данные</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Email:</span>
-              <span className="text-gray-800">{formData.contactInfo.email}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Телефон:</span>
-              <span className="text-gray-800">{formData.contactInfo.phone}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Telegram:</span>
-              <span className="text-gray-800">@{formData.contactInfo.telegram}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Photos */}
-        <div className="border-b pb-4">
-          <h3 className="text-gray-700 mb-3">Загруженные фото</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center gap-2 text-gray-800">
-              <span className="text-green-600">✓</span>
-              Фото лица {formData.photos.facePhoto && `(${formData.photos.facePhoto.name})`}
-            </div>
-            <div className="flex items-center gap-2 text-gray-800">
-              <span className="text-green-600">✓</span>
-              Фото загранпаспорта {formData.photos.passportPhoto && `(${formData.photos.passportPhoto.name})`}
-            </div>
-            {Object.keys(formData.photos.additionalPhotos).filter(key => formData.photos.additionalPhotos[key]).map(key => (
-              <div key={key} className="flex items-center gap-2 text-gray-800">
-                <span className="text-green-600">✓</span>
-                {getFieldLabel(key)} {formData.photos.additionalPhotos[key] && `(${formData.photos.additionalPhotos[key]!.name})`}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Total Price */}
-        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-4">
-          <div className="space-y-2 mb-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Стоимость визы:</span>
-              <span className="text-gray-800">{visa.price}₽</span>
-            </div>
-            {formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам' && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Срочное оформление:</span>
-                <span className="text-gray-800">+{addonPrices.urgent}₽</span>
-              </div>
-            )}
+          <SectionCard icon={<Sparkles className="w-5 h-5" />} title="Усиление заявки">
             {formData.additionalDocs.hotelBooking && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Подтверждение бронирования жилья:</span>
-                <span className="text-gray-800">+{addonPrices.hotel}₽</span>
+              <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Подтверждение проживания <span className="text-[#0F2A36]/60">(+{addonPrices.hotel}₽)</span></span>
               </div>
             )}
             {formData.additionalDocs.returnTicket && (
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Бронирование авиабилета:</span>
-                <span className="text-gray-800">+{addonPrices.ticket}₽</span>
+              <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                <span>Подтверждение обратного билета <span className="text-[#0F2A36]/60">(+{addonPrices.ticket}₽)</span></span>
               </div>
             )}
+          </SectionCard>
+        )}
+
+        {/* Как узнали о нас */}
+        {howHeardLabel && (
+          <SectionCard icon={<Megaphone className="w-5 h-5" />} title="Как узнали о нас">
+            <span className="inline-block bg-[#EAF1FF] text-[#3B5BFF] text-xs font-semibold px-3 py-1.5 rounded-full">
+              {howHeardLabel}
+            </span>
+          </SectionCard>
+        )}
+
+        {/* Контактные данные */}
+        <SectionCard icon={<Mail className="w-5 h-5" />} title="Контактные данные">
+          <Row label="Email" value={formData.contactInfo.email || '—'} />
+          <Row label="Телефон" value={formData.contactInfo.phone || '—'} />
+          <Row label="Telegram" value={formData.contactInfo.telegram ? `@${formData.contactInfo.telegram}` : '—'} />
+        </SectionCard>
+
+        {/* Загруженные фото */}
+        <SectionCard icon={<Camera className="w-5 h-5" />} title="Загруженные фото">
+          <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>Фото лица{formData.photos.facePhoto ? <span className="text-[#0F2A36]/60"> ({formData.photos.facePhoto.name})</span> : null}</span>
           </div>
-          <div className="flex justify-between items-center border-t pt-3">
-            <span className="text-gray-700">Итого:</span>
-            <span className="text-2xl text-[#3B5BFF]">{totalPrice}₽</span>
+          <div className="flex items-center gap-2 text-sm text-[#0F2A36]">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>Фото загранпаспорта{formData.photos.passportPhoto ? <span className="text-[#0F2A36]/60"> ({formData.photos.passportPhoto.name})</span> : null}</span>
           </div>
+          {additionalPhotoKeys.map(key => (
+            <div key={key} className="flex items-center gap-2 text-sm text-[#0F2A36]">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              <span>{getFieldLabel(key)}{formData.photos.additionalPhotos[key] ? <span className="text-[#0F2A36]/60"> ({formData.photos.additionalPhotos[key]!.name})</span> : null}</span>
+            </div>
+          ))}
+        </SectionCard>
+      </div>
+
+      {/* Итого — той же визуальной природы что и в Step7Payment */}
+      <div className="vd-grad-soft rounded-2xl p-5 mb-4 border border-blue-100/60">
+        <p className="text-[10px] uppercase tracking-widest text-[#3B5BFF] font-bold mb-3">Детали оплаты</p>
+        <div className="space-y-2.5 mb-3">
+          <div className="flex items-start justify-between gap-3 text-sm">
+            <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Стоимость визы</span>
+            <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">{visa.price.toLocaleString('ru-RU')} ₽</span>
+          </div>
+          {formData.additionalDocs.urgentProcessing && visa.country !== 'Вьетнам' && (
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Срочное оформление</span>
+              <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">+{addonPrices.urgent.toLocaleString('ru-RU')} ₽</span>
+            </div>
+          )}
+          {formData.additionalDocs.hotelBooking && (
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Подтверждение бронирования жилья</span>
+              <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">+{addonPrices.hotel.toLocaleString('ru-RU')} ₽</span>
+            </div>
+          )}
+          {formData.additionalDocs.returnTicket && (
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span className="text-[#0F2A36]/70 leading-snug min-w-0 break-words">Бронирование авиабилета</span>
+              <span className="text-[#0F2A36] font-semibold whitespace-nowrap shrink-0 tabular-nums">+{addonPrices.ticket.toLocaleString('ru-RU')} ₽</span>
+            </div>
+          )}
+        </div>
+        <div className="border-t border-blue-200/60 pt-3 flex items-baseline justify-between gap-3">
+          <span className="text-[#0F2A36] font-bold">Итого</span>
+          <span className="text-2xl vd-grad-text font-extrabold tracking-tight whitespace-nowrap shrink-0 tabular-nums">
+            {totalPrice.toLocaleString('ru-RU')} ₽
+          </span>
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <Button
-          variant="secondary"
-          size="lg"
-          fullWidth
-          className="!py-4"
-          onClick={onPrev}
-          leftIcon={<ChevronLeft className="w-5 h-5" />}
-        >
-          Назад
-        </Button>
+      {/* Кнопки — те же варианты что в Step7 (primary CTA + secondary назад) */}
+      <div className="space-y-3">
         <Button
           variant="primary"
           size="lg"
@@ -191,6 +184,16 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
           rightIcon={<ChevronRight className="w-5 h-5" />}
         >
           К оплате
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          fullWidth
+          className="!py-3 !rounded-2xl !bg-gray-100 !border-0 !text-[#0F2A36]/70 hover:!bg-gray-200"
+          onClick={onPrev}
+          leftIcon={<ChevronLeft className="w-4 h-4" />}
+        >
+          Назад
         </Button>
       </div>
     </div>
