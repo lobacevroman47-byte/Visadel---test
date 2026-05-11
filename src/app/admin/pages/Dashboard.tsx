@@ -6,8 +6,8 @@ import {
 import { useAdminApplications, useAdminUsers } from '../hooks/useAdminData';
 import { getFinanceStats, type FinanceStats } from '../../lib/db';
 import { Card } from '../../components/ui/brand';
-// TEMP: REMOVE — test seed drafts button (см. _DevSeedDrafts.tsx)
-import DevSeedDrafts from './_DevSeedDrafts';
+// TEMP: REMOVE — test seed drafts button (см. DevSeedDrafts.tsx)
+import DevSeedDrafts from './DevSeedDrafts';
 
 const StatCard: React.FC<{
   icon: React.ReactNode;
