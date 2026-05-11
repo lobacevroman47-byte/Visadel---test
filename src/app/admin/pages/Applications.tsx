@@ -1047,6 +1047,9 @@ const ApplicationModal: React.FC<{ application: Application; onClose: () => void
         country: application.country,
         visa_type: application.visaType,
         application_id: application.id,
+        // application_type='extension' → бэкенд использует STATUS_MESSAGES.ext_*
+        // («Продление в работе» вместо «Виза оформляется» и т.д.).
+        application_type: application.applicationType,
       }),
     });
     const data = await res.json();
@@ -1781,11 +1784,9 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
                       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold whitespace-nowrap ${statusChipClass[app.status]}`}>
                         {statusLabels[app.status]}
                       </span>
-                      {app.applicationType === 'extension' && (
-                        <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold whitespace-nowrap bg-[#EAF1FF] text-[#3B5BFF]">
-                          Продление
-                        </span>
-                      )}
+                      {/* Бэдж «Продление» удалён — тип заявки понятен из
+                          visa_type («Шри-Ланка · Первое продление...»),
+                          бэдж был визуальным шумом. */}
                       {app.urgent && (
                         <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-red-100 text-red-700">
                           <Flame className="w-3 h-3" /> Срочно

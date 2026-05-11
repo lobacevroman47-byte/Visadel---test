@@ -228,6 +228,21 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
   // Step 1 (Проверка) → Step 2 (Оплата). Из Review кнопка «Перейти к оплате»
   // ведёт сюда. Валидация уже была на step 0 → review.
   const handleGoToPayment = () => {
+    // Cron-напоминания: ставим их когда юзер дошёл до экрана оплаты.
+    // Если он за 1/6/24 часа не оплатит — придут push'и
+    // «Осталось оплатить продление». При успешной оплате отменим в
+    // handlePaymentComplete.
+    const key = draftId || `draft_extension_${visa.id}`;
+    apiFetch('/api/schedule-reminders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        draft_key: key,
+        country: visa.country,
+        visa_type: visa.type,
+        type: 'payment',
+      }),
+    }).catch(console.error);
     setCurrentStep(2);
     window.scrollTo(0, 0);
   };
@@ -246,6 +261,21 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
   const handleSaveDraft = () => {
     if (persistDraft()) {
       haptic('success');
+      // Cron-напоминания: 1ч / 6ч / 24ч после сохранения. Если юзер за это
+      // время оплатит — отменяем (см. handlePaymentComplete). Тип reminder
+      // выбирается по стадии: на step 0 (Данные) = 'draft', на step 1
+      // (Проверка) или 2 (Оплата) = 'payment'.
+      const key = draftId || `draft_extension_${visa.id}`;
+      apiFetch('/api/schedule-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          draft_key: key,
+          country: visa.country,
+          visa_type: visa.type,
+          type: currentStep >= 1 ? 'payment' : 'draft',
+        }),
+      }).catch(console.error);
       setDraftSavedShown(true);
     }
   };
@@ -362,7 +392,9 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
         return;
       }
 
-      // 3b. Уведомление юзеру.
+      // 3b. Уведомление юзеру. application_type='extension' → бэкенд
+      // подставит текст «Заявка на продление получена!» вместо общего
+      // визового шаблона.
       if (telegramId) {
         apiFetch('/api/notify-status', {
           method: 'POST',
@@ -373,6 +405,7 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
             country: visa.country,
             visa_type: visa.type,
             application_id: savedApp?.id,
+            application_type: 'extension',
           }),
         }).catch(console.error);
       }
@@ -405,6 +438,13 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
       } catch (e) {
         console.warn('[extension] failed to prune visa_drafts:', e);
       }
+
+      // 5. Отменяем cron-напоминания — юзер оплатил, спам не нужен.
+      apiFetch('/api/cancel-reminders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ draft_key: key }),
+      }).catch(console.error);
 
       haptic('success');
       setSubmitted(true);

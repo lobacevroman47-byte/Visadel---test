@@ -43,6 +43,35 @@ const STATUS_MESSAGES = {
     title: 'Ожидаем оплату',
     body: 'Пожалуйста, оплатите заявку и загрузите скриншот перевода.',
   },
+
+  // ── Тексты для продления визы (application_type='extension') ───────────────
+  // Передаются из админки и формы продления параметром body.application_type.
+  // Тексты подобраны 1-в-1 со словарём виз, но заменено «виза» → «продление».
+  ext_pending_confirmation: {
+    emoji: '📋',
+    title: 'Заявка на продление получена!',
+    body: 'Мы получили вашу заявку и проверяем оплату. Скоро возьмём в работу.',
+  },
+  ext_in_progress: {
+    emoji: '⚙️',
+    title: 'Продление в работе!',
+    body: 'Ваше продление уже оформляется. Мы сообщим, как только будет готово.',
+  },
+  ext_ready: {
+    emoji: '🎉',
+    title: 'Продление готово!',
+    body: 'Откройте приложение, оставьте отзыв и скачайте документ.',
+  },
+  ext_completed: {
+    emoji: '🎉',
+    title: 'Продление готово!',
+    body: 'Откройте приложение, оставьте отзыв и скачайте документ.',
+  },
+  ext_pending_payment: {
+    emoji: '💳',
+    title: 'Ожидаем оплату продления',
+    body: 'Пожалуйста, оплатите заявку и загрузите скриншот перевода.',
+  },
   // Booking-специфичные статусы. Раздельно для отеля и авиа — title
   // меняется в зависимости от типа («Бронь отеля готова!» vs «Бронь
   // авиабилета готова!»), чтобы клиент сразу понял о чём речь без
@@ -244,11 +273,11 @@ export default async function handler(req, res) {
   }
 
   const body = req.body ?? {};
-  const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason, referee_name } = body;
+  const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason, referee_name, application_type } = body;
   // user — только себе; admin / service — кому угодно
   const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
-  console.log('[notify-status] called:', { telegram_id, status, country, application_id });
+  console.log('[notify-status] called:', { telegram_id, status, country, application_id, application_type });
 
   if (!telegram_id || !status) {
     res.status(400).json({ error: 'telegram_id and status required' });
@@ -265,9 +294,13 @@ export default async function handler(req, res) {
   }
 
   const isPartnerEvent = PARTNER_STATUSES.has(status);
+  // Для продления визы выбираем шаблон с префиксом ext_ — слово «виза»
+  // заменено на «продление» в title/body. См. STATUS_MESSAGES выше.
+  // Если ext_-шаблона нет (например ext_draft) — fallback на обычный.
+  const isExtension = application_type === 'extension';
   const msg = isPartnerEvent
     ? buildPartnerMessage(status, { amount, country, source, card_last4, reject_reason, referee_name })
-    : STATUS_MESSAGES[status];
+    : (isExtension && STATUS_MESSAGES[`ext_${status}`]) || STATUS_MESSAGES[status];
   if (!msg) {
     console.error('[notify-status] unknown status:', status);
     res.status(400).json({ error: `Unknown status: "${status}"` });

@@ -21,8 +21,11 @@ function headers(extra = {}) {
   };
 }
 
-// Reminder intervals in minutes
-const INTERVALS = [10, 60, 720, 1440, 2880, 4320]; // 10m, 1h, 12h, 24h, 48h, 72h
+// Reminder intervals in minutes — 1h / 6h / 24h.
+// По требованию: «если черновик более 1 часа не оплачен — уведомление,
+// потом через 6 часов уведомление и на следующий день через 24 часа».
+// Использует cron /api/process-reminders который тикает каждые 5 минут.
+const INTERVALS = [60, 360, 1440]; // 1h, 6h, 24h
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
