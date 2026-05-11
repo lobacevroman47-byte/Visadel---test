@@ -57,9 +57,9 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
                 const label = getFieldLabel(key);
                 const displayValue = typeof value === 'object' ? JSON.stringify(value) : String(value);
                 return (
-                  <div key={key} className="grid grid-cols-3 gap-2">
-                    <span className="text-gray-600 col-span-1">{label}:</span>
-                    <span className="text-gray-800 col-span-2 break-words">{displayValue}</span>
+                  <div key={key} className="grid grid-cols-2 gap-3">
+                    <span className="text-gray-600 min-w-0 break-words">{label}:</span>
+                    <span className="text-gray-800 min-w-0 break-words">{displayValue}</span>
                   </div>
                 );
               })}
@@ -93,7 +93,7 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
           <div className="border-b pb-4">
             <h3 className="text-gray-700 mb-3">Как узнали о нас</h3>
             <span className="bg-blue-100 text-blue-800 text-xs px-3 py-1 rounded-full">
-              {formData.basicData.howHeard || formData.howHeard[0]}
+              {HOW_HEARD_LABELS[String(formData.basicData.howHeard || formData.howHeard[0])] ?? (formData.basicData.howHeard || formData.howHeard[0])}
             </span>
           </div>
         )}
@@ -197,6 +197,18 @@ export default function Step6Review({ formData, visa, urgent, totalPrice, addonP
   );
 }
 
+// Маппинг значений источника трафика (howHeard) → человеческое название.
+const HOW_HEARD_LABELS: Record<string, string> = {
+  telegram: 'Telegram',
+  youtube: 'YouTube',
+  instagram: 'Instagram',
+  tiktok: 'TikTok',
+  vk: 'ВКонтакте',
+  rutube: 'RuTube',
+  friends: 'Посоветовали друзья',
+  repeat: 'Оформлял(-а) ранее',
+};
+
 // Универсальный словарь русских лейблов для всех ключей в form_data.
 // Покрывает: 9 визовых стран + продление + контакты + брони + динамические
 // поля визовых форм. Если в БД лежит запись со старыми/новыми именами ключей —
@@ -237,8 +249,11 @@ const FIELD_LABELS: Record<string, string> = {
   maritalStatus: 'Семейное положение',
   spouseInfo: 'Информация о супруге',
   fatherData: 'Данные отца',
+  fatherInfo: 'Данные отца',
   motherData: 'Данные матери',
+  motherInfo: 'Данные матери',
   parentsData: 'Данные родителей',
+  parentsInfo: 'Данные родителей',
   childInfo: 'Информация о ребёнке',
   workplace: 'Место работы',
   workInfo: 'Информация о работе',
@@ -249,6 +264,7 @@ const FIELD_LABELS: Record<string, string> = {
   previousName: 'Предыдущие Ф.И.О',
   internalPassport: 'Серия и номер внутреннего паспорта',
   isBiometric: 'Биометрический паспорт',
+  biometricPassport: 'Биометрический паспорт',
   countriesVisited: 'Посещённые страны',
   emergencyContact: 'Экстренный контакт',
   howHeard: 'Откуда узнали о нас',
@@ -256,7 +272,9 @@ const FIELD_LABELS: Record<string, string> = {
   oldPassport: 'Старый паспорт',
   expectedExpenses: 'Ожидаемые расходы',
   insuranceInfo: 'Страховка',
+  insurance: 'Страховка',
   bringCurrency: 'Ввоз валюты',
+  currencyImport: 'Ввоз валюты (>5000$)',
 
   // ── Dates / travel logistics ───────────────────────────────────────────
   arrivalDate: 'Дата прилёта',
@@ -283,11 +301,15 @@ const FIELD_LABELS: Record<string, string> = {
   tripDateFrom: 'Дата начала поездки',
   tripDateTo: 'Дата окончания поездки',
   expectedEntryDate: 'Ожидаемая дата въезда',
+  entryDate: 'Ожидаемая дата въезда',
   dateRange: 'Даты поездки',
   dateStart: 'Дата начала',
   dateEnd: 'Дата окончания',
   daysInPakistan: 'Дней в Пакистане',
+  stayDuration: 'Сколько дней пребывания',
+  stayDate: 'Дата пребывания',
   residedTwoYears: 'Прожили 2 года в стране',
+  twoYearsResidence: 'Прожили 2 года в стране',
 
   // ── Trip purpose / visit ────────────────────────────────────────────────
   purpose: 'Цель поездки',
@@ -295,6 +317,7 @@ const FIELD_LABELS: Record<string, string> = {
   tripPurpose: 'Цель поездки',
   previousVisit: 'Были ранее в стране',
   visaRefusal: 'Отказы в визе',
+  visaRejection: 'Отказы в визе',
   prevVisaType: 'Тип предыдущей визы',
   prevVisaNumber: 'Номер предыдущей визы',
   prevEntryAirport: 'Аэропорт предыдущего въезда',
@@ -302,26 +325,37 @@ const FIELD_LABELS: Record<string, string> = {
 
   // ── Country-specific addresses ─────────────────────────────────────────
   addressInVietnam: 'Адрес во Вьетнаме',
+  vietnamAddress: 'Адрес во Вьетнаме',
   addressInSriLanka: 'Адрес на Шри-Ланке',
   sriLankaAddress: 'Адрес на Шри-Ланке',
   addressInKorea: 'Адрес в Корее',
   koreaAddress: 'Адрес в Корее',
   addressInCambodia: 'Адрес в Камбодже',
+  cambodiaAddress: 'Адрес в Камбодже',
   addressInKenya: 'Адрес в Кении',
+  kenyaAddress: 'Адрес в Кении',
+  pakistanAddress: 'Адрес в Пакистане',
+  plannedAddress: 'Планируемый адрес проживания',
   hotelAddress: 'Адрес отеля',
   hotelInfo: 'Информация об отеле',
 
   // ── India ──────────────────────────────────────────────────────────────
   citiesInIndia: 'Города в Индии',
+  placesToVisit: 'Места/города в Индии',
   visitedIndiaBefore: 'Были в Индии',
+  previousIndiaVisit: 'Были в Индии ранее',
   southAsiaVisits: 'Визиты в Южную Азию',
+  neighborCountries: 'Соседние страны (за 3 года)',
   contactInIndia: 'Контакт в Индии',
   indiaStamps: 'Штампы Индии',
 
   // ── Vietnam ────────────────────────────────────────────────────────────
   vietnamViolations: 'Нарушения во Вьетнаме',
+  violations: 'Нарушения во Вьетнаме',
   contactsInVietnam: 'Контакты во Вьетнаме',
+  contacts: 'Контакты во Вьетнаме',
   previousVietnamVisits: 'Предыдущие визиты во Вьетнам',
+  previousVisits: 'Предыдущие визиты',
 
   // ── Sri Lanka ──────────────────────────────────────────────────────────
   lastCountry: 'Последняя страна',
@@ -348,7 +382,16 @@ const FIELD_LABELS: Record<string, string> = {
 
   // ── Kenya ──────────────────────────────────────────────────────────────
   deniedEntry: 'Отказы во въезде в Кению',
+  entryDenied: 'Отказы во въезде в Кению',
   beenToKenya: 'Были в Кении',
+  flightInfo: 'Авиакомпания и номер рейса',
+  exitFlightInfo: 'Авиакомпания и номер рейса (вылет)',
+  departureCountry: 'Страна вылета',
+  destinationCountry: 'Страна назначения',
+
+  // ── Sri Lanka extension ────────────────────────────────────────────────
+  phoneNumbers: 'Мобильный телефон РФ и Шри-Ланка',
+  personalPhoto: 'Личное фото',
 
   // ── Philippines ────────────────────────────────────────────────────────
   firstTimePhilippines: 'Впервые на Филиппинах',
