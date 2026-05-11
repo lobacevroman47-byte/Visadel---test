@@ -202,25 +202,26 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
     });
   };
 
-  const showOptions = country !== 'Вьетнам';
+  // Вьетнам — у срочности отдельные visa types (3 дня / 4 часа / 2 часа),
+  // срочность уже в цене. Поэтому аддон «Срочное оформление» для Вьетнама
+  // скрываем (двойной счёт), но бронь отеля и обратного билета — показываем
+  // как у остальных стран.
+  const isVietnam = country === 'Вьетнам';
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
       <div className="mb-5">
         <h2 className="text-[20px] font-extrabold tracking-tight text-[#0F2A36] mb-1">Усиление заявки</h2>
         <p className="text-sm text-[#0F2A36]/60">
-          {showOptions
-            ? 'Опционально — добавь услуги, которые увеличат шанс одобрения визы'
-            : 'Для Вьетнама дополнительные опции уже включены в стоимость'}
+          Опционально — добавь услуги, которые увеличат шанс одобрения визы
         </p>
       </div>
 
-      {showOptions && (
-        <div className="space-y-3 mb-5">
+      <div className="space-y-3 mb-5">
           {/* Каждый аддон рендерим только если он enabled в админке.
              Если админ вернёт галочку «Активна» в Каталог → Брони —
              карточка появится автоматически при следующем открытии Step2. */}
-          {addonAvail.urgent && (
+          {addonAvail.urgent && !isVietnam && (
             <AddonCard
               icon={<Zap className="w-5 h-5" />}
               emoji="⚡"
@@ -440,7 +441,6 @@ export default function Step2AdditionalDocs({ country, data, onChange, onNext, o
           </AddonCard>
           )}
         </div>
-      )}
 
       <div className="flex gap-3">
         <Button
