@@ -75,10 +75,10 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
   const fdAny = fd as Record<string, string>;
   const fromBasic = [basic.firstName, basic.lastName].filter(Boolean).join(' ').trim();
   const fromRoot = [fdAny.firstName, fdAny.lastName].filter(Boolean).join(' ').trim();
-  const clientName = fromBasic || basic.fullName || fromRoot || basic.lastName || `ID ${row.user_telegram_id}`;
+  const clientName = fromBasic || basic.fullName || fromRoot || basic.lastName || `ID ${row.user_telegram_id ?? row.user_auth_id ?? '—'}`;
   return {
     id: row.id as string,
-    telegramId: row.user_telegram_id as number,
+    telegramId: (row.user_telegram_id as number | null) ?? 0,
     clientName,
     phone: contact.phone ?? '',
     email: contact.email ?? '',
@@ -310,8 +310,10 @@ export function useAdminUsers() {
 
         const appCounts: Record<number, number> = {};
         (appsRes.data ?? []).forEach((a: Record<string, unknown>) => {
-          const tid = a.user_telegram_id as number;
-          appCounts[tid] = (appCounts[tid] ?? 0) + 1;
+          // user_telegram_id может быть null для веб-юзеров (миграция 031),
+          // их заявки в этот счётчик не идут.
+          const tid = a.user_telegram_id as number | null;
+          if (tid) appCounts[tid] = (appCounts[tid] ?? 0) + 1;
         });
 
         const adminRoleMap = new Map<number, AdminStaffRole>();

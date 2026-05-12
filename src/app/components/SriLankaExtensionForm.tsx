@@ -9,6 +9,7 @@ import { useDialog } from './shared/BrandDialog';
 import { Button } from './ui/brand';
 import { saveApplication, uploadFile, getAppSettings } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getCurrentSession } from '../lib/web-auth';
 import { apiFetch } from '../lib/apiFetch';
 import { haptic } from '../lib/telegram';
 import { getMaxBonusUsage } from '../lib/bonus-config';
@@ -349,8 +350,13 @@ export default function SriLankaExtensionForm({ visa, onBack, onComplete, onGoTo
       // contactInfo для таба «Основное» (email/phone/telegram).
       // Раньше специфика продления лежала в form_data.extensionData —
       // админка её не видела, табы были пустые.
+      // Веб-юзеры — telegramId=0, у них есть auth_id из Supabase Auth.
+      const webSession = await getCurrentSession();
+      const authId = webSession?.authId ?? null;
+
       const savedApp = await saveApplication({
-        user_telegram_id: telegramId,
+        user_telegram_id: telegramId || null,
+        user_auth_id: authId,
         country: visa.country,
         visa_type: visa.type,
         visa_id: visa.id,
