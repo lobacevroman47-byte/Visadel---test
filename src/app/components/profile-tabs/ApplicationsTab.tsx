@@ -34,6 +34,7 @@ import {
 } from '../../lib/db';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { apiFetch } from '../../lib/apiFetch';
+import { getCurrentSession } from '../../lib/web-auth';
 import { useTelegram } from '../../App';
 import { useDialog } from '../shared/BrandDialog';
 import { countryFlag } from '../../lib/countryFlags';
@@ -366,11 +367,16 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
     const id = tid ?? telegramId;
     setLoading(true);
     try {
+      // Получаем auth_id для веб-юзеров (через email). Для TG-юзеров — null.
+      const webSession = await getCurrentSession();
+      const authId = webSession?.authId ?? null;
+      const hasAnyId = !!id || !!authId;
+
       const [apps, reviewed, hotels, flights] = await Promise.all([
-        id ? getUserApplications(id) : Promise.resolve([]),
+        hasAnyId ? getUserApplications(id || null, authId) : Promise.resolve([]),
         id ? getReviewedAppIds(id) : Promise.resolve(new Set<string>()),
-        id ? getUserHotelBookings(id) : Promise.resolve([] as HotelBookingRow[]),
-        id ? getUserFlightBookings(id) : Promise.resolve([] as FlightBookingRow[]),
+        hasAnyId ? getUserHotelBookings(id || null, authId) : Promise.resolve([] as HotelBookingRow[]),
+        hasAnyId ? getUserFlightBookings(id || null, authId) : Promise.resolve([] as FlightBookingRow[]),
       ]);
       setApplications(apps);
       setReviewedIds(reviewed);

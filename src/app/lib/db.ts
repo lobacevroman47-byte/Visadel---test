@@ -37,7 +37,10 @@ export interface AppUser {
 
 export interface Application {
   id?: string;
-  user_telegram_id: number;
+  /** TG-юзер — telegram_id. Веб-юзер — null, у него заполнен user_auth_id. */
+  user_telegram_id: number | null;
+  /** Auth user ID (Supabase Auth UUID). Заполнен у веб-юзеров; null у TG-юзеров. */
+  user_auth_id?: string | null;
   country: string;
   visa_type: string;
   visa_id: string;
@@ -338,8 +341,10 @@ export async function saveApplication(app: Application): Promise<Application> {
     }
 
     // Базовый payload — поля которые точно существовали ДО миграции 029.
+    // user_auth_id (миграция 031) добавляем, если есть — для веб-юзеров.
     const basePayload: Record<string, unknown> = {
       user_telegram_id: app.user_telegram_id,
+      user_auth_id: app.user_auth_id ?? null,
       country: app.country,
       visa_type: app.visa_type,
       visa_id: app.visa_id,
@@ -409,18 +414,42 @@ export async function saveApplication(app: Application): Promise<Application> {
   return newApp;
 }
 
-export async function getUserApplications(telegramId: number): Promise<Application[]> {
+/**
+ * Загружает заявки юзера. Для TG-юзеров фильтрует по telegram_id, для
+ * веб-юзеров — по auth_id. Если переданы оба — ищет по OR (для случая когда
+ * аккаунт связан и TG и Auth).
+ */
+export async function getUserApplications(
+  telegramId: number | null,
+  authId?: string | null,
+): Promise<Application[]> {
   if (isSupabaseConfigured()) {
-    const { data } = await supabase
+    let query = supabase
       .from('applications')
       .select('*')
-      .eq('user_telegram_id', telegramId)
       .is('deleted_at', null)
       .order('created_at', { ascending: false });
+
+    if (telegramId && authId) {
+      // Юзер связан и TG и Auth — ищем по OR
+      query = query.or(`user_telegram_id.eq.${telegramId},user_auth_id.eq.${authId}`);
+    } else if (authId) {
+      query = query.eq('user_auth_id', authId);
+    } else if (telegramId) {
+      query = query.eq('user_telegram_id', telegramId);
+    } else {
+      // Ни одного ID — пустой результат
+      return [];
+    }
+
+    const { data } = await query;
     return (data as Application[]) ?? [];
   }
   const apps = lsGet<Application[]>(LS_APPS, []);
-  return apps.filter(a => a.user_telegram_id === telegramId);
+  return apps.filter(a =>
+    (telegramId && a.user_telegram_id === telegramId) ||
+    (authId && a.user_auth_id === authId)
+  );
 }
 
 // ─── Bookings (Hotel + Flight) ───────────────────────────────────────────────
@@ -481,26 +510,48 @@ export async function markBookingReviewBonusGranted(
   await supabase.from(table).update({ review_bonus_granted: true }).eq('id', id);
 }
 
-export async function getUserHotelBookings(telegramId: number): Promise<HotelBookingRow[]> {
-  if (!isSupabaseConfigured() || !telegramId) return [];
-  const { data, error } = await supabase
+export async function getUserHotelBookings(
+  telegramId: number | null,
+  authId?: string | null,
+): Promise<HotelBookingRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  if (!telegramId && !authId) return [];
+  let query = supabase
     .from('hotel_bookings')
     .select('*')
-    .eq('telegram_id', telegramId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
+  if (telegramId && authId) {
+    query = query.or(`telegram_id.eq.${telegramId},auth_id.eq.${authId}`);
+  } else if (authId) {
+    query = query.eq('auth_id', authId);
+  } else {
+    query = query.eq('telegram_id', telegramId);
+  }
+  const { data, error } = await query;
   if (error) { console.warn('getUserHotelBookings error', error.message); return []; }
   return (data as HotelBookingRow[]) ?? [];
 }
 
-export async function getUserFlightBookings(telegramId: number): Promise<FlightBookingRow[]> {
-  if (!isSupabaseConfigured() || !telegramId) return [];
-  const { data, error } = await supabase
+export async function getUserFlightBookings(
+  telegramId: number | null,
+  authId?: string | null,
+): Promise<FlightBookingRow[]> {
+  if (!isSupabaseConfigured()) return [];
+  if (!telegramId && !authId) return [];
+  let query = supabase
     .from('flight_bookings')
     .select('*')
-    .eq('telegram_id', telegramId)
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
+  if (telegramId && authId) {
+    query = query.or(`telegram_id.eq.${telegramId},auth_id.eq.${authId}`);
+  } else if (authId) {
+    query = query.eq('auth_id', authId);
+  } else {
+    query = query.eq('telegram_id', telegramId);
+  }
+  const { data, error } = await query;
   if (error) { console.warn('getUserFlightBookings error', error.message); return []; }
   return (data as FlightBookingRow[]) ?? [];
 }
@@ -553,12 +604,19 @@ export async function uploadFile(
   const compressed = await compressImage(file);
   file = compressed;
   const ext = file.name.split('.').pop();
-  // Path = <telegram_id>/<folder>/<timestamp>-<rand>.<ext>
-  // Storage RLS политика разрешит чтение/запись только владельцу
-  // (split_part(name, '/', 1)::bigint = current_tg_id()).
-  // shared/ — для случаев когда tg_id неизвестен (анон, до логина).
+  // Path формируется в зависимости от типа юзера:
+  //   <telegram_id>/<folder>/...    — для TG-юзеров (Storage RLS, миграция 003)
+  //   auth_<auth_id>/<folder>/...   — для веб-юзеров (миграция 032)
+  //   shared/<folder>/...            — fallback если ни одного ID нет
   const tgId = currentTelegramIdForPath();
-  const owner = tgId ? String(tgId) : 'shared';
+  let owner: string;
+  if (tgId) {
+    owner = String(tgId);
+  } else {
+    // Веб-юзер? Получаем auth_id из Supabase session (если есть).
+    const { data: { session } } = await supabase.auth.getSession();
+    owner = session?.user?.id ? `auth_${session.user.id}` : 'shared';
+  }
   const path = `${owner}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
   const { error } = await supabase.storage
     .from('visadel-files')

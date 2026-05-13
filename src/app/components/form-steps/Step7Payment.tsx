@@ -6,6 +6,7 @@ import type { FormData } from '../ApplicationForm';
 import type { VisaOption } from '../../App';
 import { saveApplication, uploadFile, getAppSettings } from '../../lib/db';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { getCurrentSession } from '../../lib/web-auth';
 import { apiFetch } from '../../lib/apiFetch';
 import { haptic } from '../../lib/telegram';
 import { getMaxBonusUsage } from '../../lib/bonus-config';
@@ -148,8 +149,13 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
       }
 
       // 3. Save application to Supabase (or localStorage fallback)
+      // Веб-юзеры (через email) — telegramId=0, у них есть auth_id из Supabase Auth.
+      const webSession = await getCurrentSession();
+      const authId = webSession?.authId ?? null;
+
       const savedApp = await saveApplication({
-        user_telegram_id: telegramId,
+        user_telegram_id: telegramId || null,
+        user_auth_id: authId,
         country: visa.country,
         visa_type: visa.type,
         visa_id: visa.id,

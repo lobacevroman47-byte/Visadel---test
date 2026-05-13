@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { getCurrentSession } from '../lib/web-auth';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
@@ -171,8 +172,13 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         } catch { /* ignore */ }
       }
 
+      // Auth ID для веб-юзеров (через email-регистрацию). Для TG-юзеров — null.
+      const webSession = await getCurrentSession();
+      const authId = webSession?.authId ?? null;
+
       const row = {
         telegram_id: userData.telegramId ?? null,
+        auth_id: authId,
         username: userData.username ?? null,
         first_name: firstName.trim(),
         last_name: lastName.trim(),
