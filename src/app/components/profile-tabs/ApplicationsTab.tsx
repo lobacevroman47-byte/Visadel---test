@@ -368,15 +368,27 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
     setLoading(true);
     try {
       // Получаем auth_id для веб-юзеров (через email). Для TG-юзеров — null.
-      const webSession = await getCurrentSession();
-      const authId = webSession?.authId ?? null;
+      // Оборачиваем в timeout 3s + try/catch чтобы supabase.auth.getSession()
+      // не зависал навсегда (был случай — лоадер вечно крутился).
+      const authId = await Promise.race([
+        getCurrentSession().then(s => s?.authId ?? null).catch(() => null),
+        new Promise<null>(resolve => setTimeout(() => resolve(null), 3000)),
+      ]);
       const hasAnyId = !!id || !!authId;
 
       const [apps, reviewed, hotels, flights] = await Promise.all([
-        hasAnyId ? getUserApplications(id || null, authId) : Promise.resolve([]),
-        id ? getReviewedAppIds(id) : Promise.resolve(new Set<string>()),
-        hasAnyId ? getUserHotelBookings(id || null, authId) : Promise.resolve([] as HotelBookingRow[]),
-        hasAnyId ? getUserFlightBookings(id || null, authId) : Promise.resolve([] as FlightBookingRow[]),
+        hasAnyId
+          ? getUserApplications(id || null, authId).catch(e => { console.warn('getUserApplications failed:', e); return []; })
+          : Promise.resolve([]),
+        id
+          ? getReviewedAppIds(id).catch(() => new Set<string>())
+          : Promise.resolve(new Set<string>()),
+        hasAnyId
+          ? getUserHotelBookings(id || null, authId).catch(e => { console.warn('getUserHotelBookings failed:', e); return [] as HotelBookingRow[]; })
+          : Promise.resolve([] as HotelBookingRow[]),
+        hasAnyId
+          ? getUserFlightBookings(id || null, authId).catch(e => { console.warn('getUserFlightBookings failed:', e); return [] as FlightBookingRow[]; })
+          : Promise.resolve([] as FlightBookingRow[]),
       ]);
       setApplications(apps);
       setReviewedIds(reviewed);
