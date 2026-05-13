@@ -299,7 +299,16 @@ export default function Step7Payment({ formData, visa, urgent, totalPrice, addon
     } catch (err) {
       console.error('Submit error:', err);
       haptic('error');
-      toast.error('Не удалось отправить заявку. Попробуй ещё раз или сохрани черновик.');
+      // Показываем конкретный текст ошибки (раньше был generic toast).
+      // Полезно для диагностики — особенно когда веб-юзер падает на
+      // Storage RLS / FK violation / отсутствующей колонке user_auth_id.
+      const errMessage = err instanceof Error
+        ? err.message
+        : (typeof err === 'object' && err && 'message' in err ? String((err as { message: unknown }).message) : String(err));
+      await dialog.error(
+        'Не удалось отправить заявку',
+        `Ошибка: ${errMessage}\n\nПопробуйте ещё раз или сохраните черновик. Если ошибка повторяется — пришлите этот текст администратору.`,
+      );
     } finally {
       setSubmitting(false);
     }
