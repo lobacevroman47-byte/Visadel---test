@@ -440,9 +440,14 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Reload whenever telegramId becomes available (async user load race-condition fix)
+  // Reload whenever telegramId becomes available (async user load race-condition fix).
+  // ВАЖНО: load() вызываем БЕЗУСЛОВНО — для веб-юзеров (без telegramId) внутри
+  // load() получаем authId из getCurrentSession() и грузим заявки по нему.
+  // Раньше тут было `if (telegramId)` — это блокировало веб-юзеров: загрузка
+  // никогда не запускалась, useState(true) loading оставался forever → вечный
+  // лоадер на «Мои заявки».
   useEffect(() => {
-    if (telegramId) load(telegramId);
+    load(telegramId);
   }, [telegramId, load]);
 
   // Supabase Realtime — auto-update statuses without column-level filter
