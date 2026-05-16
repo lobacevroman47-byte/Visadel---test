@@ -30,10 +30,11 @@
 - **Status:** план в `supabase/035_rls_audit_plan.sql`. Требует STAGE 2 (API refactor) перед применением.
 - **ETA:** 1–2 спринта.
 
-#### P0-2. `track-click.js` без auth и rate-limit
+#### P0-2. `track-click.js` без auth и rate-limit (FIXED в этом PR)
 - **Affected:** `api/track-click.js`.
-- **Exploit:** spam-вызов из браузера → флуд в Supabase `clicks` table → инфляция стоимости + искажение аналитики.
-- **Fix:** добавить in-memory token bucket (по IP) + `requireTelegramUser` или magic header.
+- **Exploit (was):** spam-вызов из браузера → флуд в Supabase `clicks` table → инфляция стоимости + искажение аналитики.
+- **Fix applied:** валидация формата `referral_code` (regex `^[A-Za-z0-9_]{2,32}$`), in-memory token bucket по IP (30 POST/мин, 60 GET/мин), CORS whitelist через `setCors`, sanitization для `telegram_id` (только number), убран error message leak из response.
+- **Лимиты защиты:** in-memory bucket держится только на warm контейнере Vercel. Распределённая ботнетка пробьёт. Для полной защиты — Upstash Redis (Sprint 5).
 
 #### P0-3. File upload без server-side валидации
 - **Affected:** Step 4 (фото-документы), все *_BookingForm с upload.
