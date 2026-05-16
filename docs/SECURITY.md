@@ -30,16 +30,25 @@
 - **Status:** план в `supabase/035_rls_audit_plan.sql`. Требует STAGE 2 (API refactor) перед применением.
 - **ETA:** 1–2 спринта.
 
-#### P0-2. `track-click.js` без auth и rate-limit
+#### P0-2. `track-click.js` без auth и rate-limit (FIXED в этом PR)
 - **Affected:** `api/track-click.js`.
-- **Exploit:** spam-вызов из браузера → флуд в Supabase `clicks` table → инфляция стоимости + искажение аналитики.
-- **Fix:** добавить in-memory token bucket (по IP) + `requireTelegramUser` или magic header.
+- **Exploit (was):** spam-вызов из браузера → флуд в Supabase `clicks` table → инфляция стоимости + искажение аналитики.
+- **Fix applied:** валидация формата `referral_code` (regex `^[A-Za-z0-9_]{2,32}$`), in-memory token bucket по IP (30 POST/мин, 60 GET/мин), CORS whitelist через `setCors`, sanitization для `telegram_id` (только number), убран error message leak из response.
+- **Лимиты защиты:** in-memory bucket держится только на warm контейнере Vercel. Распределённая ботнетка пробьёт. Для полной защиты — Upstash Redis (Sprint 5).
 
-#### P0-3. File upload без server-side валидации
+#### P0-3. File upload без server-side валидации (PARTIAL FIX в этом PR)
 - **Affected:** Step 4 (фото-документы), все *_BookingForm с upload.
-- **Root cause:** клиент шлёт `multipart/form-data` напрямую в Supabase Storage через signed URL. Magic bytes / MIME / размер проверяются на клиенте (можно обойти).
-- **Exploit:** загрузка `.exe`, `.html` с JS, .svg с XSS → если Storage отдаётся под `default-src 'self'` на нашем домене — реальная XSS.
-- **Fix:** прокси-endpoint `/api/upload-file` с server-side `file-type` detection + MIME whitelist + max size + virus scan (опционально через ClamAV / VirusTotal API). До этого: убедиться что Storage bucket отдаётся под отдельным доменом (Supabase CDN, не visadel.agency) — это уже так.
+- **Root cause:** клиент шлёт файл напрямую в Supabase Storage. Magic bytes / MIME / размер проверяются на клиенте (можно обойти).
+- **Exploit:** загрузка `.exe`, `.html` с JS, .svg с XSS → если файл открывают прямой ссылкой на supabase.co, XSS сработает в их origin (изолировано от visadel.agency, но всё равно плохо для пользователя который кликнул).
+- **Partial fix applied (migration 036):**
+  - Storage INSERT policy ужесточена: blocklist опасных расширений (`.html`, `.svg`, `.js`, `.exe`, `.php`, и ~20 других)
+  - Path-traversal защита (`..`, `\`, URL-encoded)
+  - Path-prefix scheme расширена для веб-юзеров (`auth_<uuid>`)
+- **Что НЕ закрыто (требует Sprint 4 — server-side прокси):**
+  - Magic-byte валидация (атакующий может подделать MIME header)
+  - Virus scan (ClamAV / VirusTotal)
+  - Per-user квота
+  - Принудительный `Content-Disposition: attachment` — настроить в Supabase Dashboard вручную
 
 #### P0-4. Security headers (FIXED в этом PR)
 - **Before:** `X-Frame-Options: ALLOWALL`, CSP `frame-ancestors *`.
