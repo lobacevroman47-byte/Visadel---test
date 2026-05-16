@@ -145,4 +145,35 @@ function withTelegramAuth(handler) {
   };
 }
 
-export { verifyInitData, requireTelegramUser, requireAdminUser, withTelegramAuth, isAdminId, AuthError };
+// ─── Cron secret auth ──────────────────────────────────────────────────────
+// Vercel при вызове cron автоматически шлёт заголовок:
+//   Authorization: Bearer <CRON_SECRET>
+// где CRON_SECRET берётся из env vars проекта. Это защищает cron endpoints
+// от того что любой может дёрнуть их руками (DoS-by-cost / spam / API abuse).
+//
+// Документация: https://vercel.com/docs/cron-jobs/manage-cron-jobs#securing-cron-jobs
+//
+// На локальной разработке (без CRON_SECRET в env) — пропускаем без проверки
+// чтобы можно было дёргать cron руками в dev. На проде CRON_SECRET ДОЛЖЕН
+// быть задан — иначе endpoint остаётся открытым (warning в логах).
+function requireCronAuth(req) {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) {
+    // На проде это надо настроить. Лога warning достаточно — не падаем.
+    console.warn('[cron-auth] CRON_SECRET env var not set — cron endpoint is OPEN. Set it in Vercel env vars.');
+    return;
+  }
+  const header = req.headers?.authorization || req.headers?.Authorization;
+  if (!header || typeof header !== 'string') {
+    throw new AuthError('Cron Authorization header missing', 401);
+  }
+  const expectedHeader = `Bearer ${expected}`;
+  // timing-safe compare
+  const a = Buffer.from(header);
+  const b = Buffer.from(expectedHeader);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    throw new AuthError('Cron Authorization invalid', 401);
+  }
+}
+
+export { verifyInitData, requireTelegramUser, requireAdminUser, withTelegramAuth, isAdminId, requireCronAuth, AuthError };

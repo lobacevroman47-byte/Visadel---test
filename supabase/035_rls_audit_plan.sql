@@ -1,0 +1,144 @@
+-- ============================================================================
+-- 035: RLS audit plan — закрытие дыр USING(true)/WITH CHECK(true)
+--
+-- ⚠️ DOCUMENTATION-ONLY MIGRATION
+-- Этот файл НЕ выполняет destructive изменений автоматически. Он описывает
+-- последовательность DDL, которую нужно применить ПОСЛЕ того как все
+-- write-операции переведены на API endpoints с service_key.
+--
+-- ============================================================================
+-- АУДИТ: где сейчас RLS открыт
+-- ============================================================================
+--
+-- 1) hotel_bookings (011_bookings_select_policies.sql)
+--    SELECT TO anon, authenticated USING (true)         ⚠️
+--    UPDATE TO anon, authenticated USING (true) WITH CHECK (true)  ⚠️
+--
+-- 2) flight_bookings (011_bookings_select_policies.sql)
+--    SELECT TO anon, authenticated USING (true)         ⚠️
+--    UPDATE TO anon, authenticated USING (true) WITH CHECK (true)  ⚠️
+--
+-- 3) applications (033_restore_anon_insert_policies.sql)
+--    INSERT TO anon, authenticated WITH CHECK (true)    ⚠️
+--    UPDATE TO anon, authenticated USING (true) WITH CHECK (true)  ⚠️
+--    SELECT TO anon, authenticated USING (true)         ⚠️
+--
+-- 4) reviews (033)
+--    INSERT TO anon, authenticated WITH CHECK (true)    ⚠️
+--    SELECT TO anon, authenticated USING (true)         ⚠️
+--
+-- 5) tasks (033)
+--    INSERT/SELECT/UPDATE TO anon, authenticated — все открыты  ⚠️
+--
+-- 6) users (033)
+--    SELECT TO anon, authenticated USING (true)         ⚠️ — PII leak risk
+--
+-- ============================================================================
+-- ВЕКТОРЫ АТАКИ
+-- ============================================================================
+--
+-- A) Чтение чужих заявок:
+--    fetch('/rest/v1/applications?select=*', { headers: { apikey: ANON_KEY } })
+--    → возвращает ВСЕ заявки всех пользователей с PII (паспорт, email, телефон).
+--
+-- B) Изменение чужой заявки/брони:
+--    PATCH /rest/v1/applications?id=eq.<victim_id>
+--    body: { "data": {...}, "status": "cancelled" }
+--    → атакующий может менять чужие данные.
+--
+-- C) Tampering with payment:
+--    UPDATE hotel_bookings SET status='paid' WHERE id=<own_id>
+--    → пометить свою бронь как оплаченную без оплаты.
+--
+-- D) PII enumeration через users:
+--    GET /rest/v1/users?select=telegram_id,first_name,phone,email
+--    → выгрузить всю user-базу.
+--
+-- ============================================================================
+-- ROADMAP (Q1 — Q2)
+-- ============================================================================
+--
+-- STAGE 1 (DONE — миграции 030/031/032): добавили dual-auth (telegram_id +
+--   auth_id). Frontend знает свой telegram_id.
+--
+-- STAGE 2 (TODO): перевести ВСЕ write-операции на API endpoints с service_key
+--   и `requireTelegramUser(req)`/`requireAdminUser(req)`. Список endpoints
+--   которые нужно создать или дополнить:
+--
+--     POST /api/save-application       — INSERT/UPDATE applications от имени tg_id
+--     POST /api/cancel-application     — UPDATE applications.status
+--     POST /api/save-review            — INSERT reviews от имени tg_id
+--     POST /api/update-review          — уже есть, проверить auth
+--     POST /api/save-hotel-booking     — INSERT hotel_bookings
+--     POST /api/save-flight-booking    — INSERT flight_bookings
+--     POST /api/admin-update-booking-status — UPDATE bookings.status (admin only)
+--     POST /api/admin-update-application-status — UPDATE applications.status (admin only)
+--     POST /api/save-task-proof        — UPDATE tasks.proof_url (own task only)
+--
+-- STAGE 3 (после STAGE 2): применить DDL ниже чтобы закрыть RLS.
+--   Перед применением — обязательно прогнать smoke-tests:
+--     [ ] User создаёт заявку → save-application 200, INSERT прошёл
+--     [ ] User видит свои заявки → /rest/v1/applications через anon-key вернул только свои
+--     [ ] User НЕ видит чужие → GET с подставленным telegram_id чужой → 0 rows
+--     [ ] Admin меняет статус → admin-update-application-status 200
+--     [ ] Anon без telegram_id не может ничего → 401/RLS deny
+--
+-- ============================================================================
+-- TARGET DDL (НЕ ВЫПОЛНЯТЬ ПОКА НЕ ПРОЙДЕН STAGE 2)
+-- ============================================================================
+--
+-- Раскомментировать когда STAGE 2 готов. Каждая секция независима — можно
+-- катить по таблице.
+--
+-- -- hotel_bookings ─────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "update_hotel_bookings" ON hotel_bookings;
+-- DROP POLICY IF EXISTS "select_hotel_bookings" ON hotel_bookings;
+-- CREATE POLICY "self_select_hotel_bookings" ON hotel_bookings
+--   FOR SELECT TO anon, authenticated
+--   USING (telegram_id = current_tg_id());
+-- -- UPDATE остаётся только через service_key (нет policy → deny by default).
+--
+-- -- flight_bookings ────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "update_flight_bookings" ON flight_bookings;
+-- DROP POLICY IF EXISTS "select_flight_bookings" ON flight_bookings;
+-- CREATE POLICY "self_select_flight_bookings" ON flight_bookings
+--   FOR SELECT TO anon, authenticated
+--   USING (telegram_id = current_tg_id());
+--
+-- -- applications ───────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "applications_anon_insert" ON applications;
+-- DROP POLICY IF EXISTS "applications_anon_update" ON applications;
+-- DROP POLICY IF EXISTS "applications_anon_select" ON applications;
+-- CREATE POLICY "self_select_applications" ON applications
+--   FOR SELECT TO anon, authenticated
+--   USING (telegram_id = current_tg_id());
+-- -- INSERT/UPDATE только через service_key API.
+--
+-- -- reviews ────────────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "reviews_anon_insert" ON reviews;
+-- -- SELECT для reviews можно оставить открытым (отзывы публичны), но
+-- -- ограничить колонки через VIEW reviews_public (без telegram_id).
+--
+-- -- tasks ──────────────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "tasks_anon_insert" ON tasks;
+-- DROP POLICY IF EXISTS "tasks_anon_update" ON tasks;
+-- CREATE POLICY "self_select_tasks" ON tasks
+--   FOR SELECT TO anon, authenticated
+--   USING (telegram_id = current_tg_id());
+--
+-- -- users ──────────────────────────────────────────────────────────────────
+-- DROP POLICY IF EXISTS "users_anon_select" ON users;
+-- CREATE POLICY "self_select_users" ON users
+--   FOR SELECT TO anon, authenticated
+--   USING (
+--     telegram_id = current_tg_id()
+--     OR auth_id  = current_auth_id()
+--   );
+-- -- Для UI partner-dashboard / bonus balance — единственный нужный кейс,
+-- -- self_select покрывает.
+--
+-- ============================================================================
+-- ROLLBACK
+-- ============================================================================
+-- Если что-то сломалось — миграции 011/033 содержат оригинальные `USING(true)`
+-- политики, применить их повторно вернёт состояние до закрытия.
