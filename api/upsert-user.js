@@ -200,6 +200,14 @@ export default async function handler(req, res) {
         updateBody.referred_by = referred_by;
         referrerJustAttached = true;
       }
+      // Авто-восстановление: если юзер был soft-deleted админом (миграция 034)
+      // и сейчас снова заходит в приложение — сбрасываем deleted_at = NULL.
+      // Юзер опять появится в админке. Старые заявки/брони остаются deleted —
+      // история не возвращается автоматически (нужно явно UPDATE через SQL).
+      if (existing.deleted_at) {
+        updateBody.deleted_at = null;
+        console.log(`[upsert-user] auto-recovering soft-deleted user ${verifiedTgId} (was deleted at ${existing.deleted_at})`);
+      }
       const updRes = await fetch(
         `${SUPABASE_URL}/rest/v1/users?telegram_id=eq.${verifiedTgId}`,
         {
