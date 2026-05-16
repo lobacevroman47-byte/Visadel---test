@@ -123,6 +123,13 @@ export default async function handler(req, res) {
       email,
       updated_at: new Date().toISOString(),
     };
+    // Авто-восстановление: если веб-юзер был soft-deleted админом (миграция 034)
+    // и сейчас снова логинится через email — сбрасываем deleted_at = NULL.
+    // Старые заявки/брони остаются deleted (нужно явно UPDATE через SQL).
+    if (existing[0].deleted_at) {
+      patch.deleted_at = null;
+      console.log(`[web-user-upsert] auto-recovering soft-deleted web user ${authId} (was deleted at ${existing[0].deleted_at})`);
+    }
     const updRes = await fetch(
       `${SUPABASE_URL}/rest/v1/users?auth_id=eq.${encodeURIComponent(authId)}`,
       {
