@@ -8,6 +8,8 @@
 // Без auth (анонимно) — отказ. Иначе любой мог бы спамить чужой Telegram.
 
 import { requireTelegramUser, isAdminId, AuthError } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
 //
 // Dedup strategy (3 layers — any one prevents duplicates):
 //   1. In-memory Map (same Vercel warm instance, 30s)
@@ -245,11 +247,7 @@ async function deleteDedupRow(application_id, status) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data, X-Service-Key');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
   // Auth flow:
@@ -258,6 +256,15 @@ export default async function handler(req, res) {
   //                          если обычный юзер, target принудительно = его собственный ID
   const SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY;
   const isServiceCall = SERVICE_KEY && req.headers['x-service-key'] === SERVICE_KEY;
+
+  // Rate-limit (только для не-service вызовов). Admin burst при массовом
+  // изменении статусов нормален — 30/мин на IP покрывает.
+  if (!isServiceCall) {
+    if (rateLimitByIp(req, { bucket: 'notify-status', max: 30, windowMs: 60_000 })) {
+      res.status(429).json({ error: 'rate limit exceeded' });
+      return;
+    }
+  }
   let verifiedTgId = null;
   let isAdminCaller = false;
   if (!isServiceCall) {

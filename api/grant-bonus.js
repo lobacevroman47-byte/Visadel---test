@@ -13,6 +13,8 @@
 //   { telegram_id, type, amount, description, application_id }  — admin/cron (с X-Service-Key)
 
 import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -192,15 +194,22 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data, X-Service-Key');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
   // ── Auth: либо проверенная Telegram подпись, либо service key (cron/админка)
   const serviceKeyHeader = req.headers['x-service-key'];
   const isServiceCall = SERVICE_KEY && serviceKeyHeader === SERVICE_KEY;
+
+  // Rate-limit (только для не-service вызовов — admin/cron не лимитируем).
+  // Финансовый flow: 15/мин на IP — щедро для нормального юзера, но убивает
+  // runaway скрипт или скомпрометированный токен.
+  if (!isServiceCall) {
+    if (rateLimitByIp(req, { bucket: 'grant-bonus', max: 15, windowMs: 60_000 })) {
+      res.status(429).json({ error: 'rate limit exceeded' });
+      return;
+    }
+  }
 
   let verifiedTgId = null;
   if (!isServiceCall) {

@@ -13,6 +13,9 @@
 //   TRAVELPAYOUTS_API_TOKEN — обязательный для pricesForDates / groupedPrices
 //                             (хранится только на сервере, в бандл клиента не попадает)
 
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
+
 const TP_BASE   = 'https://api.travelpayouts.com';
 const PLACES    = 'https://autocomplete.travelpayouts.com/places2';
 const TOKEN     = process.env.TRAVELPAYOUTS_API_TOKEN || '';
@@ -55,11 +58,15 @@ function buildQueryString(params, allowed) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'GET') { res.status(405).json({ error: 'method not allowed' }); return; }
+
+  // Rate-limit: 60/мин на IP. Travelpayouts сам платит за запросы — защита
+  // от runaway autocomplete (places action), и от cost amplification.
+  if (rateLimitByIp(req, { bucket: 'travelpayouts', max: 60, windowMs: 60_000 })) {
+    res.status(429).json({ error: 'rate limit exceeded' });
+    return;
+  }
 
   const { action } = req.query || {};
   const cfg = ACTIONS[action];

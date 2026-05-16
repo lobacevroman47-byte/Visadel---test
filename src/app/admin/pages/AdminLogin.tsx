@@ -1,35 +1,23 @@
-import React, { useState, useEffect } from 'react';
-import { Loader2, ShieldCheck, Lock } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Loader2, ShieldCheck, ShieldX } from 'lucide-react';
 import { useAdmin } from '../contexts/AdminContext';
-import { Button, Input } from '../../components/ui/brand';
 
 export const AdminLogin: React.FC = () => {
-  const { login, loginWithTelegram } = useAdmin();
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [tgChecked, setTgChecked] = useState(false);
+  const { loginWithTelegram } = useAdmin();
+  const [state, setState] = useState<'checking' | 'denied'>('checking');
 
-  // Try Telegram auto-login on mount
+  // Auth flow:
+  //   1. mount → пробуем auto-login через Telegram initData
+  //   2a. id в ADMIN_TELEGRAM_IDS → success → AdminApp монтирует панель
+  //   2b. id отсутствует / не в списке → показываем "доступ только админам"
+  // Старого password-gate больше нет (хеш в bundle = P1 уязвимость).
   useEffect(() => {
     loginWithTelegram().then(success => {
-      if (!success) setTgChecked(true);
+      if (!success) setState('denied');
     });
-  }, []);
+  }, [loginWithTelegram]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!password.trim()) return;
-    setError('');
-    setLoading(true);
-    const result = await login(password);
-    if (!result.success) {
-      setError(result.error ?? 'Неверный пароль');
-    }
-    setLoading(false);
-  };
-
-  if (!tgChecked) {
+  if (state === 'checking') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#3B5BFF] to-[#4F2FE6] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-white animate-spin" />
@@ -37,45 +25,29 @@ export const AdminLogin: React.FC = () => {
     );
   }
 
+  // denied
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#3B5BFF] to-[#4F2FE6] flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-[#EAF1FF] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <ShieldCheck className="w-8 h-8 text-[#3B5BFF]" />
-          </div>
-          <h1 className="text-xl font-semibold text-[#0F2A36] mb-1">Visadel Agency</h1>
-          <p className="text-[#0F2A36]/60 text-sm">Вход в панель управления</p>
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm text-center">
+        <div className="w-16 h-16 bg-[#FFEAEA] rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <ShieldX className="w-8 h-8 text-[#E63B3B]" />
         </div>
+        <h1 className="text-xl font-semibold text-[#0F2A36] mb-2">Доступ запрещён</h1>
+        <p className="text-[#0F2A36]/60 text-sm mb-6">
+          Админка доступна только из Telegram-аккаунта администратора.
+          Открой её через бота с админского аккаунта.
+        </p>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm text-[#0F2A36] mb-2 font-medium">
-              <Lock className="w-3.5 h-3.5 inline mr-1" />
-              Пароль
-            </label>
-            <Input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Введите пароль"
-              autoComplete="current-password"
-              required
-              error={error || undefined}
-            />
+        <div className="bg-[#F5F7FB] rounded-xl p-4 text-left">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="w-4 h-4 text-[#3B5BFF] flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-[#0F2A36]/70 leading-relaxed">
+              Если ты администратор — твой Telegram-ID должен быть в списке
+              <code className="mx-1 px-1 py-0.5 bg-white rounded text-[10px]">VITE_ADMIN_TELEGRAM_IDS</code>
+              на Vercel.
+            </p>
           </div>
-
-          <Button
-            type="submit"
-            variant="primary"
-            size="lg"
-            fullWidth
-            loading={loading}
-            disabled={!password.trim()}
-          >
-            {loading ? 'Проверяем...' : 'Войти'}
-          </Button>
-        </form>
+        </div>
       </div>
     </div>
   );

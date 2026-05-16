@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до этого PR), **6.0/10** (после применения этого PR).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (после первого PR) → **7.5/10** (после CORS+rate-limit+admin-gate PR).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -56,26 +56,34 @@
 
 ### P1 — High (требует усилий для эксплуатации)
 
-#### P1-1. `?admin=true` UI-gate
-- **Affected:** `src/app/admin/contexts/AdminContext.tsx:25-28`.
-- **Root cause:** клиентский gate через `VITE_ADMIN_PASSWORD_HASH` — хеш в bundle, видим всем. Можно brute-force оффлайн.
-- **Mitigation в коде:** на бэке `requireAdminUser` проверяет telegram_id против ADMIN_TELEGRAM_IDS — то есть РЕАЛЬНАЯ защита есть на API. UI-gate — лишь cosmetic.
-- **Fix:** убрать password-hash вообще, gate'ить только по `tgUser.id ∈ ADMIN_IDS` (доступно сразу после initData). Скрывать admin route если не админ.
+#### P1-1. `?admin=true` UI-gate (FIXED)
+- **Affected:** `src/app/admin/contexts/AdminContext.tsx`, `AdminLogin.tsx`.
+- **Root cause:** клиентский gate через `VITE_ADMIN_PASSWORD_HASH` — хеш в bundle, brute-force оффлайн.
+- **Fix applied:** убран PASSWORD_HASH, sha256, brute-force-protection. Auth flow теперь Telegram-only: `tgUser.id ∈ VITE_ADMIN_TELEGRAM_IDS`. AdminLogin показывает "Доступ запрещён" вместо password-формы если не админ. Бэк `requireAdminUser` (по ADMIN_TELEGRAM_IDS env) был и остаётся реальным gate.
+- **Env cleanup TODO:** удалить `VITE_ADMIN_PASSWORD_HASH` из Vercel env vars (опционально, не критично — переменная просто игнорируется).
 
-#### P1-2. CORS `*` на всех API
-- **Affected:** все `api/*.js` отдают `Access-Control-Allow-Origin: *`.
-- **Vector:** CSRF через open tab — если у юзера в одной вкладке Telegram Mini App, в другой malicious site, `fetch('/api/grant-bonus', {headers:{authorization: 'tma ...'}})` может пройти. Защита: `Authorization` header требует ручной установки → preflight, который из `*` пропускается.
-- **Fix:** helper `api/_lib/cors.js` (этот PR) — whitelist для `visadel.agency`, `*.vercel.app`, `*.telegram.org`. Wire-up postponed — нужно прогнать все endpoints через интеграционные тесты.
+#### P1-2. CORS `*` на всех API (FIXED)
+- **Affected:** все `api/*.js` отдавали `Access-Control-Allow-Origin: *`.
+- **Vector:** CSRF через open tab — если у юзера в одной вкладке Telegram Mini App, в другой malicious site, `fetch('/api/grant-bonus', {headers:{authorization: 'tma ...'}})` мог пройти.
+- **Fix applied:** все 15 user-facing endpoints мигрированы на `setCors(req, res)` из `api/_lib/cors.js`. Whitelist: `visadel.agency`, `*.vercel.app`, `*.telegram.org`. Server-to-server (без Origin header) не блокируется. Cron-endpoints (process-reminders, update-usd-rate) не имеют CORS — они вызываются Vercel-инфраструктурой напрямую.
 
 #### P1-3. Bonus race condition
 - **Affected:** `grantBonus` flow.
 - **Vector:** double-spend через параллельные `grant-bonus` calls. Миграция 020 (partner atomic balance) использует SQL transaction — для partner ОК. Но `bonus_logs` insert + `users.bonus_balance` update — два отдельных запроса.
 - **Fix:** обернуть в Postgres function `grant_user_bonus(tg_id, amount, reason)` с FOR UPDATE lock + idempotency key. Частично уже есть для partner-payouts, нужно вынести в общий паттерн.
 
-#### P1-4. Rate limiting отсутствует
+#### P1-4. Rate limiting отсутствует (PARTIAL FIX)
 - **Affected:** все API endpoints.
 - **Vector:** spam → cost amplification (Vercel function invocations + Supabase row writes + Telegram API rate).
-- **Fix:** Upstash Redis + `@upstash/ratelimit`. Per-tg_id и per-IP limits. Critical endpoints: `grant-bonus`, `save-application`, `track-click`, `post-review`, `notify-admin`.
+- **Fix applied:** in-memory token bucket (`api/_lib/rate-limit.js`) подключён к критичным endpoints:
+  - `grant-bonus` — 15/мин по IP (финансовый flow)
+  - `post-review` — 5/мин по IP (отзывы редкие, нет смысла больше)
+  - `notify-admin` — 10/мин по IP (анти-спам в TG админам)
+  - `notify-status` — 30/мин по IP (admin burst при массовых апдейтах OK)
+  - `travelpayouts` — 60/мин по IP (cost amplification на внешний API)
+  - `admin-grant-bonus`, `admin-delete-user` — 30/мин по IP (anti-runaway если admin токен compromised)
+  - `track-click` — 30 POST + 60 GET / мин по IP
+- **Что НЕ закрыто (Sprint 5):** in-memory bucket сбрасывается на cold-start Vercel. Для полной защиты — Upstash Redis + `@upstash/ratelimit`.
 
 #### P1-5. PII в localStorage
 - **Affected:** `visa_drafts`, `hotel_booking_draft`, `flight_booking_draft`.

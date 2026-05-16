@@ -7,6 +7,8 @@
 // POST { event, ... } or POST { type: 'hotel_booking' | 'flight_booking', customer_name, details }
 
 import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -51,12 +53,15 @@ async function sendTg(token, chat_id, text, reply_markup) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+  // Rate-limit: 10/мин на IP. Защита от спама админам Telegram-уведомлениями
+  // (TG API rate-limit + админ задолбается). Нормальный юзер шлёт 1-2/час.
+  if (rateLimitByIp(req, { bucket: 'notify-admin', max: 10, windowMs: 60_000 })) {
+    res.status(429).json({ error: 'rate limit exceeded' });
+    return;
+  }
 
   // Verified Telegram user — customer_telegram возьмём из подписи
   let verified;

@@ -8,17 +8,22 @@
 // The bot must be admin in @visadel_recall channel
 
 import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
 
 const CHANNEL = '@visadel_recall';
 const STARS = ['', '⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'];
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
+
+  // Rate-limit: 5/мин на IP. Отзывы пишут раз в жизни, 5/мин убивает спам
+  // в публичный канал без помех для нормальных юзеров.
+  if (rateLimitByIp(req, { bucket: 'post-review', max: 5, windowMs: 60_000 })) {
+    res.status(429).json({ error: 'rate limit exceeded' });
+    return;
+  }
 
   let verified;
   try { verified = requireTelegramUser(req); }
