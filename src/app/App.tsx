@@ -17,7 +17,6 @@ const FlightBookingForm      = lazy(() => import('./components/FlightBookingForm
 const BookingsMenu           = lazy(() => import('./components/BookingsMenu'));
 const Flights                = lazy(() => import('./components/Flights'));
 const AdminApp               = lazy(() => import('./admin/AdminApp').then(m => ({ default: m.AdminApp })));
-const LoginScreen            = lazy(() => import('./components/LoginScreen'));
 import {
   getTelegramUser,
   initTelegramApp,
@@ -26,9 +25,9 @@ import {
   type TelegramUser,
 } from './lib/telegram';
 import { upsertUser, resolveReferralCode, getAdminRole, markUserEngaged, type AppUser, type AdminRole } from './lib/db';
-import { getCurrentSession, upsertWebUser } from './lib/web-auth';
 import { getDraftsForVisa, type VisaDraft } from './lib/visaDrafts';
 import DraftPickerModal from './components/DraftPickerModal';
+import OpenInTelegramModal from './components/shared/OpenInTelegramModal';
 import { AppCatalogProvider } from './contexts/AppCatalogContext';
 
 // ─── Telegram User Context ────────────────────────────────────────────────────
@@ -73,7 +72,6 @@ export function useTelegram() {
 
 type Screen =
   | 'splash'
-  | 'login'  // веб-юзеры без Telegram WebApp — экран Email/Password входа
   | 'home'
   | 'application'
   | 'profile'
@@ -108,6 +106,11 @@ function App() {
   // переходим в application screen.
   const [draftPicker, setDraftPicker] = useState<{ visa: VisaOption; urgent: boolean; addons?: { urgent: boolean; hotel: boolean; ticket: boolean }; drafts: VisaDraft[] } | null>(null);
   const [activeDraftId, setActiveDraftId] = useState<string | undefined>(undefined);
+  // Browse-only gate для веб-юзеров (без Telegram). Открывается когда веб-юзер
+  // пытается оформить визу/продление/бронь отеля/открыть профиль — feature-name
+  // показывается в модалке («Оформление визы доступно в Telegram»). Авиабилеты
+  // НЕ показывают модалку — они работают через веб полноценно.
+  const [tgGateFeature, setTgGateFeature] = useState<string | null>(null);
   const [initialProfileTab, setInitialProfileTab] = useState<'profile' | 'applications' | 'tasks' | 'referrals' | 'reviews' | undefined>(undefined);
 
   const [tgUser, setTgUser] = useState<TelegramUser | null>(null);
@@ -162,10 +165,12 @@ function App() {
       return;
     }
 
-    // Identification flow — три пути:
+    // Identification flow:
     //   1. Telegram WebApp (initData) — TG mini-app, есть tg user
-    //   2. Supabase Auth session — веб-юзер уже залогинен (повторное открытие сайта)
-    //   3. Нет ни TG ни session — показываем LoginScreen (только для веб, не для TG)
+    //   2. Web (без TG) — Browse-only режим: показываем сайт-витрину
+    //      без регистрации. Оформление визы / брони отеля / продления —
+    //      gated через OpenInTelegramModal с deeplink в бот.
+    //      Исключение: бронь авиабилетов работает на сайте без gate.
     const isInTelegram = isTelegramWebApp();
     const tg = isInTelegram ? getTelegramUser() : null;
     setTgUser(tg);
@@ -173,51 +178,14 @@ function App() {
     // Initialize legacy localStorage (for components that still read it)
     initializeUserData();
 
-    // Если веб (не Telegram) — проверяем существующую Supabase Auth session.
-    // Если session есть → upsertWebUser, грузим юзера, переходим в home.
-    // Если нет session → показываем LoginScreen.
+    // Веб-юзер (не Telegram) — сразу в home. Никакой регистрации/LoginScreen
+    // не нужно. Все gated действия перехватываются на уровне навигации
+    // (handleVisaSelect, onOpenHotelBooking и т.д.) и показывают модалку
+    // «Откройте в Telegram».
     if (!isInTelegram) {
-      (async () => {
-        try {
-          const session = await getCurrentSession();
-          if (session) {
-            // Уже залогинен — подтягиваем запись из users
-            const webUser = await upsertWebUser({
-              firstName: session.email.split('@')[0],
-              signupSource: 'email',
-            });
-            if (webUser) {
-              setAppUser(webUser);
-              localStorage.setItem('vd_user', JSON.stringify(webUser));
-              const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
-              localStorage.setItem('userData', JSON.stringify({
-                ...existing,
-                bonusBalance: webUser.bonus_balance,
-                isInfluencer: webUser.is_influencer,
-                name: existing.name || webUser.first_name,
-                phone: existing.phone || webUser.phone || '',
-                email: webUser.email ?? existing.email ?? '',
-                telegramId: webUser.telegram_id ?? null,
-                referralCode: webUser.referral_code,
-                authId: webUser.auth_id,
-              }));
-              setCurrentScreen('home');
-            } else {
-              // Session есть, но upsert упал — на LoginScreen
-              setCurrentScreen('login');
-            }
-          } else {
-            // Нет session — показываем экран входа
-            setCurrentScreen('login');
-          }
-        } catch (e) {
-          console.error('[App] web session check failed:', e);
-          setCurrentScreen('login');
-        } finally {
-          setIsLoading(false);
-        }
-      })();
-      return; // Telegram-flow ниже не нужен
+      setCurrentScreen('home');
+      setIsLoading(false);
+      return;
     }
 
     // Если в Telegram, но почему-то не получили tg user — fallback на mock (dev mode).
@@ -351,7 +319,20 @@ function App() {
     markUserEngaged(appUser.telegram_id).catch(e => console.warn('markUserEngaged failed:', e));
   }, [currentScreen, appUser?.telegram_id, hasEngaged]);
 
+  // Browse-only gate: веб-юзеры (без TG) при попытке оформить визу/продление/
+  // бронь отеля/открыть профиль — получают модалку «Откройте в Telegram».
+  // Авиабилеты работают через веб без gate. Возвращает true если gate открыт
+  // (выполнение действия нужно прервать).
+  const gateIfWeb = (feature: string): boolean => {
+    if (!isTelegramWebApp()) {
+      setTgGateFeature(feature);
+      return true;
+    }
+    return false;
+  };
+
   const handleVisaSelect = (visa: VisaOption, urgent = false, addons?: { urgent: boolean; hotel: boolean; ticket: boolean }) => {
+    if (gateIfWeb('Оформление визы')) return;
     // Multi-draft: проверяем есть ли уже незавершённые анкеты на эту визу.
     // Если 1+ → показываем DraftPickerModal (юзер выбирает «продолжить» или
     // «начать новую»). Если 0 → сразу новая анкета.
@@ -425,50 +406,27 @@ function App() {
       <AppCatalogProvider>
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
         {currentScreen === 'splash' && <SplashScreen />}
-        {currentScreen === 'login' && (
-          <Suspense fallback={<SplashScreen />}>
-            <LoginScreen
-              onAuthenticated={(user) => {
-                // Web-юзер успешно вошёл — сохраняем и переходим в home.
-                setAppUser(user);
-                localStorage.setItem('vd_user', JSON.stringify(user));
-                const existing = (() => { try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; } })();
-                localStorage.setItem('userData', JSON.stringify({
-                  ...existing,
-                  bonusBalance: user.bonus_balance,
-                  isInfluencer: user.is_influencer,
-                  name: existing.name || user.first_name,
-                  phone: existing.phone || user.phone || '',
-                  email: user.email ?? existing.email ?? '',
-                  telegramId: user.telegram_id ?? null,
-                  referralCode: user.referral_code,
-                  authId: user.auth_id,
-                }));
-                setCurrentScreen('home');
-              }}
-              referredBy={new URLSearchParams(window.location.search).get('ref') ?? undefined}
-              telegramBotUsername={import.meta.env.VITE_TG_BOT_USERNAME ?? 'Visadel_test_bot'}
-            />
-          </Suspense>
-        )}
+        {/* LoginScreen больше НЕ показывается — Browse-only режим:
+            веб-юзеры сразу попадают на home, оформление gated через
+            OpenInTelegramModal (см. рендер модалки в конце). */}
         {currentScreen === 'home' && (
           <>
             {mainTab === 'visas' && (
               <div className="pb-20">
                 <Home
                   onVisaSelect={handleVisaSelect}
-                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-                  onOpenReferrals={() => { setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
-                  onOpenExtension={(visa) => { setSelectedVisa(visa); setCurrentScreen('extension'); }}
-                  onOpenPartnerApplication={() => setCurrentScreen('partner_application')}
+                  onOpenProfile={() => { if (gateIfWeb('Личный кабинет')) return; setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                  onOpenReferrals={() => { if (gateIfWeb('Реферальная программа')) return; setInitialProfileTab('referrals'); setCurrentScreen('profile'); }}
+                  onOpenExtension={(visa) => { if (gateIfWeb('Продление визы')) return; setSelectedVisa(visa); setCurrentScreen('extension'); }}
+                  onOpenPartnerApplication={() => { if (gateIfWeb('Партнёрская программа')) return; setCurrentScreen('partner_application'); }}
                 />
               </div>
             )}
             {mainTab === 'bookings' && (
               <Suspense fallback={<SplashScreen />}>
                 <BookingsMenu
-                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
-                  onOpenHotelBooking={() => setCurrentScreen('hotel_booking')}
+                  onOpenProfile={() => { if (gateIfWeb('Личный кабинет')) return; setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                  onOpenHotelBooking={() => { if (gateIfWeb('Бронь отеля')) return; setCurrentScreen('hotel_booking'); }}
                   onOpenFlightBooking={() => setCurrentScreen('flight_booking')}
                 />
               </Suspense>
@@ -476,7 +434,7 @@ function App() {
             {mainTab === 'flights' && (
               <Suspense fallback={<SplashScreen />}>
                 <Flights
-                  onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                  onOpenProfile={() => { if (gateIfWeb('Личный кабинет')) return; setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
                 />
               </Suspense>
             )}
@@ -485,7 +443,7 @@ function App() {
                 title="Отели"
                 description="Бронирование отелей по всему миру. Подключим Островок и Booking — будет фильтр по звёздам, цене и удобствам."
                 emoji="🏨"
-                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                onOpenProfile={() => { if (gateIfWeb('Личный кабинет')) return; setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
               />
             )}
             {mainTab === 'excursions' && (
@@ -493,7 +451,7 @@ function App() {
                 title="Экскурсии"
                 description="Каталог экскурсий по странам с местными гидами. После запуска — бронирования напрямую через приложение, как у виз и отелей."
                 emoji="🗺️"
-                onOpenProfile={() => { setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
+                onOpenProfile={() => { if (gateIfWeb('Личный кабинет')) return; setInitialProfileTab('profile'); setCurrentScreen('profile'); }}
               />
             )}
             <BottomNav active={mainTab} onChange={setMainTab} />
@@ -590,6 +548,13 @@ function App() {
             />
           </Suspense>
         )}
+        {/* Browse-only gate для веб-юзеров: показывается при попытке
+            оформить визу/бронь отеля/открыть профиль. Авиабилеты не gated. */}
+        <OpenInTelegramModal
+          open={tgGateFeature !== null}
+          feature={tgGateFeature ?? undefined}
+          onClose={() => setTgGateFeature(null)}
+        />
       </div>
       <Toaster
         position="top-center"
