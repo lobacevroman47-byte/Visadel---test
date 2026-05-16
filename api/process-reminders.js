@@ -1,6 +1,12 @@
 // Vercel Cron — processes due reminders and sends Telegram push notifications
 // Runs every 5 minutes via vercel.json crons config
 // GET /api/process-reminders
+//
+// ⚠️ SECURITY: endpoint защищён двумя путями (см. handler ниже):
+//   1) Vercel cron автоматически шлёт `x-vercel-cron` header (нельзя
+//      подделать извне — Vercel edge режет header от внешних клиентов)
+//   2) `x-service-key: <SUPABASE_SERVICE_KEY>` — для ручного триггера
+// Любой посторонний GET без обоих → 401.
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
