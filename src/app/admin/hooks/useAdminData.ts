@@ -34,7 +34,10 @@ export type AdminStaffRole = 'founder' | 'admin' | 'moderator';
 
 export interface AdminUser {
   id: string;
+  /** Telegram-юзеры — реальный telegram_id. Веб-юзеры (через email) — 0. */
   telegramId: number;
+  /** Auth user ID (Supabase Auth UUID) для веб-юзеров. null для TG-юзеров. */
+  authId: string | null;
   name: string;
   username: string;
   phone: string;
@@ -104,8 +107,11 @@ function rowToApplication(row: Record<string, unknown>): AdminApplication {
 function rowToUser(row: Record<string, unknown>, appsCount: number): AdminUser {
   return {
     id: row.id as string,
-    telegramId: row.telegram_id as number,
-    name: `${row.first_name}${row.last_name ? ' ' + row.last_name : ''}`,
+    // Веб-юзеры (через email) имеют telegram_id = NULL — мапим в 0 для совместимости.
+    // Для удаления / других операций используем authId fallback.
+    telegramId: (row.telegram_id as number | null) ?? 0,
+    authId: (row.auth_id as string | null) ?? null,
+    name: `${row.first_name ?? row.email ?? 'Без имени'}${row.last_name ? ' ' + row.last_name : ''}`,
     username: (row.username as string) ?? '',
     phone: (row.phone as string) ?? '',
     email: (row.email as string) ?? '',
