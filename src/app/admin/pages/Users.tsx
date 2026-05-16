@@ -84,9 +84,10 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
     setSaving(true);
     try {
       const counts = await deleteUserSoftly({
-        telegramId: user.telegramId,
-        // Если у юзера только auth_id (веб без TG) — передаём его тоже.
-        // У AdminUser auth_id пока нет; добавим в будущем.
+        // Передаём оба ID — для TG-юзера telegramId>0, для веб-юзера authId UUID.
+        // Если у юзера только auth_id (веб без TG) — передаётся он, иначе API ругается 400.
+        telegramId: user.telegramId > 0 ? user.telegramId : undefined,
+        authId: user.authId ?? undefined,
       });
       onSaved();
       onClose();
