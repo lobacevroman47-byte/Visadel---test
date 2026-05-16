@@ -1,13 +1,17 @@
-import { FileText, Calendar, Plane, Hotel, Map } from 'lucide-react';
+import { FileText, Calendar, Plane } from 'lucide-react';
 
+// 'hotels' и 'excursions' оставлены в типе, но временно скрыты из меню
+// (см. TABS массив ниже). Вернёмся когда подключим Островок/Booking + гидов.
 export type MainTab = 'visas' | 'bookings' | 'flights' | 'hotels' | 'excursions';
 
 const TABS: { id: MainTab; label: string; Icon: typeof FileText }[] = [
-  { id: 'visas',      label: 'Визы',       Icon: FileText },
-  { id: 'bookings',   label: 'Брони',      Icon: Calendar },
-  { id: 'flights',    label: 'Билеты',     Icon: Plane },
-  { id: 'hotels',     label: 'Отели',      Icon: Hotel },
-  { id: 'excursions', label: 'Экскурсии',  Icon: Map },
+  { id: 'visas',    label: 'Визы',    Icon: FileText },
+  { id: 'bookings', label: 'Брони',   Icon: Calendar },
+  { id: 'flights',  label: 'Билеты',  Icon: Plane },
+  // TEMP: hotels и excursions временно скрыты — добавим когда будет готов
+  // backend (Островок/Booking API + каталог гидов). Возврат — просто раскомментировать.
+  // { id: 'hotels',     label: 'Отели',      Icon: Hotel },
+  // { id: 'excursions', label: 'Экскурсии',  Icon: Map },
 ];
 
 interface BottomNavProps {
