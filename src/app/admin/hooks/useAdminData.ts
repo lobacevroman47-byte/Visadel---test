@@ -302,8 +302,12 @@ export function useAdminUsers() {
     try {
       if (isSupabaseConfigured()) {
         const [usersRes, appsRes, adminsRes] = await Promise.all([
-          supabase.from('users').select('*').order('created_at', { ascending: false }),
-          supabase.from('applications').select('user_telegram_id'),
+          // Фильтр deleted_at IS NULL — soft-deleted юзеры (через
+          // api/admin-delete-user.js) не показываются в админке.
+          // Восстановление: UPDATE users SET deleted_at=NULL WHERE ...
+          supabase.from('users').select('*').is('deleted_at', null).order('created_at', { ascending: false }),
+          // Считаем активные заявки (не soft-deleted)
+          supabase.from('applications').select('user_telegram_id').is('deleted_at', null),
           supabase.from('admin_users').select('telegram_id, role'),
         ]);
         if (usersRes.error) throw usersRes.error;
@@ -374,4 +378,34 @@ export async function updateUserBonuses(telegramId: number, amount: number, add:
 export async function updateUserStatus(telegramId: number, isInfluencer: boolean) {
   if (!isSupabaseConfigured()) return;
   await supabase.from('users').update({ is_influencer: isInfluencer }).eq('telegram_id', telegramId);
+}
+
+/**
+ * Soft-delete юзера + каскадно все его заявки/брони.
+ * Записи помечаются deleted_at = now() — данные остаются в БД, восстановление
+ * через Supabase SQL Editor: UPDATE users SET deleted_at=NULL WHERE ...
+ * См. supabase/034_users_soft_delete.sql.
+ */
+export async function deleteUserSoftly(params: { telegramId?: number; authId?: string | null }): Promise<{
+  users: number;
+  applications: number;
+  hotel_bookings: number;
+  flight_bookings: number;
+}> {
+  const body: Record<string, unknown> = {};
+  if (params.telegramId) body.target_telegram_id = params.telegramId;
+  if (params.authId) body.target_auth_id = params.authId;
+
+  const res = await apiFetch('/api/admin-delete-user', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    console.error('[deleteUserSoftly] API failed:', res.status, errText);
+    throw new Error(`Не удалось удалить пользователя: ${res.status} ${errText}`);
+  }
+  const data = await res.json().catch(() => ({} as { deleted?: Record<string, number> }));
+  return data.deleted ?? { users: 0, applications: 0, hotel_bookings: 0, flight_bookings: 0 };
 }

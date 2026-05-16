@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Plus, Minus, Loader2, RefreshCw, ExternalLink, ShieldCheck, Shield, User as UserIcon } from 'lucide-react';
-import { useAdminUsers, updateUserBonuses, updateUserStatus, type AdminUser } from '../hooks/useAdminData';
+import { Search, Plus, Minus, Loader2, RefreshCw, ExternalLink, ShieldCheck, Shield, User as UserIcon, Trash2 } from 'lucide-react';
+import { useAdminUsers, updateUserBonuses, updateUserStatus, deleteUserSoftly, type AdminUser } from '../hooks/useAdminData';
 import { useDialog } from '../../components/shared/BrandDialog';
 import { Button, Input, Card, Modal } from '../../components/ui/brand';
 
@@ -63,6 +63,48 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
     }
   };
 
+  // Soft-delete юзера + cascade на его заявки/брони. Двойное подтверждение
+  // чтобы случайно не нажать. Восстановление через Supabase SQL Editor
+  // (см. supabase/034_users_soft_delete.sql) — все данные остаются в БД.
+  const handleDelete = async () => {
+    const confirm1 = await dialog.confirm(
+      `Удалить пользователя ${user.name}?`,
+      'Будут помечены как удалённые: профиль, все заявки на визы, брони отеля и авиабилета. '
+      + 'Данные останутся в БД — администратор может восстановить через SQL Editor.',
+      { confirmLabel: 'Продолжить', cancelLabel: 'Отмена' },
+    );
+    if (!confirm1) return;
+    const confirm2 = await dialog.confirm(
+      'Точно удалить?',
+      `${user.name} больше не сможет пользоваться приложением. Действие можно отменить только через SQL.`,
+      { confirmLabel: 'Удалить навсегда', cancelLabel: 'Не удалять' },
+    );
+    if (!confirm2) return;
+
+    setSaving(true);
+    try {
+      const counts = await deleteUserSoftly({
+        telegramId: user.telegramId,
+        // Если у юзера только auth_id (веб без TG) — передаём его тоже.
+        // У AdminUser auth_id пока нет; добавим в будущем.
+      });
+      onSaved();
+      onClose();
+      await dialog.info(
+        'Пользователь удалён',
+        `Помечено как удалённое:\n• Профиль: ${counts.users}\n`
+        + `• Заявок на визы: ${counts.applications}\n`
+        + `• Броней отеля: ${counts.hotel_bookings}\n`
+        + `• Броней авиабилета: ${counts.flight_bookings}\n\n`
+        + 'Восстановление — через Supabase SQL Editor (см. supabase/034_users_soft_delete.sql).',
+      );
+    } catch (err) {
+      await dialog.error('Ошибка при удалении', err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const tgUsername = user.username?.replace('@', '') ?? '';
 
   return (
@@ -80,19 +122,35 @@ const UserModal: React.FC<{ user: AdminUser; onClose: () => void; onSaved: () =>
       ) : undefined}
       size="md"
       footer={(
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="primary"
+              size="lg"
+              fullWidth
+              loading={saving}
+              onClick={handleSave}
+            >
+              {saving ? 'Сохранение...' : 'Сохранить'}
+            </Button>
+            <Button type="button" variant="secondary" size="lg" onClick={onClose}>
+              Отмена
+            </Button>
+          </div>
+          {/* Soft-delete: помечает users.deleted_at + cascade на заявки/брони.
+              Защита: 2 подтверждения. Админ не может удалить себя — серверная
+              проверка в api/admin-delete-user.js. */}
           <Button
             type="button"
-            variant="primary"
-            size="lg"
+            variant="danger"
+            size="md"
             fullWidth
-            loading={saving}
-            onClick={handleSave}
+            disabled={saving}
+            onClick={handleDelete}
+            leftIcon={<Trash2 size={16} />}
           >
-            {saving ? 'Сохранение...' : 'Сохранить'}
-          </Button>
-          <Button type="button" variant="secondary" size="lg" onClick={onClose}>
-            Отмена
+            Удалить пользователя из приложения
           </Button>
         </div>
       )}
@@ -189,7 +247,13 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
       user.phone.includes(searchQuery) ||
       user.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       user.email.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || user.status === statusFilter;
+    // Фильтр статусов: all / regular / partner / admin.
+    // "admin" — юзеры с adminRole (founder / admin / moderator из admin_users
+    // таблицы или env VITE_ADMIN_TELEGRAM_IDS).
+    const matchesStatus =
+      statusFilter === 'all' ? true :
+      statusFilter === 'admin' ? !!user.adminRole :
+      user.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
@@ -229,6 +293,7 @@ export const Users: React.FC<UsersProps> = ({ filter }) => {
             <option value="all">Все</option>
             <option value="regular">Обычные</option>
             <option value="partner">Партнёры</option>
+            <option value="admin">Админы</option>
           </select>
         </div>
       </Card>
