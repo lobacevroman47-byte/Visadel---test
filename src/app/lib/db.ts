@@ -695,11 +695,27 @@ export async function submitReview(params: {
     // INSERT через API endpoint /api/save-review с service_key —
     // telegram_id берётся из verified initData (нельзя подделать),
     // а не из params.telegramId. Закрывает P0-1 RLS на reviews.
+    //
+    // Отзыв либо на заявку, либо на бронь. ApplicationsTab для брони
+    // передаёт applicationId в формате `hotel_<uuid>` / `flight_<uuid>`
+    // (см. ReviewModal usage). Парсим префикс → booking_id + booking_type.
+    // Для заявки — applicationId это чистый UUID.
+    let reviewTarget: Record<string, string>;
+    const bookingMatch = /^(hotel|flight)_(.+)$/.exec(params.applicationId);
+    if (bookingMatch) {
+      reviewTarget = {
+        booking_id: bookingMatch[2],
+        booking_type: bookingMatch[1],
+      };
+    } else {
+      reviewTarget = { application_id: params.applicationId };
+    }
+
     const r = await apiFetch('/api/save-review', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        application_id: params.applicationId,
+        ...reviewTarget,
         country: params.country,
         rating: params.rating,
         text: params.text,
