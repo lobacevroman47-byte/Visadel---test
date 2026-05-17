@@ -20,6 +20,8 @@
 //
 // Returns: { user: AppUser } — текущая запись после upsert.
 
+import { setCors } from './_lib/cors.js';
+
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
 const ANON_KEY     = process.env.VITE_SUPABASE_ANON_KEY;
@@ -64,11 +66,7 @@ async function verifySupabaseJwt(jwt) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
 
   if (!SUPABASE_URL || !SERVICE_KEY || !ANON_KEY) {

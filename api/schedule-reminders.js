@@ -8,6 +8,7 @@
 // (telegram_id больше не принимается из тела — verified из initData)
 
 import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -28,10 +29,7 @@ function headers(extra = {}) {
 const INTERVALS = [60, 360, 1440]; // 1h, 6h, 24h
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
   // Verified Telegram user — никаких telegram_id из body

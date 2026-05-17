@@ -12,6 +12,7 @@ export interface AdminUser {
 
 interface AdminContextType {
   currentUser: AdminUser | null;
+  /** @deprecated Password-gate убран. Только Telegram-id check. Оставлено для обратной совместимости. */
   login: (password: string) => Promise<{ success: boolean; error?: string }>;
   loginWithTelegram: () => Promise<boolean>;
   logout: () => void;
@@ -21,11 +22,17 @@ interface AdminContextType {
 
 const AdminContext = createContext<AdminContextType | undefined>(undefined);
 
-// ─── Config from Vercel environment variables ────────────────────────────────
-// VITE_ADMIN_PASSWORD_HASH — SHA-256 hash of your password (see README)
-// VITE_ADMIN_TELEGRAM_IDS  — comma-separated allowed Telegram IDs, e.g. "123456789,987654321"
+// ─── Auth model ───────────────────────────────────────────────────────────────
+// Раньше был двойной gate: пароль (хеш в bundle через VITE_ADMIN_PASSWORD_HASH)
+// + Telegram-id check. Хеш в bundle — это P1 уязвимость: видно всем, можно
+// brute-force оффлайн. Сейчас оставили ТОЛЬКО Telegram-id check —
+// это и так был реальный gate (бэк проверяет `requireAdminUser` по
+// ADMIN_TELEGRAM_IDS env, password ни на что не влиял на сервере).
+//
+// Список админов: VITE_ADMIN_TELEGRAM_IDS на клиенте (для UI gate) +
+// ADMIN_TELEGRAM_IDS на сервере (для API requireAdminUser).
+// Обе env обязательны.
 
-const PASSWORD_HASH = import.meta.env.VITE_ADMIN_PASSWORD_HASH ?? '';
 const ALLOWED_TG_IDS: string[] = (import.meta.env.VITE_ADMIN_TELEGRAM_IDS ?? '')
   .split(',')
   .map((s: string) => s.trim())
@@ -62,33 +69,7 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-// ─── Brute-force protection ───────────────────────────────────────────────────
-
-const ATTEMPT_KEY = 'vd_admin_attempts';
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 30 * 60 * 1000;
-
-interface Attempts { count: number; lockedUntil: number }
-
-function getAttempts(): Attempts {
-  try { return JSON.parse(localStorage.getItem(ATTEMPT_KEY) ?? '{"count":0,"lockedUntil":0}'); }
-  catch { return { count: 0, lockedUntil: 0 }; }
-}
-
-function recordAttempt(success: boolean) {
-  if (success) { localStorage.removeItem(ATTEMPT_KEY); return; }
-  const a = getAttempts();
-  const count = a.count + 1;
-  const lockedUntil = count >= MAX_ATTEMPTS ? Date.now() + LOCKOUT_MS : a.lockedUntil;
-  localStorage.setItem(ATTEMPT_KEY, JSON.stringify({ count, lockedUntil }));
-}
-
-// ─── Crypto ───────────────────────────────────────────────────────────────────
-
-async function sha256(text: string): Promise<string> {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
+// ─── Telegram helpers ─────────────────────────────────────────────────────────
 
 function getTelegramUserId(): string | null {
   try {
@@ -126,30 +107,14 @@ export const AdminProvider: React.FC<{ children: ReactNode; onBackToApp?: () => 
     return true;
   }, []);
 
-  const login = useCallback(async (password: string): Promise<{ success: boolean; error?: string }> => {
-    const a = getAttempts();
-    if (a.lockedUntil > Date.now()) {
-      const mins = Math.ceil((a.lockedUntil - Date.now()) / 60000);
-      return { success: false, error: `Слишком много попыток. Подождите ${mins} мин.` };
-    }
-
-    if (!PASSWORD_HASH) {
-      return { success: false, error: 'Пароль не настроен. Добавьте VITE_ADMIN_PASSWORD_HASH в Vercel.' };
-    }
-
-    const hash = await sha256(password);
-    if (hash !== PASSWORD_HASH) {
-      recordAttempt(false);
-      const remaining = MAX_ATTEMPTS - (getAttempts().count);
-      return { success: false, error: `Неверный пароль. Осталось попыток: ${remaining}` };
-    }
-
-    recordAttempt(true);
-    const tgName = getTelegramUsername();
-    const user = makeUser(tgName !== 'Администратор' ? tgName : '');
-    writeSession(user);
-    setCurrentUser(user);
-    return { success: true };
+  // Deprecated. Password-gate убран (хеш в bundle = P1).
+  // Оставлено для обратной совместимости с AdminLogin.tsx — всегда возвращает
+  // ошибку "не настроено". Реальный auth flow — loginWithTelegram.
+  const login = useCallback(async (_password: string): Promise<{ success: boolean; error?: string }> => {
+    return {
+      success: false,
+      error: 'Вход по паролю отключён. Открой админку из Telegram-аккаунта администратора.',
+    };
   }, []);
 
   const logout = useCallback(() => {

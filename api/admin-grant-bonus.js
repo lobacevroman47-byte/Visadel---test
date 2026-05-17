@@ -15,6 +15,8 @@
 //   add=false  → −amount (но не меньше 0, не уходит в минус)
 
 import { requireTelegramUser, AuthError, isAdminId } from './_lib/telegram-auth.js';
+import { setCors } from './_lib/cors.js';
+import { rateLimitByIp } from './_lib/rate-limit.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -43,11 +45,14 @@ async function isAdminInDb(telegramId) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Telegram-Init-Data');
-  if (req.method === 'OPTIONS') { res.status(200).end(); return; }
+  if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).end(); return; }
+
+  // Rate-limit: admin endpoint, anti-runaway если admin токен скомпрометирован.
+  if (rateLimitByIp(req, { bucket: 'admin-grant-bonus', max: 30, windowMs: 60_000 })) {
+    res.status(429).json({ error: 'rate limit exceeded' });
+    return;
+  }
 
   if (!SUPABASE_URL || !SERVICE_KEY) {
     res.status(500).json({ error: 'supabase env not configured' });
