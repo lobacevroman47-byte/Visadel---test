@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review + RLS reviews) → **9.3/10** (PR #6 server-side audit logs) → **9.4/10** (PR #9 TG CloudStorage proof-of-concept).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review + RLS reviews) → **9.3/10** (PR #6 server-side audit logs) → **9.4/10** (PR #9 TG CloudStorage) → **9.6/10** (PR #10 save-hotel/flight-booking + RLS bookings).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -18,8 +18,8 @@
 
 ### P0 — Critical (active exploit possible)
 
-#### P0-1. Open RLS на пользовательских таблицах (PARTIAL FIX — reviews закрыт в PR #8)
-- **Affected:** `applications`, `hotel_bookings`, `flight_bookings`, `reviews` (✅ закрыт), `tasks`, `users`.
+#### P0-1. Open RLS на пользовательских таблицах (PARTIAL FIX — reviews + bookings INSERT закрыты)
+- **Affected:** `applications`, `hotel_bookings` (✅ INSERT закрыт), `flight_bookings` (✅ INSERT закрыт), `reviews` (✅ закрыт), `tasks`, `users`.
 - **Root cause:** миграции 011 и 033 ставят `USING(true) WITH CHECK(true)` для всех ролей.
 - **Exploit (для оставшихся таблиц):**
   ```http
@@ -31,15 +31,20 @@
   - Новый `/api/save-review` endpoint — INSERT через service_key + `requireTelegramUser`
   - `user_telegram_id` FORCED из verified initData (не из body — нельзя подделать)
   - Zod валидация (rating 1-5, text 1-2000, country, application_id)
-  - Rate-limit 5/мин по IP, Sentry, audit
-  - Frontend `submitReview()` мигрирован на `apiFetch('/api/save-review')`
-  - Миграция 038 закрывает `reviews_anon_insert` policy
+  - Frontend `submitReview()` мигрирован, миграция 038 закрывает policy
+- **Fix applied (bookings INSERT, PR #10):**
+  - `/api/save-hotel-booking` + `/api/save-flight-booking` — service_key + dual-auth (TG initData ИЛИ Supabase JWT для web-юзеров)
+  - `telegram_id` / `auth_id` / `status` / `referrer_code` FORCED из верифицированных источников — клиент не может подделать `status='confirmed'` или поставить `price=0`
+  - `api/_lib/dual-auth.js` — новый общий helper для TG/Web auth
+  - Zod валидация: HTML-инъекции в именах блокируются, email/phone/date format, price 0..10M, guests 1..20
+  - Frontend `HotelBookingForm` + `FlightBookingForm` мигрированы на `apiFetch`
+  - Миграция 039 закрывает `anon_insert_hotel_bookings` + `anon_insert_flight_bookings`
 - **Что осталось (Sprint 3 continued):**
-  - `/api/save-application` + миграция (закрыть `applications_anon_insert`)
-  - `/api/save-hotel-booking`, `/api/save-flight-booking`
-  - `/api/admin-update-application-status`, `/api/admin-update-booking-status`
-  - Финальный mini-PR с раскомментированной STAGE 3 миграции 035 для остальных таблиц
-- **ETA:** ещё 1 спринт.
+  - `/api/save-application` (большой — много полей, dual-auth, FK fallback)
+  - `/api/admin-update-application-status`, `/api/admin-update-booking-status` (admin UPDATE)
+  - SELECT closure для applications/bookings (фильтр по telegram_id через RLS вместо ручного `.eq()` в коде)
+  - Финальный mini-PR с раскомментированной STAGE 3 миграции 035 для оставшихся таблиц (users, tasks)
+- **ETA:** ещё 0.5 спринта.
 
 #### P0-2. `track-click.js` без auth и rate-limit (FIXED в этом PR)
 - **Affected:** `api/track-click.js`.

@@ -15,6 +15,8 @@ import {
   webUserUpsertSchema,
   postReviewSchema,
   saveReviewSchema,
+  saveHotelBookingSchema,
+  saveFlightBookingSchema,
   adminGrantBonusSchema,
 } from './validators.js';
 
@@ -238,6 +240,114 @@ describe('saveReviewSchema', () => {
     expect(r.ok).toBe(true);
     // user_telegram_id игнорируется (Zod strip по умолчанию)
     expect(r.data.user_telegram_id).toBeUndefined();
+  });
+});
+
+describe('saveHotelBookingSchema', () => {
+  const valid = {
+    first_name: 'Иван',
+    last_name: 'Петров',
+    country: 'Таиланд',
+    city: 'Бангкок',
+    check_in: '2026-06-01',
+    check_out: '2026-06-10',
+    guests: 2,
+    children_ages: [],
+    email: 'ivan@example.com',
+    phone: '+7 999 123-45-67',
+    telegram_login: '@ivan',
+    passport_url: 'https://example.com/p.pdf',
+    payment_screenshot_url: 'https://example.com/s.jpg',
+    price: 50000,
+  };
+
+  it('пропускает валидную бронь', () => {
+    expect(validate(valid, saveHotelBookingSchema).ok).toBe(true);
+  });
+
+  it('отвергает HTML в first_name', () => {
+    const r = validate({ ...valid, first_name: '<script>x</script>' }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает невалидный email', () => {
+    const r = validate({ ...valid, email: 'not-an-email' }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает невалидный phone (буквы)', () => {
+    const r = validate({ ...valid, phone: 'callme' }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает невалидный date format', () => {
+    const r = validate({ ...valid, check_in: '01.06.2026' }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает price > 10M', () => {
+    const r = validate({ ...valid, price: 50_000_000 }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает negative price', () => {
+    const r = validate({ ...valid, price: -100 }, saveHotelBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает guests=0 и guests>20', () => {
+    expect(validate({ ...valid, guests: 0 }, saveHotelBookingSchema).ok).toBe(false);
+    expect(validate({ ...valid, guests: 21 }, saveHotelBookingSchema).ok).toBe(false);
+  });
+
+  it('игнорирует telegram_id / auth_id / status из body (Zod strip)', () => {
+    const r = validate(
+      { ...valid, telegram_id: 99999, auth_id: 'hacker', status: 'confirmed' },
+      saveHotelBookingSchema
+    );
+    expect(r.ok).toBe(true);
+    expect(r.data.telegram_id).toBeUndefined();
+    expect(r.data.auth_id).toBeUndefined();
+    expect(r.data.status).toBeUndefined();
+  });
+});
+
+describe('saveFlightBookingSchema', () => {
+  const valid = {
+    first_name: 'Ivan',
+    last_name: 'Petrov',
+    from_city: 'Москва',
+    to_city: 'Бангкок',
+    booking_date: '2026-06-15',
+    email: 'ivan@example.com',
+    phone: '+79991234567',
+    telegram_login: '@ivan',
+    passport_url: 'https://example.com/p.pdf',
+    payment_screenshot_url: 'https://example.com/s.jpg',
+    price: 30000,
+  };
+
+  it('пропускает валидную бронь', () => {
+    expect(validate(valid, saveFlightBookingSchema).ok).toBe(true);
+  });
+
+  it('отвергает booking_date в неправильном формате', () => {
+    const r = validate({ ...valid, booking_date: 'soon' }, saveFlightBookingSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('passport_url может быть null', () => {
+    expect(validate({ ...valid, passport_url: null }, saveFlightBookingSchema).ok).toBe(true);
+  });
+
+  it('игнорирует подделанный telegram_id / status', () => {
+    const r = validate(
+      { ...valid, telegram_id: 99999, status: 'confirmed' },
+      saveFlightBookingSchema
+    );
+    expect(r.ok).toBe(true);
+    expect(r.data.telegram_id).toBeUndefined();
+    expect(r.data.status).toBeUndefined();
   });
 });
 

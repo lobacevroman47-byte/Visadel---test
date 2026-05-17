@@ -1,0 +1,68 @@
+-- ============================================================================
+-- 039: Закрытие RLS-дыры в hotel_bookings + flight_bookings (P0-1 continued)
+--
+-- ПРОБЛЕМА:
+-- Миграции 007 и 008 поставили открытые INSERT policies:
+--   anon_insert_hotel_bookings  WITH CHECK (true)
+--   anon_insert_flight_bookings WITH CHECK (true)
+-- — атакующий с anon-key мог:
+--   1. Создать бронь от имени любого telegram_id/auth_id
+--   2. Поставить status='confirmed' (визуально оплачена)
+--   3. Подделать price (например 0) — обойти платёж
+--   4. Подделать passport_url / payment_screenshot_url
+--
+-- РЕШЕНИЕ:
+-- 1) PR создал /api/save-hotel-booking и /api/save-flight-booking — INSERT
+--    идёт через service_key с verified telegram_id/auth_id из подписи
+--    (нельзя подделать). status FORCED='pending_confirmation'.
+-- 2) Эта миграция закрывает anon INSERT — больше через anon-key не пройдёт.
+--
+-- ⚠️ ПРИМЕНЯТЬ ТОЛЬКО ПОСЛЕ:
+--   1. PR смержен в dev
+--   2. Vercel передеплоил dev / prod
+--   3. Smoke-test: hotel + flight booking из mini-app проходит
+--
+-- Если применить РАНЬШЕ — фронт получит 42501 (RLS deny) на старых
+-- инстансах ещё не передеплоились с новыми save-*-booking flows.
+--
+-- ============================================================================
+
+-- Закрываем anon INSERT. Остаётся реальный путь — service_key через
+-- /api/save-hotel-booking / /api/save-flight-booking.
+DROP POLICY IF EXISTS "anon_insert_hotel_bookings" ON hotel_bookings;
+DROP POLICY IF EXISTS "anon_insert_flight_bookings" ON flight_bookings;
+
+-- SELECT и UPDATE policy НЕ трогаем — они нужны:
+--   SELECT — для "Мои брони" в личном кабинете (через anon-key с фильтром
+--            telegram_id). Хотя сейчас filter в queries, не в RLS — это
+--            тоже security debt, но это отдельный refactor (миграция 040).
+--   UPDATE — для админских изменений статусов (тоже через anon-key пока).
+--            Будет закрыто отдельным PR с /api/admin-update-booking-status.
+
+-- ============================================================================
+-- Smoke-test после применения
+-- ============================================================================
+--
+-- 1. Попробовать INSERT через anon-key (должен fail):
+--    curl -X POST '<supabase>/rest/v1/hotel_bookings' \
+--      -H "apikey: <ANON_KEY>" \
+--      -H "Content-Type: application/json" \
+--      -d '{"first_name":"hack","last_name":"x","country":"X","city":"X",
+--           "check_in":"2026-06-01","check_out":"2026-06-05","guests":1,
+--           "email":"x@x.x","phone":"+10","telegram_login":"@x","price":0,
+--           "status":"confirmed"}'
+--    Ожидаемый ответ: 42501 "new row violates row-level security policy"
+--
+-- 2. То же для flight_bookings — должен fail.
+--
+-- 3. Через /api/save-hotel-booking с валидной TG initData → должно пройти
+--    (200 OK { ok: true, id: '...' }). status в БД будет pending_confirmation
+--    (не то что в body даже если кто-то подделал).
+--
+-- ============================================================================
+-- ROLLBACK (если что-то сломалось)
+-- ============================================================================
+--   CREATE POLICY "anon_insert_hotel_bookings" ON hotel_bookings
+--     FOR INSERT TO anon WITH CHECK (true);
+--   CREATE POLICY "anon_insert_flight_bookings" ON flight_bookings
+--     FOR INSERT TO anon WITH CHECK (true);

@@ -106,6 +106,56 @@ export const saveReviewSchema = z.object({
   text: z.string().min(1).max(2000),
 });
 
+// ─── save-hotel-booking (INSERT в hotel_bookings через service_key) ─────────
+// Закрывает P0-1 RLS для hotel_bookings. user_telegram_id/auth_id берётся
+// из handler'а (initData или Supabase JWT), не из body.
+
+// Email RFC 5321 simplified
+const emailSchema = z.string().email().max(254);
+// Phone: digits + spaces + +-(), 7-32 chars
+const phoneSchema = z.string().regex(/^[+\d\s()-]{7,32}$/);
+// Telegram login — @username или просто username
+const tgLoginSchema = z.string().max(64).regex(/^@?[A-Za-z0-9_]+$/);
+// Дата YYYY-MM-DD
+const dateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+// URL — для загруженных файлов
+const urlSchema = z.string().url().max(2048);
+
+export const saveHotelBookingSchema = z.object({
+  first_name: nameSchema,
+  last_name: nameSchema,
+  country: z.string().min(1).max(128),
+  city: z.string().min(1).max(128),
+  check_in: dateSchema,
+  check_out: dateSchema,
+  guests: z.number().int().min(1).max(20),
+  children_ages: z.array(z.string().max(8)).max(20).default([]),
+  email: emailSchema,
+  phone: phoneSchema,
+  telegram_login: tgLoginSchema,
+  passport_url: urlSchema.nullable().optional(),
+  payment_screenshot_url: urlSchema.nullable().optional(),
+  price: z.number().min(0).max(10_000_000),
+  extra_fields: z.record(z.string().max(64), z.string().max(2048)).nullable().optional(),
+  username: z.string().max(64).nullable().optional(),
+});
+
+export const saveFlightBookingSchema = z.object({
+  first_name: nameSchema,
+  last_name: nameSchema,
+  from_city: z.string().min(1).max(128),
+  to_city: z.string().min(1).max(128),
+  booking_date: dateSchema,
+  email: emailSchema,
+  phone: phoneSchema,
+  telegram_login: tgLoginSchema,
+  passport_url: urlSchema.nullable().optional(),
+  payment_screenshot_url: urlSchema.nullable().optional(),
+  price: z.number().min(0).max(10_000_000),
+  extra_fields: z.record(z.string().max(64), z.string().max(2048)).nullable().optional(),
+  username: z.string().max(64).nullable().optional(),
+});
+
 // ─── admin-grant-bonus ──────────────────────────────────────────────────────
 
 export const adminGrantBonusSchema = z.object({
