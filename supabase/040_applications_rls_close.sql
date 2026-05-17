@@ -1,0 +1,67 @@
+-- ============================================================================
+-- 040: Закрытие RLS-дыры в applications (P0-1 — INSERT only в этой итерации)
+--
+-- ПРОБЛЕМА (до этой миграции):
+-- Миграция 033 поставила открытые policies:
+--   applications_anon_insert WITH CHECK (true)
+--   applications_anon_update USING (true) WITH CHECK (true)
+--   applications_anon_select USING (true)
+-- — атакующий с anon-key мог:
+--   1. INSERT: создать заявку от имени любого user_telegram_id с подделанным
+--      price (обойти оплату)
+--   2. UPDATE: обновить чужую заявку, выкрасть бонусы (bonuses_used = max)
+--   3. SELECT: выгрузить ВСЕ заявки всех клиентов с паспортами
+--
+-- РЕШЕНИЕ (поэтапно):
+-- 1) [✅ ЭТОТ PR] /api/save-application — INSERT/UPDATE через service_key:
+--    - user_telegram_id / user_auth_id FORCED из verified initData/JWT
+--    - UPDATE имеет ownership-check (WHERE id=? AND user_id матчит)
+--    - UPDATE имеет whitelist полей (status, form_data, payment_proof_url,
+--      bonuses_used) — нельзя обойти оплату через UPDATE
+-- 2) [✅ ЭТОТ файл] DROP applications_anon_insert
+-- 3) [TODO — следующий PR] /api/admin-update-application-status — admin
+--    может менять status/visa_url/usd_rate/tax_pct. Сейчас админ делает это
+--    через supabase.from('applications').update() с anon-key (полагается на
+--    applications_anon_update policy).
+--    После того PR — DROP applications_anon_update.
+-- 4) [TODO — Sprint 4] applications_anon_select закрыть через
+--    USING (telegram_id = current_tg_id() OR user_auth_id = auth.uid())
+--    — после миграции user-side filter на RLS-level.
+--
+-- ⚠️ ПРИМЕНЯТЬ ТОЛЬКО ПОСЛЕ:
+--   1. PR смержен в dev
+--   2. Vercel передеплоил dev / prod
+--   3. Smoke-test: создание заявки + редактирование draft из mini-app проходит
+--
+-- ============================================================================
+
+-- Закрываем anon INSERT — больше через anon-key нельзя.
+-- Единственный путь — /api/save-application с verified auth.
+DROP POLICY IF EXISTS "applications_anon_insert" ON public.applications;
+
+-- НЕ закрываем applications_anon_update и applications_anon_select сейчас —
+-- эти flow требуют отдельных refactor'ов (см. TODO выше).
+
+-- ============================================================================
+-- Smoke-test после применения
+-- ============================================================================
+--
+-- 1. INSERT через anon-key (должен fail):
+--    curl -X POST '<supabase>/rest/v1/applications' \
+--      -H "apikey: <ANON_KEY>" \
+--      -H "Content-Type: application/json" \
+--      -d '{"user_telegram_id":1,"country":"X","visa_type":"x","status":"submitted",
+--           "price":0,"form_data":{},"bonuses_used":0,"urgent":false}'
+--    → 42501 "new row violates row-level security policy" ✓
+--
+-- 2. Через /api/save-application с валидной TG initData → должно пройти (200 OK).
+--
+-- 3. UPDATE админом через анон-key (старый flow) — ПРОДОЛЖАЕТ работать
+--    (applications_anon_update не тронут). Это temporary security debt,
+--    закроется в следующем PR с /api/admin-update-application-status.
+--
+-- ============================================================================
+-- ROLLBACK
+-- ============================================================================
+--   CREATE POLICY "applications_anon_insert" ON public.applications
+--     FOR INSERT TO anon, authenticated WITH CHECK (true);
