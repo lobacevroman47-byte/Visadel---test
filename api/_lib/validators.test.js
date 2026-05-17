@@ -185,39 +185,82 @@ describe('postReviewSchema', () => {
 });
 
 describe('saveReviewSchema', () => {
-  it('пропускает валидный отзыв', () => {
+  const APP_UUID = '550e8400-e29b-41d4-a716-446655440000';
+  const BOOKING_UUID = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+
+  it('пропускает отзыв на заявку (application_id)', () => {
     const r = validate(
-      { application_id: 'app-123', country: 'Таиланд', rating: 5, text: 'Отлично' },
+      { application_id: APP_UUID, country: 'Таиланд', rating: 5, text: 'Отлично' },
       saveReviewSchema
     );
     expect(r.ok).toBe(true);
   });
 
-  it('требует application_id', () => {
+  it('пропускает отзыв на бронь (booking_id + booking_type)', () => {
+    const r = validate(
+      { booking_id: BOOKING_UUID, booking_type: 'hotel', country: 'Бронь отеля', rating: 5, text: 'Супер' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('отвергает если нет ни application_id ни booking_id', () => {
     const r = validate(
       { country: 'Таиланд', rating: 5, text: 'Отлично' },
       saveReviewSchema
     );
     expect(r.ok).toBe(false);
-    expect(r.errors.some(e => e.path.includes('application_id'))).toBe(true);
+  });
+
+  it('отвергает если ОБА источника (application_id + booking_id)', () => {
+    const r = validate(
+      { application_id: APP_UUID, booking_id: BOOKING_UUID, booking_type: 'hotel',
+        country: 'X', rating: 5, text: 'ok' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает booking_id без booking_type', () => {
+    const r = validate(
+      { booking_id: BOOKING_UUID, country: 'X', rating: 5, text: 'ok' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает невалидный booking_type', () => {
+    const r = validate(
+      { booking_id: BOOKING_UUID, booking_type: 'cruise', country: 'X', rating: 5, text: 'ok' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает невалидный UUID в application_id', () => {
+    const r = validate(
+      { application_id: 'not-a-uuid', country: 'Таиланд', rating: 5, text: 'ok' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
   });
 
   it('требует country', () => {
     const r = validate(
-      { application_id: 'app-1', rating: 5, text: 'ok' },
+      { application_id: APP_UUID, rating: 5, text: 'ok' },
       saveReviewSchema
     );
     expect(r.ok).toBe(false);
   });
 
   it('отвергает rating вне 1..5', () => {
-    expect(validate({ application_id: 'a', country: 'b', rating: 0, text: 'x' }, saveReviewSchema).ok).toBe(false);
-    expect(validate({ application_id: 'a', country: 'b', rating: 6, text: 'x' }, saveReviewSchema).ok).toBe(false);
+    expect(validate({ application_id: APP_UUID, country: 'b', rating: 0, text: 'x' }, saveReviewSchema).ok).toBe(false);
+    expect(validate({ application_id: APP_UUID, country: 'b', rating: 6, text: 'x' }, saveReviewSchema).ok).toBe(false);
   });
 
   it('отвергает пустой text', () => {
     const r = validate(
-      { application_id: 'a', country: 'b', rating: 5, text: '' },
+      { application_id: APP_UUID, country: 'b', rating: 5, text: '' },
       saveReviewSchema
     );
     expect(r.ok).toBe(false);
@@ -225,21 +268,18 @@ describe('saveReviewSchema', () => {
 
   it('отвергает text > 2000 chars', () => {
     const r = validate(
-      { application_id: 'a', country: 'b', rating: 5, text: 'a'.repeat(2001) },
+      { application_id: APP_UUID, country: 'b', rating: 5, text: 'a'.repeat(2001) },
       saveReviewSchema
     );
     expect(r.ok).toBe(false);
   });
 
   it('не принимает user_telegram_id из body (FORCED из initData в handler)', () => {
-    // Схема не упоминает user_telegram_id — даже если фронт его пошлёт,
-    // handler возьмёт его из verified initData.
     const r = validate(
-      { application_id: 'a', country: 'b', rating: 5, text: 'ok', user_telegram_id: 99999 },
+      { application_id: APP_UUID, country: 'b', rating: 5, text: 'ok', user_telegram_id: 99999 },
       saveReviewSchema
     );
     expect(r.ok).toBe(true);
-    // user_telegram_id игнорируется (Zod strip по умолчанию)
     expect(r.data.user_telegram_id).toBeUndefined();
   });
 });

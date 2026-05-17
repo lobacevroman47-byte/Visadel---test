@@ -61,9 +61,25 @@ async function handler(req, res) {
     res.status(400).json({ error: 'invalid input', details: parsed.errors });
     return;
   }
-  const { application_id, country, rating, text } = parsed.data;
+  const { application_id, booking_id, booking_type, country, rating, text } = parsed.data;
 
   try {
+    // Отзыв либо на заявку, либо на бронь. saveReviewSchema через .refine
+    // гарантирует что заполнен ровно один источник.
+    const reviewRow = {
+      user_telegram_id: verifiedTgId, // ← FORCED, не из body
+      country,
+      rating,
+      text,
+      status: 'pending',
+    };
+    if (application_id) {
+      reviewRow.application_id = application_id;
+    } else {
+      reviewRow.booking_id = booking_id;
+      reviewRow.booking_type = booking_type;
+    }
+
     const r = await fetch(`${SUPABASE_URL}/rest/v1/reviews`, {
       method: 'POST',
       headers: {
@@ -72,14 +88,7 @@ async function handler(req, res) {
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
-      body: JSON.stringify({
-        user_telegram_id: verifiedTgId, // ← FORCED, не из body
-        application_id,
-        country,
-        rating,
-        text,
-        status: 'pending',
-      }),
+      body: JSON.stringify(reviewRow),
     });
     if (!r.ok) {
       const errText = await r.text().catch(() => '');

@@ -98,13 +98,29 @@ export const postReviewSchema = z.object({
 });
 
 // ─── save-review (INSERT в reviews через service_key — закрывает RLS-дыру) ──
+//
+// Отзыв либо на визовую заявку (application_id), либо на бронь
+// (booking_id + booking_type). Ровно один источник — см. .refine ниже.
 
 export const saveReviewSchema = z.object({
-  application_id: z.string().min(1).max(64),
+  // Отзыв на заявку
+  application_id: z.string().uuid().optional(),
+  // Отзыв на бронь
+  booking_id: z.string().uuid().optional(),
+  booking_type: z.enum(['hotel', 'flight']).optional(),
+  // Общие поля
   country: z.string().min(1).max(64),
   rating: z.number().int().min(1).max(5),
   text: z.string().min(1).max(2000),
-});
+}).refine(
+  (v) => {
+    const hasApp = !!v.application_id;
+    const hasBooking = !!v.booking_id && !!v.booking_type;
+    // Ровно один источник (XOR)
+    return hasApp !== hasBooking;
+  },
+  { message: 'either application_id OR (booking_id + booking_type) required, not both' }
+);
 
 // ─── save-hotel-booking (INSERT в hotel_bookings через service_key) ─────────
 // Закрывает P0-1 RLS для hotel_bookings. user_telegram_id/auth_id берётся
