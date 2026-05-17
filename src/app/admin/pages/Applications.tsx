@@ -1577,12 +1577,15 @@ export const Applications: React.FC<ApplicationsProps> = ({ filter }) => {
     if (!ok) return;
     if (!isSupabaseConfigured()) return;
 
-    const { error } = await supabase
-      .from('applications')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', app.id);
-    if (error) {
-      await dialog.error('Не удалось удалить', error.message);
+    // P0-1: soft-delete через /api/admin-update-application (service_key)
+    const r = await apiFetch('/api/admin-update-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: app.id, patch: { deleted_at: new Date().toISOString() } }),
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      await dialog.error('Не удалось удалить', `Ошибка ${r.status}: ${body}`);
       return;
     }
 

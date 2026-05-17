@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review + RLS reviews) → **9.3/10** (PR #6 server-side audit logs) → **9.4/10** (PR #9 TG CloudStorage) → **9.6/10** (PR #10 save-hotel/flight-booking + RLS bookings) → **9.7/10** (PR #11 save-application + RLS applications INSERT).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review + RLS reviews) → **9.3/10** (PR #6 server-side audit logs) → **9.4/10** (PR #9 TG CloudStorage) → **9.6/10** (PR #10 save-hotel/flight-booking + RLS bookings) → **9.7/10** (PR #11 save-application + RLS applications INSERT) → **9.8/10** (PR #12 admin-update endpoints + RLS UPDATE closure).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 

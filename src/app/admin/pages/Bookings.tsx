@@ -180,12 +180,15 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
     if (!ok) return;
     if (!isSupabaseConfigured()) return;
 
-    const { error } = await supabase
-      .from(table)
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', id);
-    if (error) {
-      await dialog.error('Не удалось удалить', error.message);
+    // P0-1: soft-delete через /api/admin-update-booking (service_key)
+    const delRes = await apiFetch('/api/admin-update-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, table, patch: { deleted_at: new Date().toISOString() } }),
+    });
+    if (!delRes.ok) {
+      const body = await delRes.text().catch(() => '');
+      await dialog.error('Не удалось удалить', `Ошибка ${delRes.status}: ${body}`);
       return;
     }
 
@@ -260,9 +263,15 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       : flights.find(f => f.id === id);
     const prevStatus = prevBooking?.status ?? null;
 
-    const { error } = await supabase.from(table).update({ status }).eq('id', id);
-    if (error) {
-      await dialog.error('Не удалось обновить статус', error.message);
+    // P0-1: статус через /api/admin-update-booking (service_key)
+    const stRes = await apiFetch('/api/admin-update-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, table, patch: { status } }),
+    });
+    if (!stRes.ok) {
+      const body = await stRes.text().catch(() => '');
+      await dialog.error('Не удалось обновить статус', `Ошибка ${stRes.status}: ${body}`);
       return;
     }
 
@@ -402,12 +411,19 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       }),
     });
 
-    // Update booking row with commission tracking fields
-    await supabase.from(table).update({
-      partner_commission_pct: pct,
-      partner_commission_amount_rub: amount,
-      partner_commission_status: 'pending',
-    }).eq('id', bookingId);
+    // Update booking row with commission tracking fields (P0-1: service_key)
+    await apiFetch('/api/admin-update-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: bookingId, table,
+        patch: {
+          partner_commission_pct: pct,
+          partner_commission_amount_rub: amount,
+          partner_commission_status: 'pending',
+        },
+      }),
+    });
 
     // Push-уведомление партнёру (best-effort, не блокирует)
     apiFetch('/api/notify-status', {
@@ -466,9 +482,14 @@ export const Bookings: React.FC<BookingsProps> = ({ initialTab }) => {
       }),
     });
 
-    await supabase.from(table).update({
-      partner_commission_status: 'cancelled',
-    }).eq('id', bookingId);
+    await apiFetch('/api/admin-update-booking', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: bookingId, table,
+        patch: { partner_commission_status: 'cancelled' },
+      }),
+    });
   }
 
   const handleExportCsv = () => {
@@ -767,12 +788,15 @@ function ConfirmationUploader({
       const newUrl = await uploadFile(file, 'visas');
       if (!newUrl) { await dialog.error('Не удалось загрузить файл', 'Проверь Supabase Storage.'); return; }
       if (isSupabaseConfigured()) {
-        const { error } = await supabase.from(table).update({ confirmation_url: newUrl }).eq('id', id);
-        if (error) {
-          await dialog.error(
-            'Не удалось сохранить ссылку на файл',
-            `${error.message}\n\nПохоже что в БД нет колонки confirmation_url. Выполни в Supabase SQL Editor:\n\nALTER TABLE ${table} ADD COLUMN IF NOT EXISTS confirmation_url text;`
-          );
+        // P0-1: confirmation_url через /api/admin-update-booking (service_key)
+        const r = await apiFetch('/api/admin-update-booking', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id, table, patch: { confirmation_url: newUrl } }),
+        });
+        if (!r.ok) {
+          const body = await r.text().catch(() => '');
+          await dialog.error('Не удалось сохранить ссылку на файл', `Ошибка ${r.status}: ${body}`);
           return;
         }
       }
