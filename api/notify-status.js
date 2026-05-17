@@ -11,6 +11,7 @@ import { requireTelegramUser, isAdminId, AuthError } from './_lib/telegram-auth.
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { validate, notifyStatusSchema } from './_lib/validators.js';
 //
 // Dedup strategy (3 layers — any one prevents duplicates):
 //   1. In-memory Map (same Vercel warm instance, 30s)
@@ -280,15 +281,22 @@ async function handler(req, res) {
     }
   }
 
-  const body = req.body ?? {};
+  // Zod-валидация: status enum, длины строк, no HTML. passthrough для
+  // прочих полей (admin/cron могут добавлять).
+  const parsed = validate(req.body ?? {}, notifyStatusSchema);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'invalid input', details: parsed.errors });
+    return;
+  }
+  const body = parsed.data;
   const { status, country, visa_type, application_id, amount, source, card_last4, reject_reason, referee_name, application_type } = body;
   // user — только себе; admin / service — кому угодно
   const telegram_id = (isServiceCall || isAdminCaller) ? body.telegram_id : verifiedTgId;
 
   console.log('[notify-status] called:', { telegram_id, status, country, application_id, application_type });
 
-  if (!telegram_id || !status) {
-    res.status(400).json({ error: 'telegram_id and status required' });
+  if (!telegram_id) {
+    res.status(400).json({ error: 'telegram_id required' });
     return;
   }
 

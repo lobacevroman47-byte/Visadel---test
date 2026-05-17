@@ -16,6 +16,7 @@ import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { validate, grantBonusSchema } from './_lib/validators.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -186,12 +187,19 @@ async function handler(req, res) {
     }
   }
 
-  const body = req.body ?? {};
-  const { type, amount, description, application_id } = body;
-  // Доверяем telegram_id из initData; service-каллу разрешаем переопределить
-  const telegram_id = isServiceCall ? body.telegram_id : verifiedTgId;
-  if (!telegram_id || !type || !amount) {
-    res.status(400).json({ error: 'telegram_id, type, amount required' });
+  // Zod-валидация: type-coerce защита, whitelist полей, enum для type.
+  // Service-call может пересылать произвольный telegram_id; для user-call
+  // мы перетрём его на verifiedTgId ниже (initData wins).
+  const parsed = validate(req.body ?? {}, grantBonusSchema);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'invalid input', details: parsed.errors });
+    return;
+  }
+  const { type, amount, description, application_id } = parsed.data;
+  // Доверяем telegram_id из initData; service-каллу разрешаем переопределить.
+  const telegram_id = isServiceCall ? parsed.data.telegram_id : verifiedTgId;
+  if (!telegram_id) {
+    res.status(400).json({ error: 'telegram_id required' });
     return;
   }
 
