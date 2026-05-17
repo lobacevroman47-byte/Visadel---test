@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **8.8/10** (PR #6 audit logs) → **9.0/10** (PR #7 Vitest smoke tests).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **8.8/10** (PR #6 audit logs) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review API + RLS closure для reviews — первая часть P0-1).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -18,17 +18,28 @@
 
 ### P0 — Critical (active exploit possible)
 
-#### P0-1. Open RLS на пользовательских таблицах
-- **Affected:** `applications`, `hotel_bookings`, `flight_bookings`, `reviews`, `tasks`, `users`.
+#### P0-1. Open RLS на пользовательских таблицах (PARTIAL FIX — reviews закрыт в PR #8)
+- **Affected:** `applications`, `hotel_bookings`, `flight_bookings`, `reviews` (✅ закрыт), `tasks`, `users`.
 - **Root cause:** миграции 011 и 033 ставят `USING(true) WITH CHECK(true)` для всех ролей.
-- **Exploit:**
+- **Exploit (для оставшихся таблиц):**
   ```http
   GET /rest/v1/applications?select=* HTTP/1.1
   apikey: <ANON_KEY из bundle>
   ```
   → возвращает ВСЕ заявки всех клиентов с паспортными данными.
-- **Status:** план в `supabase/035_rls_audit_plan.sql`. Требует STAGE 2 (API refactor) перед применением.
-- **ETA:** 1–2 спринта.
+- **Fix applied (reviews, PR #8):**
+  - Новый `/api/save-review` endpoint — INSERT через service_key + `requireTelegramUser`
+  - `user_telegram_id` FORCED из verified initData (не из body — нельзя подделать)
+  - Zod валидация (rating 1-5, text 1-2000, country, application_id)
+  - Rate-limit 5/мин по IP, Sentry, audit
+  - Frontend `submitReview()` мигрирован на `apiFetch('/api/save-review')`
+  - Миграция 038 закрывает `reviews_anon_insert` policy
+- **Что осталось (Sprint 3 continued):**
+  - `/api/save-application` + миграция (закрыть `applications_anon_insert`)
+  - `/api/save-hotel-booking`, `/api/save-flight-booking`
+  - `/api/admin-update-application-status`, `/api/admin-update-booking-status`
+  - Финальный mini-PR с раскомментированной STAGE 3 миграции 035 для остальных таблиц
+- **ETA:** ещё 1 спринт.
 
 #### P0-2. `track-click.js` без auth и rate-limit (FIXED в этом PR)
 - **Affected:** `api/track-click.js`.

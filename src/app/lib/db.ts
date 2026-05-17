@@ -716,14 +716,23 @@ export async function submitReview(params: {
   username?: string;
 }): Promise<void> {
   if (isSupabaseConfigured()) {
-    await supabase.from('reviews').insert({
-      user_telegram_id: params.telegramId,
-      application_id: params.applicationId,
-      country: params.country,
-      rating: params.rating,
-      text: params.text,
-      status: 'pending',
+    // INSERT через API endpoint /api/save-review с service_key —
+    // telegram_id берётся из verified initData (нельзя подделать),
+    // а не из params.telegramId. Закрывает P0-1 RLS на reviews.
+    const r = await apiFetch('/api/save-review', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        application_id: params.applicationId,
+        country: params.country,
+        rating: params.rating,
+        text: params.text,
+      }),
     });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      throw new Error(`save-review failed: ${r.status} ${body}`);
+    }
     // Bonus is granted by the caller via /api/grant-bonus (with dedup) — don't add here
   } else {
     const reviews = lsGet<unknown[]>('vd_reviews', []);

@@ -1,0 +1,61 @@
+-- ============================================================================
+-- 038: Закрытие RLS-дыры в reviews — первая часть P0-1 closure
+--
+-- ПРОБЛЕМА (до этой миграции):
+-- Миграция 033 поставила открытую policy `reviews_anon_insert WITH CHECK (true)`
+-- — атакующий с anon-key мог писать отзывы от имени любого юзера с любым
+-- text/rating. Просто:
+--   curl -X POST '<supabase>/rest/v1/reviews' \
+--     -H "apikey: <ANON_KEY>" \
+--     -d '{"user_telegram_id": <victim>, "rating": 1, "text": "...", "country": "..."}'
+--
+-- РЕШЕНИЕ:
+-- 1) PR #8 создал endpoint /api/save-review который пишет через service_key.
+--    Фронт мигрирован: submitReview() в db.ts теперь идёт через apiFetch.
+-- 2) Эта миграция закрывает `reviews_anon_insert` — INSERT через anon
+--    больше невозможен. service_key (bypass RLS) продолжает работать.
+--
+-- ⚠️ ПРИМЕНЯТЬ ТОЛЬКО ПОСЛЕ:
+--   1. PR #8 (save-review API) смержен в dev
+--   2. Vercel передеплоил dev / prod
+--   3. Smoke-test: отзыв из mini-app проходит (через /api/save-review)
+--
+-- Если применить РАНЬШЕ — фронт получит 42501 (RLS deny) на старых
+-- инстансах которые ещё не передеплоились с новой submitReview().
+--
+-- ============================================================================
+
+-- Закрываем INSERT для anon. Остаётся реальный путь — service_key
+-- (bypass RLS, через /api/save-review).
+DROP POLICY IF EXISTS "reviews_anon_insert" ON public.reviews;
+
+-- SELECT для anon оставляем открытым — отзывы публичны (показываются
+-- на главной, в карточках стран). Полей user_telegram_id мы не отдаём
+-- в публичный UI (см. queries в db.ts → они выбирают только нужные колонки).
+-- Если позже понадобится — закрыть через VIEW reviews_public без PII.
+
+-- ============================================================================
+-- Smoke-test после применения
+-- ============================================================================
+--
+-- 1. Попробовать INSERT через anon-key (должен fail):
+--    curl -X POST '<supabase>/rest/v1/reviews' \
+--      -H "apikey: <ANON_KEY>" \
+--      -H "Content-Type: application/json" \
+--      -d '{"user_telegram_id": 123, "rating": 5, "text": "test", "country": "RU", "status": "pending"}'
+--    Ожидаемый ответ: 42501 "new row violates row-level security policy"
+--
+-- 2. Через /api/save-review с валидным initData — должно пройти (200 OK).
+--
+-- 3. SELECT через anon-key — продолжает работать (открыт):
+--    curl '<supabase>/rest/v1/reviews?select=id,rating,text,country' \
+--      -H "apikey: <ANON_KEY>"
+--    → массив отзывов без PII (запросом мы не выбираем user_telegram_id).
+--
+-- ============================================================================
+-- ROLLBACK (если что-то сломалось)
+-- ============================================================================
+--   CREATE POLICY "reviews_anon_insert" ON public.reviews
+--     FOR INSERT TO anon, authenticated WITH CHECK (true);
+--
+-- — повторит исходное состояние из миграции 033.

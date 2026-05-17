@@ -97,6 +97,15 @@ export const postReviewSchema = z.object({
   country: z.string().max(64).optional(),
 });
 
+// ─── save-review (INSERT в reviews через service_key — закрывает RLS-дыру) ──
+
+export const saveReviewSchema = z.object({
+  application_id: z.string().min(1).max(64),
+  country: z.string().min(1).max(64),
+  rating: z.number().int().min(1).max(5),
+  text: z.string().min(1).max(2000),
+});
+
 // ─── admin-grant-bonus ──────────────────────────────────────────────────────
 
 export const adminGrantBonusSchema = z.object({
