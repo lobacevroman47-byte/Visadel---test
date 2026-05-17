@@ -38,6 +38,7 @@ import { getCurrentSession } from '../../lib/web-auth';
 import { useTelegram } from '../../App';
 import { useDialog } from '../shared/BrandDialog';
 import { countryFlag } from '../../lib/countryFlags';
+import { secureStorage } from '../../lib/secureStorage';
 
 interface Draft {
   id: string;
@@ -66,10 +67,14 @@ interface BookingDraft {
   summary: string;
 }
 
-function loadBookingDrafts(): BookingDraft[] {
+// Читаем черновики броней через secureStorage — он проверяет сначала
+// TG CloudStorage, потом localStorage fallback. Важно: FlightBookingForm
+// пишет draft в CloudStorage (P1-5), поэтому прямое чтение localStorage
+// его НЕ находило. secureStorage.getItem решает это для обоих типов.
+async function loadBookingDrafts(): Promise<BookingDraft[]> {
   const drafts: BookingDraft[] = [];
   try {
-    const h = localStorage.getItem('hotel_booking_draft');
+    const h = await secureStorage.getItem('hotel_booking_draft');
     if (h) {
       const d = JSON.parse(h);
       const summary = [d.country, d.city].filter(Boolean).join(', ') || 'Без страны';
@@ -77,7 +82,7 @@ function loadBookingDrafts(): BookingDraft[] {
     }
   } catch { /* no-op */ }
   try {
-    const f = localStorage.getItem('flight_booking_draft');
+    const f = await secureStorage.getItem('flight_booking_draft');
     if (f) {
       const d = JSON.parse(f);
       const summary = [d.fromCity, d.toCity].filter(Boolean).join(' → ') || 'Без маршрута';
@@ -432,8 +437,9 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
         }
       } catch {}
 
-      // Load booking drafts (single-slot per type) from localStorage
-      setBookingDrafts(loadBookingDrafts());
+      // Load booking drafts (single-slot per type) — через secureStorage
+      // (TG CloudStorage + localStorage fallback)
+      setBookingDrafts(await loadBookingDrafts());
     } finally {
       setLoading(false);
     }
@@ -718,9 +724,10 @@ export default function ApplicationsTab({ onContinueDraft, onContinueHotelDraft,
               {bookingDrafts.map(bd => {
                 const isHotel = bd.type === 'hotel';
                 const onContinue = isHotel ? onContinueHotelDraft : onContinueFlightDraft;
-                const onDelete = () => {
-                  try { localStorage.removeItem(isHotel ? 'hotel_booking_draft' : 'flight_booking_draft'); } catch { /* no-op */ }
-                  setBookingDrafts(loadBookingDrafts());
+                const onDelete = async () => {
+                  // Чистим обе локации (CloudStorage + localStorage)
+                  await secureStorage.removeItem(isHotel ? 'hotel_booking_draft' : 'flight_booking_draft');
+                  setBookingDrafts(await loadBookingDrafts());
                 };
                 return (
                   <div key={`booking-${bd.type}`} className="bg-white rounded-xl shadow-md p-4 border-l-4 border-gray-400">

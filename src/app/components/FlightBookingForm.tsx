@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check, Save } from 'lucide-react';
 import { uploadFile } from '../lib/db';
 import { isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
@@ -110,10 +110,27 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-save draft to localStorage с debounce 1s + lastSavedAt трекинг.
+  // Auto-save draft с debounce 1s + lastSavedAt трекинг.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   // Cron-напоминания расписываем один раз за сессию (как у отеля).
   const remindersScheduled = useRef(false);
+
+  // Собирает JSON черновика из текущего состояния формы.
+  const buildDraftJson = useCallback((): string => JSON.stringify({
+    firstName, lastName, fromCity, toCity, bookingDate,
+    email, phone, telegramLogin, extraValues,
+    savedAt: new Date().toISOString(),
+  }), [firstName, lastName, fromCity, toCity, bookingDate, email, phone,
+       telegramLogin, extraValues]);
+
+  // Ручное сохранение по кнопке Save в шапке.
+  const handleManualSave = useCallback(() => {
+    void secureStorage.setItem('flight_booking_draft', buildDraftJson())
+      .catch(e => console.warn('[flight-draft] manual save failed:', e));
+    setLastSavedAt(Date.now());
+    haptic('success');
+  }, [buildDraftJson]);
+
   useEffect(() => {
     const anyContent = !!(firstName || lastName || fromCity || toCity || bookingDate ||
       email || phone || telegramLogin);
@@ -121,11 +138,8 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
     const timer = setTimeout(() => {
       // P1-5: пишем через secureStorage (TG CloudStorage если доступен,
       // localStorage fallback). PII не утечёт через Stored XSS на TG-клиенте.
-      void secureStorage.setItem('flight_booking_draft', JSON.stringify({
-        firstName, lastName, fromCity, toCity, bookingDate,
-        email, phone, telegramLogin, extraValues,
-        savedAt: new Date().toISOString(),
-      })).catch(e => console.warn('[flight-draft] save failed:', e));
+      void secureStorage.setItem('flight_booking_draft', buildDraftJson())
+        .catch(e => console.warn('[flight-draft] save failed:', e));
       try {
         setLastSavedAt(Date.now());
         if (!remindersScheduled.current) {
@@ -144,7 +158,7 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
       } catch { /* no-op */ }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [firstName, lastName, fromCity, toCity, bookingDate, email, phone, telegramLogin, extraValues]);
+  }, [firstName, lastName, fromCity, toCity, bookingDate, email, phone, telegramLogin, extraValues, buildDraftJson]);
 
   // UX state
   const [submitting, setSubmitting] = useState(false);
@@ -299,14 +313,22 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
             </svg>
             <span className="text-[#0F2A36] font-extrabold text-[18px] tracking-tight">VISADEL</span>
           </div>
-          {/* Индикатор автосохранения */}
-          {lastSavedAt && Date.now() - lastSavedAt < 2500 ? (
-            <span className="text-[10px] text-emerald-600/80 font-semibold animate-pulse">
-              ✓ Сохранено
-            </span>
-          ) : (
-            <span className="w-9" />
-          )}
+          {/* Индикатор автосохранения + кнопка ручного сохранения черновика */}
+          <div className="flex items-center gap-2">
+            {lastSavedAt && Date.now() - lastSavedAt < 2500 && (
+              <span className="text-[10px] text-emerald-600/80 font-semibold animate-pulse">
+                ✓ Сохранено
+              </span>
+            )}
+            <button
+              onClick={handleManualSave}
+              className="w-11 h-11 rounded-full border border-gray-200 hover:bg-gray-50 flex items-center justify-center text-gray-700 transition active:scale-95"
+              title="Сохранить черновик"
+              aria-label="Сохранить черновик"
+            >
+              <Save className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
