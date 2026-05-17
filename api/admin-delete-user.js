@@ -14,6 +14,7 @@ import { requireTelegramUser, AuthError, isAdminId } from './_lib/telegram-auth.
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { logAdminAction } from './_lib/audit-log.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -78,8 +79,11 @@ async function handler(req, res) {
 
   // ── 1. Auth: верифицируем initData админа ──
   let verifiedTgId;
+  let verifiedAdmin = null;
   try {
-    verifiedTgId = requireTelegramUser(req).telegramId;
+    const verified = requireTelegramUser(req);
+    verifiedTgId = verified.telegramId;
+    verifiedAdmin = verified.user;
   } catch (err) {
     const status = err instanceof AuthError ? (err.status || 401) : 500;
     res.status(status).json({ error: err.message || 'auth failed' });
@@ -143,6 +147,22 @@ async function handler(req, res) {
       res.status(404).json({ error: 'target user not found (or already deleted)' });
       return;
     }
+
+    // ── Server-side audit log ──
+    // Запись о soft-delete — критично для forensics (кто и когда удалил).
+    await logAdminAction({
+      admin_tg_id: verifiedTgId,
+      admin_name: verifiedAdmin?.username ? `@${verifiedAdmin.username}` : (verifiedAdmin?.first_name ?? null),
+      action: 'user.soft_delete',
+      target_type: 'user',
+      target_id: target_telegram_id ?? target_auth_id,
+      details: {
+        target_telegram_id,
+        target_auth_id,
+        cascaded: counts,
+        deleted_at: deletedAt,
+      },
+    });
 
     res.status(200).json({ ok: true, deleted: counts });
   } catch (err) {

@@ -2,16 +2,24 @@
 //
 // Auth: admin-only. Без проверки любой мог бы апрувить/реджектить отзывы
 // или выставлять любой статус.
+//
+// Также пишет в admin_audit_log — все изменения отзывов отслеживаются.
 
 import { requireAdminUser, AuthError } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
+import { logAdminAction } from './_lib/audit-log.js';
 
 export default async function handler(req, res) {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') return res.status(405).end();
 
-  try { requireAdminUser(req); }
-  catch (err) {
+  let verifiedAdmin = null;
+  let verifiedTgId = null;
+  try {
+    const verified = requireAdminUser(req);
+    verifiedTgId = verified.telegramId;
+    verifiedAdmin = verified.user;
+  } catch (err) {
     const status = err instanceof AuthError ? (err.status || 401) : 500;
     res.status(status).json({ error: err.message || 'auth failed' });
     return;
@@ -37,8 +45,23 @@ export default async function handler(req, res) {
 
   if (!resp.ok) {
     const text = await resp.text();
-    return res.status(500).json({ error: text });
+    console.error('[update-review] PATCH failed:', resp.status, text);
+    return res.status(500).json({ error: 'internal error' });
   }
+
+  // Audit log: фиксируем что именно поменяли. Сам text не выгружаем
+  // (privacy + объём), только список изменённых ключей и status если был.
+  await logAdminAction({
+    admin_tg_id: verifiedTgId,
+    admin_name: verifiedAdmin?.username ? `@${verifiedAdmin.username}` : (verifiedAdmin?.first_name ?? null),
+    action: 'review.update',
+    target_type: 'review',
+    target_id: id,
+    details: {
+      changed_fields: Object.keys(fields),
+      status: typeof fields.status === 'string' ? fields.status : undefined,
+    },
+  });
 
   return res.status(200).json({ ok: true });
 }

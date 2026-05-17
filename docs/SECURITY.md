@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **8.8/10** (PR #6 audit logs) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review API + RLS closure для reviews — первая часть P0-1).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review API + RLS closure для reviews) → **9.3/10** (PR #6 server-side audit logs).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -110,7 +110,11 @@
 ### P2 — Medium
 
 - **P2-1.** Zod-валидация подключена ✅ на 5 критичных endpoints: `grant-bonus`, `notify-status`, `web-user-upsert`, `post-review`, `admin-grant-bonus`. Schemas в `api/_lib/validators.js`. Защищает от type-coercion (`amount='100'` теперь 400), HTML-инъекций в именах, fake реф-кодов, отрицательного amount в admin-grant. Остальные endpoints получат validation постепенно по мере касания.
-- **P2-2.** `audit_logs` есть (миграции 005/006), но не пишет ВСЕ admin-actions. Не покрыты: `admin-delete-user`, manual bonus grants.
+- **P2-2.** `admin_audit_log` покрытие расширено ✅ — server-side helper `api/_lib/audit-log.js` (`logAdminAction`) подключён к 3 admin endpoints:
+  - `admin-grant-bonus` → action `bonus.grant` / `bonus.revoke` (с previous_balance, new_balance, amount, description)
+  - `admin-delete-user` → action `user.soft_delete` (с cascade counts, deleted_at)
+  - `update-review` → action `review.update` (с changed_fields, status)
+  Помимо frontend `auditLog()` (через anon-key) — теперь дублирование на бэке через service_key. Frontend помогает с UI-actions, backend гарантирует запись даже если admin вызывает API напрямую через curl/postman.
 - **P2-3.** `npm audit` + `npm run build` в CI ✅ — `.github/workflows/security-checks.yml`. Запускается на каждом PR в dev/main + раз в неделю (понедельник 06:00 UTC). Test job (`npm test`) добавляется вручную — см. раздел "CI test job" ниже.
 - **P2-4.** Sentry интегрирован ✅ (frontend через `@sentry/react`, backend через `@sentry/node` + `withSentry` wrapper). Включается через env vars `VITE_SENTRY_DSN` / `SENTRY_DSN` — пока не заданы, no-op. Setup: см. `docs/SENTRY_SETUP.md`. PII scrubbing встроен (passport, password, Authorization, Bearer, initData).
 - **P2-7 (new).** Vitest smoke tests ✅ — 65 тестов на критичные helpers: `validators.js` (27), `rate-limit.js` (10), `cors.js` (15), `telegram-auth.js` (13 включая HMAC roundtrip с фейк-токеном). Запускается в CI как отдельный job (`npm test`). Regression-защита от ослабления Zod схем, HMAC изменений, CORS whitelist. Расширять при добавлении новых API helpers.
