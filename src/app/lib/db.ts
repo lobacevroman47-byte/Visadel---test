@@ -478,12 +478,18 @@ export interface FlightBookingRow {
 }
 
 // Mark booking as having received the review bonus (idempotency flag).
+//
+// DEPRECATED как самостоятельная операция: флаг review_bonus_granted теперь
+// выставляет /api/save-review на сервере (service_key) сразу после записи
+// отзыва на бронь. anon-key UPDATE на bookings закрыт миграцией 042.
+// Функция оставлена no-op для обратной совместимости с вызывающим кодом —
+// фронт обновляет UI оптимистично через onUpdate(), серверный флаг
+// гарантирует персистентность.
 export async function markBookingReviewBonusGranted(
-  table: 'hotel_bookings' | 'flight_bookings',
-  id: string,
+  _table: 'hotel_bookings' | 'flight_bookings',
+  _id: string,
 ): Promise<void> {
-  if (!isSupabaseConfigured()) return;
-  await supabase.from(table).update({ review_bonus_granted: true }).eq('id', id);
+  // no-op — см. /api/save-review
 }
 
 export async function getUserHotelBookings(
