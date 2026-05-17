@@ -325,84 +325,60 @@ export async function claimDailyBonus(telegramId: number): Promise<{ claimed: bo
 
 export async function saveApplication(app: Application): Promise<Application> {
   if (isSupabaseConfigured()) {
-    if (app.id) {
-      const { data } = await supabase
-        .from('applications')
-        .update({
-          status: app.status,
-          form_data: app.form_data,
-          payment_proof_url: app.payment_proof_url ?? null,
-          bonuses_used: app.bonuses_used,
-        })
-        .eq('id', app.id)
-        .select()
-        .single();
-      return (data as Application) ?? app;
-    }
-
-    // Базовый payload — поля которые точно существовали ДО миграции 029.
-    // user_auth_id (миграция 031) добавляем, если есть — для веб-юзеров.
-    const basePayload: Record<string, unknown> = {
-      user_telegram_id: app.user_telegram_id,
-      user_auth_id: app.user_auth_id ?? null,
-      country: app.country,
-      visa_type: app.visa_type,
-      visa_id: app.visa_id,
-      price: app.price,
-      urgent: app.urgent,
+    // P0-1: INSERT/UPDATE через /api/save-application с service_key +
+    // dual-auth (TG initData ИЛИ Supabase JWT). user_telegram_id /
+    // user_auth_id берутся из verified источника на сервере, не из body.
+    // UPDATE — только для записей которые принадлежат текущему юзеру
+    // (ownership check на сервере, чтобы нельзя было обновить чужую).
+    const payload: Record<string, unknown> = {
       status: app.status,
       form_data: app.form_data,
       payment_proof_url: app.payment_proof_url ?? null,
-      bonuses_used: app.bonuses_used,
-      usd_rate_rub: app.usd_rate_rub ?? null,
-      tax_pct: app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT,
+      bonuses_used: app.bonuses_used ?? 0,
     };
-    // application_type — добавили миграцией 029. Если миграция ещё не
-    // накатана в БД (типичная ситуация в dev/staging), Supabase вернёт
-    // PGRST204 / 42703. Тогда повторяем insert без этого поля.
-    const fullPayload = {
-      ...basePayload,
-      application_type: app.application_type ?? 'visa',
-    };
-
-    let { data, error } = await supabase
-      .from('applications')
-      .insert(fullPayload)
-      .select()
-      .single();
-
-    if (error && (
-      error.code === 'PGRST204' ||
-      error.code === '42703' ||
-      /application_type/i.test(error.message ?? '')
-    )) {
-      console.warn('[saveApplication] application_type column missing — retrying without it. Run migration supabase/029_application_type.sql to enable extension flow.');
-      const retry = await supabase
-        .from('applications')
-        .insert(basePayload)
-        .select()
-        .single();
-      data = retry.data;
-      error = retry.error;
+    if (app.id) {
+      // UPDATE flow
+      payload.id = app.id;
+    } else {
+      // INSERT flow — INSERT-only поля
+      payload.country = app.country;
+      payload.visa_type = app.visa_type;
+      payload.visa_id = app.visa_id;
+      payload.price = app.price;
+      payload.urgent = app.urgent;
+      payload.usd_rate_rub = app.usd_rate_rub ?? null;
+      payload.tax_pct = app.tax_pct ?? BONUS_CONFIG.TAX_PCT_DEFAULT;
+      payload.application_type = app.application_type ?? 'visa';
     }
 
-    if (error) {
-      console.error('saveApplication Supabase error:', JSON.stringify(error));
-      // FK violation — user not yet in DB, fall through to localStorage
-      if (error.code === '23503') {
-        console.warn('FK violation — saving to localStorage instead');
+    try {
+      const r = await apiFetch('/api/save-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (r.status === 409) {
+        // FK violation — user not in users table. Fallback на localStorage.
+        console.warn('[saveApplication] 409 FK violation — saving to localStorage instead');
         const apps = lsGet<Application[]>(LS_APPS, []);
         const newApp = { ...app, id: crypto.randomUUID(), created_at: new Date().toISOString() };
         apps.push(newApp);
         lsSet(LS_APPS, apps);
         return newApp;
       }
-      throw new Error(`Supabase error ${error.code}: ${error.message}`);
+      if (!r.ok) {
+        const body = await r.text().catch(() => '');
+        throw new Error(`save-application failed: ${r.status} ${body}`);
+      }
+      const data = await r.json();
+      return (data?.application as Application) ?? app;
+    } catch (err) {
+      console.error('[saveApplication] API error:', err);
+      throw err;
     }
-    return data as Application;
   }
 
-  // localStorage fallback
+  // localStorage fallback (Supabase не настроен — dev mode)
   const apps = lsGet<Application[]>(LS_APPS, []);
   if (app.id) {
     const idx = apps.findIndex(a => a.id === app.id);

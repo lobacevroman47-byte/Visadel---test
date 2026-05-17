@@ -156,6 +156,49 @@ export const saveFlightBookingSchema = z.object({
   username: z.string().max(64).nullable().optional(),
 });
 
+// ─── save-application (INSERT/UPDATE applications через service_key) ────────
+//
+// Закрывает последнюю крупную RLS-дыру P0-1.
+// Сервер решает INSERT vs UPDATE по наличию id.
+// Для UPDATE — whitelist полей (status, form_data, payment_proof_url, bonuses_used) +
+// ownership check (записи только своего telegram_id/auth_id).
+// user_telegram_id / user_auth_id FORCED из verified источника, не из body.
+
+const applicationStatusSchema = z.enum([
+  'draft', 'submitted', 'pending_confirmation', 'pending_payment',
+  'in_progress', 'ready', 'completed', 'cancelled',
+]);
+
+const applicationTypeSchema = z.enum(['visa', 'extension']);
+
+// form_data — JSONB с произвольной структурой. Лимит размера 100KB (для защиты
+// от bloat — обычная заявка ~5-20KB). Глубина не лимитируется, но Zod
+// внутренне ограничивает рекурсию.
+const formDataSchema = z.record(z.string().max(128), z.unknown())
+  .refine(
+    (v) => JSON.stringify(v).length <= 100_000,
+    { message: 'form_data too large (>100KB)' }
+  );
+
+export const saveApplicationSchema = z.object({
+  // Optional ID — если есть, делаем UPDATE; если нет — INSERT
+  id: z.string().uuid().optional(),
+  // INSERT-only поля (для UPDATE игнорируются на сервере)
+  country: z.string().min(1).max(128).optional(),
+  visa_type: z.string().max(64).optional(),
+  visa_id: z.string().max(128).optional(),
+  price: z.number().min(0).max(10_000_000).optional(),
+  urgent: z.boolean().optional(),
+  usd_rate_rub: z.number().min(0).max(1000).nullable().optional(),
+  tax_pct: z.number().min(0).max(100).nullable().optional(),
+  application_type: applicationTypeSchema.optional(),
+  // UPDATE-able поля (используются и для INSERT и для UPDATE)
+  status: applicationStatusSchema,
+  form_data: formDataSchema,
+  payment_proof_url: z.string().url().max(2048).nullable().optional(),
+  bonuses_used: z.number().int().min(0).max(1_000_000).default(0),
+});
+
 // ─── admin-grant-bonus ──────────────────────────────────────────────────────
 
 export const adminGrantBonusSchema = z.object({

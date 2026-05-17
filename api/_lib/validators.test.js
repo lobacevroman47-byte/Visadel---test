@@ -17,6 +17,7 @@ import {
   saveReviewSchema,
   saveHotelBookingSchema,
   saveFlightBookingSchema,
+  saveApplicationSchema,
   adminGrantBonusSchema,
 } from './validators.js';
 
@@ -348,6 +349,82 @@ describe('saveFlightBookingSchema', () => {
     expect(r.ok).toBe(true);
     expect(r.data.telegram_id).toBeUndefined();
     expect(r.data.status).toBeUndefined();
+  });
+});
+
+describe('saveApplicationSchema', () => {
+  const validInsert = {
+    country: 'Таиланд',
+    visa_type: 'tourist',
+    visa_id: 'TH-tourist-30',
+    price: 5000,
+    urgent: false,
+    status: 'submitted',
+    form_data: { passport: '1234', name: 'Иван' },
+    bonuses_used: 0,
+  };
+
+  const validUpdate = {
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    status: 'submitted',
+    form_data: { foo: 'bar' },
+    bonuses_used: 100,
+  };
+
+  it('пропускает валидный INSERT', () => {
+    expect(validate(validInsert, saveApplicationSchema).ok).toBe(true);
+  });
+
+  it('пропускает валидный UPDATE (с id)', () => {
+    expect(validate(validUpdate, saveApplicationSchema).ok).toBe(true);
+  });
+
+  it('отвергает невалидный UUID в id', () => {
+    const r = validate({ ...validUpdate, id: 'not-a-uuid' }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает unknown status', () => {
+    const r = validate({ ...validInsert, status: 'hacked' }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает unknown application_type', () => {
+    const r = validate({ ...validInsert, application_type: 'fake' }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает negative price', () => {
+    const r = validate({ ...validInsert, price: -100 }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает negative bonuses_used', () => {
+    const r = validate({ ...validInsert, bonuses_used: -50 }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает form_data > 100KB (anti-bloat)', () => {
+    const bigData = { huge: 'a'.repeat(101_000) };
+    const r = validate({ ...validInsert, form_data: bigData }, saveApplicationSchema);
+    expect(r.ok).toBe(false);
+  });
+
+  it('игнорирует user_telegram_id / user_auth_id из body (FORCED на сервере)', () => {
+    const r = validate(
+      { ...validInsert, user_telegram_id: 99999, user_auth_id: 'hacker-uuid' },
+      saveApplicationSchema
+    );
+    expect(r.ok).toBe(true);
+    expect(r.data.user_telegram_id).toBeUndefined();
+    expect(r.data.user_auth_id).toBeUndefined();
+  });
+
+  it('bonuses_used default = 0', () => {
+    const { bonuses_used, ...without } = validInsert; // eslint-disable-line no-unused-vars
+    const r = validate(without, saveApplicationSchema);
+    expect(r.ok).toBe(true);
+    expect(r.data.bonuses_used).toBe(0);
   });
 });
 
