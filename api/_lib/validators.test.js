@@ -14,6 +14,7 @@ import {
   notifyStatusSchema,
   webUserUpsertSchema,
   postReviewSchema,
+  saveReviewSchema,
   adminGrantBonusSchema,
 } from './validators.js';
 
@@ -177,6 +178,66 @@ describe('postReviewSchema', () => {
       postReviewSchema
     );
     expect(r.ok).toBe(false);
+  });
+});
+
+describe('saveReviewSchema', () => {
+  it('пропускает валидный отзыв', () => {
+    const r = validate(
+      { application_id: 'app-123', country: 'Таиланд', rating: 5, text: 'Отлично' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(true);
+  });
+
+  it('требует application_id', () => {
+    const r = validate(
+      { country: 'Таиланд', rating: 5, text: 'Отлично' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+    expect(r.errors.some(e => e.path.includes('application_id'))).toBe(true);
+  });
+
+  it('требует country', () => {
+    const r = validate(
+      { application_id: 'app-1', rating: 5, text: 'ok' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает rating вне 1..5', () => {
+    expect(validate({ application_id: 'a', country: 'b', rating: 0, text: 'x' }, saveReviewSchema).ok).toBe(false);
+    expect(validate({ application_id: 'a', country: 'b', rating: 6, text: 'x' }, saveReviewSchema).ok).toBe(false);
+  });
+
+  it('отвергает пустой text', () => {
+    const r = validate(
+      { application_id: 'a', country: 'b', rating: 5, text: '' },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('отвергает text > 2000 chars', () => {
+    const r = validate(
+      { application_id: 'a', country: 'b', rating: 5, text: 'a'.repeat(2001) },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(false);
+  });
+
+  it('не принимает user_telegram_id из body (FORCED из initData в handler)', () => {
+    // Схема не упоминает user_telegram_id — даже если фронт его пошлёт,
+    // handler возьмёт его из verified initData.
+    const r = validate(
+      { application_id: 'a', country: 'b', rating: 5, text: 'ok', user_telegram_id: 99999 },
+      saveReviewSchema
+    );
+    expect(r.ok).toBe(true);
+    // user_telegram_id игнорируется (Zod strip по умолчанию)
+    expect(r.data.user_telegram_id).toBeUndefined();
   });
 });
 
