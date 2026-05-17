@@ -19,6 +19,7 @@ import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
 import { validate, adminGrantBonusSchema } from './_lib/validators.js';
+import { logAdminAction } from './_lib/audit-log.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -63,8 +64,11 @@ async function handler(req, res) {
 
   // ── 1. Auth: верифицируем initData админа ──
   let verifiedTgId;
+  let verifiedAdmin = null;
   try {
-    verifiedTgId = requireTelegramUser(req).telegramId;
+    const verified = requireTelegramUser(req);
+    verifiedTgId = verified.telegramId;
+    verifiedAdmin = verified.user; // для audit log: { id, username, first_name }
   } catch (err) {
     const status = err instanceof AuthError ? (err.status || 401) : 500;
     res.status(status).json({ error: err.message || 'auth failed' });
@@ -143,6 +147,23 @@ async function handler(req, res) {
       const text = await logRes.text().catch(() => '');
       console.warn('[admin-grant-bonus] bonus_logs insert non-fatal:', logRes.status, text);
     }
+
+    // ── 7. Server-side audit log (admin_audit_log) ──
+    // Дублирует frontend auditLog() — гарантирует запись даже если фронт
+    // вызвал API напрямую без UI. Best-effort, не блокирует ответ.
+    await logAdminAction({
+      admin_tg_id: verifiedTgId,
+      admin_name: verifiedAdmin?.username ? `@${verifiedAdmin.username}` : (verifiedAdmin?.first_name ?? null),
+      action: add ? 'bonus.grant' : 'bonus.revoke',
+      target_type: 'user',
+      target_id: target_telegram_id,
+      details: {
+        amount,
+        previous_balance: current,
+        new_balance: newBalance,
+        description: customDescription ?? null,
+      },
+    });
 
     res.status(200).json({ ok: true, newBalance, previousBalance: current });
   } catch (err) {
