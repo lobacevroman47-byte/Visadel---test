@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -67,10 +67,11 @@
 - **Vector:** CSRF через open tab — если у юзера в одной вкладке Telegram Mini App, в другой malicious site, `fetch('/api/grant-bonus', {headers:{authorization: 'tma ...'}})` мог пройти.
 - **Fix applied:** все 15 user-facing endpoints мигрированы на `setCors(req, res)` из `api/_lib/cors.js`. Whitelist: `visadel.agency`, `*.vercel.app`, `*.telegram.org`. Server-to-server (без Origin header) не блокируется. Cron-endpoints (process-reminders, update-usd-rate) не имеют CORS — они вызываются Vercel-инфраструктурой напрямую.
 
-#### P1-3. Bonus race condition
-- **Affected:** `grantBonus` flow.
-- **Vector:** double-spend через параллельные `grant-bonus` calls. Миграция 020 (partner atomic balance) использует SQL transaction — для partner ОК. Но `bonus_logs` insert + `users.bonus_balance` update — два отдельных запроса.
-- **Fix:** обернуть в Postgres function `grant_user_bonus(tg_id, amount, reason)` с FOR UPDATE lock + idempotency key. Частично уже есть для partner-payouts, нужно вынести в общий паттерн.
+#### P1-3. Bonus race condition (FIXED)
+- **Affected (was):** `grantBonus()` в `api/grant-bonus.js` для `bonus_balance` flow.
+- **Vector (was):** classic lost-update. Запрос A читает 100, считает 150 (+50), пишет 150. Параллельный B читает 100, считает 130 (+30), пишет 130. Итог: 130 (правильно 180). Под нагрузкой реален при двойном клике, friend referral burst, cron+manual одновременно.
+- **Fix applied:** Postgres function `inc_bonus_balance(p_telegram_id, p_delta)` через миграцию 037. `UPDATE ... SET balance = balance + delta` — атомарный stmt с row-lock. Если строки нет — `INSERT ... ON CONFLICT` fallback. `api/grant-bonus.js` теперь делает один RPC вместо двух запросов.
+- **Дедупликация:** уже была через unique constraint `bonus_logs(telegram_id, type, dedupe_key)` — этот PR её не меняет. RPC закрывает оставшийся race.
 
 #### P1-4. Rate limiting отсутствует (PARTIAL FIX)
 - **Affected:** все API endpoints.

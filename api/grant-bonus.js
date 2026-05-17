@@ -34,22 +34,8 @@ async function dbGet(path) {
   return r.json();
 }
 
-async function dbPatch(path, body) {
-  // Используем return=representation чтобы видеть сколько строк апдейтнули.
-  // Раньше был return=minimal — успешный 200 без тела, и нельзя было понять
-  // что WHERE filter не нашёл ни одной строки (silent no-op).
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
-    method: 'PATCH',
-    headers: headers({ Prefer: 'return=representation' }),
-    body: JSON.stringify(body),
-  });
-  if (!r.ok) {
-    const errText = await r.text().catch(() => '');
-    throw new Error(`dbPatch ${path} failed: ${r.status} ${errText}`);
-  }
-  const rows = await r.json().catch(() => []);
-  return Array.isArray(rows) ? rows : [];
-}
+// dbPatch удалён — единственное использование (users.bonus_balance UPDATE)
+// заменено на атомарный RPC inc_bonus_balance (миграция 037).
 
 async function dbInsert(table, body) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
@@ -124,6 +110,24 @@ async function incPartnerBalance(telegram_id, delta) {
   return r.json().catch(() => null);
 }
 
+// Атомарный inc/dec bonus_balance через RPC (миграция 037).
+// Закрывает P1-3: раньше grantBonus делал read+compute+write — два запроса,
+// между ними race condition мог потерять начисление при параллельных вызовах
+// (двойной клик / friend referral burst). Теперь — один atomic UPDATE.
+// Если строки в users нет — RPC сама UPSERT'ит с минимально нужными полями.
+async function incBonusBalance(telegram_id, delta) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/inc_bonus_balance`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({ p_telegram_id: telegram_id, p_delta: delta }),
+  });
+  if (!r.ok) {
+    const errText = await r.text().catch(() => '');
+    throw new Error(`inc_bonus_balance failed: ${r.status} ${errText}`);
+  }
+  return r.json().catch(() => null);
+}
+
 async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
   // 1) Атомарный лог. Если уже был такой dedupe_key — вернёт alreadyGranted=true
   if (dedupe_key) {
@@ -142,55 +146,13 @@ async function grantBonus(telegram_id, type, amount, description, dedupe_key) {
     return { newPartnerBalance };
   }
 
-  // 3) Обычный (bonus) баланс. PostgREST не даёт SET balance = balance + N без RPC,
-  //    поэтому read → compute → write. Дедуп логов в (1) защищает от
-  //    двойного начисления; параллельные запросы могут разойтись на величину
-  //    (в будущем — RPC inc_balance).
-  //
-  //    Если строки в users нет (founder заходил через ?admin=true и пропустил
-  //    upsertUser, или RLS заблокировал INSERT с фронта) — PATCH молча
-  //    апдейтит 0 строк, баланс остаётся 0, но bonus_logs уже записан.
-  //    Поэтому fallback'ом делаем UPSERT через on_conflict=telegram_id.
+  // 3) Обычный (bonus) баланс — атомарный RPC inc_bonus_balance (миграция 037).
+  //    Закрывает P1-3 race condition: два параллельных вызова больше не
+  //    затирают друг друга. RPC сам делает UPSERT если строки в users нет
+  //    (например founder заходил через ?admin=true и пропустил upsertUser,
+  //    или RLS заблокировал INSERT с фронта).
   if (!affectsBonusBalance(type)) return { skipped: false };
-  const [user] = await dbGet(`users?telegram_id=eq.${telegram_id}&select=bonus_balance`);
-  const newBalance = ((user?.bonus_balance) ?? 0) + amount;
-
-  if (user) {
-    const updated = await dbPatch(`users?telegram_id=eq.${telegram_id}`, { bonus_balance: newBalance });
-    // Защита от silent no-op: если WHERE не нашёл ни одной строки (например
-    // строка удалена прямо во время операции), создаём её.
-    if (updated.length === 0) {
-      console.warn(`[grant-bonus] PATCH matched 0 rows for ${telegram_id} — fallback to upsert`);
-      const referral_code = `USR_${telegram_id}`;
-      await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=telegram_id`, {
-        method: 'POST',
-        headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-        body: JSON.stringify({
-          telegram_id,
-          bonus_balance: newBalance,
-          referral_code,
-          first_name: 'User',
-        }),
-      });
-    }
-  } else {
-    // Юзера нет — создаём минимальную строку. on_conflict=telegram_id +
-    // resolution=merge-duplicates делает upsert (на случай race condition,
-    // если параллельный запрос успел вставить). Минимально нужны
-    // telegram_id и referral_code (UNIQUE NOT NULL по схеме).
-    const referral_code = `USR_${telegram_id}`;
-    await fetch(`${SUPABASE_URL}/rest/v1/users?on_conflict=telegram_id`, {
-      method: 'POST',
-      headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-      body: JSON.stringify({
-        telegram_id,
-        bonus_balance: newBalance,
-        referral_code,
-        first_name: 'User',
-      }),
-    });
-  }
-
+  const newBalance = await incBonusBalance(telegram_id, amount);
   return { newBalance };
 }
 
