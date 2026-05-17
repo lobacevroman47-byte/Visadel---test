@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, Plus, Minus, X, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { getCurrentSession } from '../lib/web-auth';
+import { isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
@@ -193,34 +192,14 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
         paymentScreenshot ? uploadFile(paymentScreenshot, 'payments') : Promise.resolve(null),
       ]);
 
-      // 2. Save row (best effort — no DB table is fine; admin still gets notification)
+      // 2. Save через /api/save-hotel-booking (P0-1: закрывает RLS).
+      // telegram_id / auth_id / referrer_code / status — FORCED на сервере
+      // из verified источника (initData ИЛИ Supabase JWT), не из body.
       const userData = (() => {
         try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
       })();
 
-      // Захват referrer_code чтобы партнёр получил % с этой брони после
-      // hold-периода (мигр. 017). Берём referred_by из users по текущему
-      // telegram_id; если юзер не в users или без реферера — оставим NULL.
-      let referrerCode: string | null = null;
-      if (isSupabaseConfigured() && userData.telegramId) {
-        try {
-          const { data: u } = await supabase
-            .from('users')
-            .select('referred_by')
-            .eq('telegram_id', userData.telegramId)
-            .single();
-          referrerCode = (u as { referred_by?: string | null } | null)?.referred_by ?? null;
-        } catch { /* ignore — best-effort attribution */ }
-      }
-
-      // Auth ID для веб-юзеров (через email-регистрацию). Для TG-юзеров — null.
-      const webSession = await getCurrentSession();
-      const authId = webSession?.authId ?? null;
-
-      const row = {
-        telegram_id: userData.telegramId ?? null,
-        auth_id: authId,
-        username: userData.username ?? null,
+      const apiPayload = {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         country: country.trim(),
@@ -233,21 +212,34 @@ export default function HotelBookingForm({ onBack, onComplete, onGoToProfile }: 
         phone: phone.trim(),
         telegram_login: telegramLogin.trim(),
         passport_url: passportUrl,
-        price,
         payment_screenshot_url: paymentUrl,
+        price,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
-        // Атрибуция партнёра: NULL если юзер пришёл органически
-        referrer_code: referrerCode,
-        // Юзер прикрепил скриншот оплаты при сабмите → сразу
-        // pending_confirmation. Админ видит в инбоксе как «ожидает
-        // подтверждения», не как «новая без оплаты».
-        status: 'pending_confirmation',
+        username: userData.username ?? null,
+      };
+
+      // Для notify-admin сохраним old-style row (включая поля которые сервер
+      // выставит сам — для красивого письма админу).
+      const row = {
+        ...apiPayload,
+        telegram_id: userData.telegramId ?? null,
+        status: 'pending_confirmation' as const,
       };
 
       if (isSupabaseConfigured()) {
-        await supabase.from('hotel_bookings').insert(row).then(r => {
-          if (r.error) console.warn('hotel_bookings insert failed (table may not exist yet):', r.error.message);
-        });
+        try {
+          const r = await apiFetch('/api/save-hotel-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apiPayload),
+          });
+          if (!r.ok) {
+            const txt = await r.text().catch(() => '');
+            console.warn('[hotel-booking] /api/save-hotel-booking failed:', r.status, txt);
+          }
+        } catch (e) {
+          console.warn('[hotel-booking] /api/save-hotel-booking error:', e);
+        }
       }
 
       // 3. Notify admin (best effort)

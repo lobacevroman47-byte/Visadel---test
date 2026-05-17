@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, User, Plane, Mail, Phone, Send, Upload, Loader2, FileText, X, MapPin, Calendar, CreditCard, Copy, Sparkles, Check } from 'lucide-react';
 import { uploadFile } from '../lib/db';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { getCurrentSession } from '../lib/web-auth';
+import { isSupabaseConfigured } from '../lib/supabase';
 import BookingExtraField from './booking/BookingExtraField';
 import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
@@ -197,28 +196,9 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         try { return JSON.parse(localStorage.getItem('userData') ?? '{}'); } catch { return {}; }
       })();
 
-      // Захват referrer_code чтобы партнёр получил % с этой брони после
-      // hold-периода (мигр. 017). Best-effort — fail silently.
-      let referrerCode: string | null = null;
-      if (isSupabaseConfigured() && userData.telegramId) {
-        try {
-          const { data: u } = await supabase
-            .from('users')
-            .select('referred_by')
-            .eq('telegram_id', userData.telegramId)
-            .single();
-          referrerCode = (u as { referred_by?: string | null } | null)?.referred_by ?? null;
-        } catch { /* ignore */ }
-      }
-
-      // Auth ID для веб-юзеров (через email-регистрацию). Для TG-юзеров — null.
-      const webSession = await getCurrentSession();
-      const authId = webSession?.authId ?? null;
-
-      const row = {
-        telegram_id: userData.telegramId ?? null,
-        auth_id: authId,
-        username: userData.username ?? null,
+      // P0-1: save через /api/save-flight-booking — service_key + verified auth.
+      // telegram_id / auth_id / referrer_code / status — FORCED на сервере.
+      const apiPayload = {
         first_name: firstName.trim(),
         last_name: lastName.trim(),
         from_city: fromCity.trim(),
@@ -228,17 +208,33 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         phone: phone.trim(),
         telegram_login: telegramLogin.trim(),
         passport_url: passportUrl,
-        price,
         payment_screenshot_url: paymentUrl,
+        price,
         extra_fields: Object.keys(extraValues).length > 0 ? extraValues : null,
-        referrer_code: referrerCode,
-        status: 'pending_confirmation',
+        username: userData.username ?? null,
+      };
+
+      // Для notify-admin сохраним old-style row (для красивого письма админу).
+      const row = {
+        ...apiPayload,
+        telegram_id: userData.telegramId ?? null,
+        status: 'pending_confirmation' as const,
       };
 
       if (isSupabaseConfigured()) {
-        await supabase.from('flight_bookings').insert(row).then(r => {
-          if (r.error) console.warn('flight_bookings insert failed (table may not exist yet):', r.error.message);
-        });
+        try {
+          const r = await apiFetch('/api/save-flight-booking', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(apiPayload),
+          });
+          if (!r.ok) {
+            const txt = await r.text().catch(() => '');
+            console.warn('[flight-booking] /api/save-flight-booking failed:', r.status, txt);
+          }
+        } catch (e) {
+          console.warn('[flight-booking] /api/save-flight-booking error:', e);
+        }
       }
 
       try {
