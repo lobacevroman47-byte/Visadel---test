@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **8.8/10** (PR #6 audit logs) → **9.0/10** (PR #7 Vitest smoke tests).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -100,8 +100,9 @@
 
 - **P2-1.** Zod-валидация подключена ✅ на 5 критичных endpoints: `grant-bonus`, `notify-status`, `web-user-upsert`, `post-review`, `admin-grant-bonus`. Schemas в `api/_lib/validators.js`. Защищает от type-coercion (`amount='100'` теперь 400), HTML-инъекций в именах, fake реф-кодов, отрицательного amount в admin-grant. Остальные endpoints получат validation постепенно по мере касания.
 - **P2-2.** `audit_logs` есть (миграции 005/006), но не пишет ВСЕ admin-actions. Не покрыты: `admin-delete-user`, manual bonus grants.
-- **P2-3.** `npm audit` workflow готов к подключению. Файл `.github/workflows/security-checks.yml` создан локально, но GitHub блокирует push workflow-файлов через PAT без `workflow` scope. Нужно либо обновить scope в GitHub Settings → Developer settings → Tokens, либо создать файл через GitHub UI вручную. Содержимое — см. ниже в `docs/SECURITY.md → CI workflow`.
+- **P2-3.** `npm audit` + `npm run build` в CI ✅ — `.github/workflows/security-checks.yml`. Запускается на каждом PR в dev/main + раз в неделю (понедельник 06:00 UTC). Test job (`npm test`) добавляется вручную — см. раздел "CI test job" ниже.
 - **P2-4.** Sentry интегрирован ✅ (frontend через `@sentry/react`, backend через `@sentry/node` + `withSentry` wrapper). Включается через env vars `VITE_SENTRY_DSN` / `SENTRY_DSN` — пока не заданы, no-op. Setup: см. `docs/SENTRY_SETUP.md`. PII scrubbing встроен (passport, password, Authorization, Bearer, initData).
+- **P2-7 (new).** Vitest smoke tests ✅ — 65 тестов на критичные helpers: `validators.js` (27), `rate-limit.js` (10), `cors.js` (15), `telegram-auth.js` (13 включая HMAC roundtrip с фейк-токеном). Запускается в CI как отдельный job (`npm test`). Regression-защита от ослабления Zod схем, HMAC изменений, CORS whitelist. Расширять при добавлении новых API helpers.
 - **P2-5.** Backups Supabase — Pro-plan включает daily PITR на 7 дней, но snapshot-стратегии для cold-storage нет.
 - **P2-6.** Hosting localization (152-ФЗ) — Supabase US, Vercel global. Отложено до перехода на ИП/ООО (см. `project_legal_status_blocker.md`).
 
@@ -213,3 +214,31 @@ jobs:
       - run: npm ci
       - run: npm run build
 ```
+
+## CI test job (добавить вручную — PAT workflow scope)
+
+После PR #7 (Vitest smoke tests) в репозитории появилось 65 тестов
+в `api/_lib/*.test.js`. Чтобы CI блокировал merge при упавших тестах,
+добавь test-job в существующий `.github/workflows/security-checks.yml`.
+
+GitHub → файл `.github/workflows/security-checks.yml` → Edit → в КОНЕЦ
+добавь блок:
+
+```yaml
+  test:
+    name: Vitest smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test
+```
+
+(Отступы — 2 пробела. Block должен быть на одном уровне с `build:` и `npm-audit:`.)
+
+Коммит прямо в `dev`. Через ~1 минуту в Actions появится третий job
+"Vitest smoke tests" — должен быть зелёным (65 passed).
