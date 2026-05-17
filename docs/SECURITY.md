@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (после первого PR) → **7.5/10** (после CORS+rate-limit+admin-gate PR).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -90,24 +90,17 @@
 - **Vector:** Stored XSS → exfiltration паспортов. Сейчас XSS-вектора нет (нет userland innerHTML), но layered defense.
 - **Fix:** мигрировать черновики в TG `cloudStorage` API (зашифрован TG-инфраструктурой). Для web-юзеров — оставить localStorage с warning или server-side draft через `/api/drafts`.
 
-#### P1-6. Stack traces в response
-- **Affected:** некоторые API handlers возвращают `err.message` в JSON при ошибке.
-- **Vector:** information disclosure (Supabase column names, env hints).
-- **Fix:** общий error wrapper:
-  ```js
-  catch (err) {
-    console.error('[endpoint]', err);
-    const safeMsg = err.publicMessage ?? 'internal error';
-    res.status(err.status ?? 500).json({ error: safeMsg });
-  }
-  ```
+#### P1-6. Stack traces в response (FIXED)
+- **Affected:** 7 endpoints возвращали `err.message` / `String(err)` в 500 response.
+- **Vector:** information disclosure (Supabase column names, env hints, stack frames).
+- **Fix applied:** все 500-responses теперь возвращают `{ error: 'internal error' }`. Полный stack уходит в Sentry через `captureException` + Vercel logs через `console.error`. Endpoints обновлены: grant-bonus, post-review, upsert-user, admin-grant-bonus, admin-delete-user, notify-status, web-user-upsert.
 
 ### P2 — Medium
 
 - **P2-1.** Нет Zod/joi схем на API inputs — type-coercion риски, missing fields = silent bugs.
 - **P2-2.** `audit_logs` есть (миграции 005/006), но не пишет ВСЕ admin-actions. Не покрыты: `admin-delete-user`, manual bonus grants.
 - **P2-3.** `npm audit` не автоматизирован в CI.
-- **P2-4.** Sentry не подключён — нет visibility на runtime errors в prod.
+- **P2-4.** Sentry интегрирован ✅ (frontend через `@sentry/react`, backend через `@sentry/node` + `withSentry` wrapper). Включается через env vars `VITE_SENTRY_DSN` / `SENTRY_DSN` — пока не заданы, no-op. Setup: см. `docs/SENTRY_SETUP.md`. PII scrubbing встроен (passport, password, Authorization, Bearer, initData).
 - **P2-5.** Backups Supabase — Pro-plan включает daily PITR на 7 дней, но snapshot-стратегии для cold-storage нет.
 - **P2-6.** Hosting localization (152-ФЗ) — Supabase US, Vercel global. Отложено до перехода на ИП/ООО (см. `project_legal_status_blocker.md`).
 

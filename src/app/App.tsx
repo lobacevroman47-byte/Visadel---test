@@ -193,6 +193,12 @@ function App() {
     const tgFinal: TelegramUser | null = tg ?? getMockUser();
     if (!tg && tgFinal) setTgUser(tgFinal);
 
+    // Sentry user context — чтобы в дашборде видеть кто страдал.
+    // No-op если DSN не задан.
+    if (tgFinal) {
+      import('./lib/sentry').then(m => m.sentrySetUser({ id: tgFinal.id, username: tgFinal.username }));
+    }
+
     // Upsert user in Supabase / localStorage
     if (tgFinal) {
       const startParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? undefined;

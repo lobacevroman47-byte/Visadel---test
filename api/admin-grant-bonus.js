@@ -17,6 +17,7 @@
 import { requireTelegramUser, AuthError, isAdminId } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
+import { withSentry, captureException } from './_lib/sentry.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -44,7 +45,7 @@ async function isAdminInDb(telegramId) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).end(); return; }
 
@@ -146,6 +147,9 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true, newBalance, previousBalance: current });
   } catch (err) {
     console.error('[admin-grant-bonus] exception:', err);
-    res.status(500).json({ error: String(err) });
+    captureException(err, { endpoint: 'admin-grant-bonus' });
+    res.status(500).json({ error: 'internal error' });
   }
 }
+
+export default withSentry(handler);

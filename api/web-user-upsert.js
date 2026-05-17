@@ -21,6 +21,7 @@
 // Returns: { user: AppUser } — текущая запись после upsert.
 
 import { setCors } from './_lib/cors.js';
+import { withSentry, captureException } from './_lib/sentry.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -65,7 +66,7 @@ async function verifySupabaseJwt(jwt) {
   };
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'method not allowed' }); return; }
 
@@ -173,8 +174,15 @@ export default async function handler(req, res) {
   const inserted = await insRes.json().catch(() => []);
   if (!insRes.ok || !Array.isArray(inserted) || inserted.length === 0) {
     console.error('[web-user-upsert] insert failed:', insRes.status, inserted);
-    res.status(500).json({ error: 'insert failed', details: inserted });
+    captureException(new Error(`web-user-upsert insert failed: ${insRes.status}`), {
+      endpoint: 'web-user-upsert',
+      supabase_status: insRes.status,
+    });
+    // Не возвращаем details клиенту (information disclosure про Supabase).
+    res.status(500).json({ error: 'insert failed' });
     return;
   }
   res.status(200).json({ user: inserted[0] });
 }
+
+export default withSentry(handler);

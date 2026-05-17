@@ -1,10 +1,13 @@
-// Простейший error reporter — собирает unhandled-ошибки и шлёт админам в Telegram
-// через /api/notify-admin (в prod). В dev только console.error.
+// Error reporter — собирает unhandled-ошибки и:
+//   1) шлёт в Sentry (если VITE_SENTRY_DSN задан, см. sentry.ts)
+//   2) шлёт админам в Telegram через /api/notify-admin (в prod)
+// В dev только console.error.
 //
-// Когда подключим настоящий Sentry — заменим имплементацию здесь, не меняя
-// caller'ов. Все вызовы reportError(...) останутся.
+// Sentry — основной инструмент для production troubleshooting. TG-уведомления
+// остаются как fallback (если Sentry квота кончилась / DSN не настроен).
 
 import { apiFetch } from './apiFetch';
+import { sentryCaptureException } from './sentry';
 
 const isProd = typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'production';
 const seen = new Set<string>();
@@ -53,6 +56,9 @@ export function reportError(err: unknown, context: Context = {}): void {
   if (seen.size > 50) seen.clear();
 
   console.error('[error-report]', message, context, stack);
+
+  // 1) Sentry (no-op если DSN не задан)
+  sentryCaptureException(err, context);
 
   if (!isProd) return;
 
