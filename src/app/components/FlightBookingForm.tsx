@@ -428,7 +428,9 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         <section className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <FileText className="w-5 h-5 text-[#3B5BFF]" />
-            <h3 className="text-sm font-bold text-[#0F2A36]">Загранпаспорт</h3>
+            <h3 className="text-sm font-bold text-[#0F2A36]">
+              Загранпаспорт <span className="text-red-500">*</span>
+            </h3>
           </div>
           {!passport ? (
             <label className="block border-2 border-dashed border-gray-300 rounded-xl p-6 cursor-pointer hover:border-[#5C7BFF] hover:bg-[#EAF1FF] transition text-center">
