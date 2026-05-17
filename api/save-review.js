@@ -104,6 +104,31 @@ async function handler(req, res) {
     const rows = await r.json().catch(() => []);
     const id = Array.isArray(rows) && rows.length > 0 ? rows[0].id : null;
 
+    // Для отзыва на бронь — выставляем флаг review_bonus_granted на брони
+    // (идемпотентность: кнопка отзыва больше не показывается).
+    // Раньше это делал фронт через anon-key, но миграция 042 закрыла
+    // bookings UPDATE — теперь только через service_key здесь.
+    if (booking_id && booking_type) {
+      try {
+        const table = `${booking_type}_bookings`;
+        await fetch(
+          `${SUPABASE_URL}/rest/v1/${table}?id=eq.${encodeURIComponent(booking_id)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              apikey: SERVICE_KEY,
+              Authorization: `Bearer ${SERVICE_KEY}`,
+              'Content-Type': 'application/json',
+              Prefer: 'return=minimal',
+            },
+            body: JSON.stringify({ review_bonus_granted: true }),
+          }
+        );
+      } catch (e) {
+        console.warn('[save-review] review_bonus_granted flag update non-fatal:', e);
+      }
+    }
+
     res.status(200).json({ ok: true, id });
   } catch (err) {
     console.error('[save-review] exception:', err);
