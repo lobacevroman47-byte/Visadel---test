@@ -4,6 +4,11 @@ import { ErrorBoundary } from "./app/components/ErrorBoundary";
 import { DialogProvider } from "./app/components/shared/BrandDialog";
 import "./styles/index.css";
 import { installGlobalErrorHandlers } from "./app/lib/errorReporter";
+import { initSentry } from "./app/lib/sentry";
+
+// Sentry init — должен быть до createRoot, чтобы ловить ошибки из React-tree.
+// No-op если VITE_SENTRY_DSN не задан.
+initSentry();
 
 // Один раз чистим у юзеров устаревшие локальные данные после ручной чистки
 // БД 10 мая 2026 (удалили все тестовые users/applications/bonus_logs).

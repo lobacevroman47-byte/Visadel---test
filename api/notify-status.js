@@ -10,6 +10,7 @@
 import { requireTelegramUser, isAdminId, AuthError } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
+import { withSentry, captureException } from './_lib/sentry.js';
 //
 // Dedup strategy (3 layers — any one prevents duplicates):
 //   1. In-memory Map (same Vercel warm instance, 30s)
@@ -246,7 +247,7 @@ async function deleteDedupRow(application_id, status) {
   }
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
@@ -382,7 +383,10 @@ export default async function handler(req, res) {
     res.status(200).json({ ok: true, sent: true, message_id: data.result?.message_id });
   } catch (err) {
     console.error('[notify-status] fetch error:', err);
+    captureException(err, { endpoint: 'notify-status' });
     if (dbDedup === 'new') await deleteDedupRow(application_id, status);
-    res.status(500).json({ error: String(err) });
+    res.status(500).json({ error: 'internal error' });
   }
 }
+
+export default withSentry(handler);

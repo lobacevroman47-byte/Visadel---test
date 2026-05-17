@@ -10,11 +10,12 @@
 import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
+import { withSentry, captureException } from './_lib/sentry.js';
 
 const CHANNEL = '@visadel_recall';
 const STARS = ['', '⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'];
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') { res.status(405).json({ error: 'Method not allowed' }); return; }
 
@@ -63,6 +64,10 @@ export default async function handler(req, res) {
     const data = await tgRes.json();
     res.status(200).json(data);
   } catch (err) {
-    res.status(500).json({ error: String(err) });
+    console.error('[post-review] error:', err?.message ?? err);
+    captureException(err, { endpoint: 'post-review' });
+    res.status(500).json({ error: 'internal error' });
   }
 }
+
+export default withSentry(handler);
