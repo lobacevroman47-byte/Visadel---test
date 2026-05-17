@@ -18,6 +18,7 @@ import { requireTelegramUser, AuthError, isAdminId } from './_lib/telegram-auth.
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { validate, adminGrantBonusSchema } from './_lib/validators.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -79,17 +80,16 @@ async function handler(req, res) {
     return;
   }
 
-  // ── 3. Парсим body ──
-  const body = req.body ?? {};
-  const target_telegram_id = Number(body.target_telegram_id);
-  const amount = Number(body.amount);
-  const add = body.add !== false; // default true
-  const customDescription = typeof body.description === 'string' ? body.description : null;
-
-  if (!target_telegram_id || !Number.isFinite(amount) || amount <= 0) {
-    res.status(400).json({ error: 'target_telegram_id and amount > 0 required' });
+  // ── 3. Парсим body через Zod ──
+  // Защита: amount строго positive integer, target_telegram_id обязателен.
+  // Раньше Number(body.add) или add='maybe' могли проскочить и логика
+  // вычитала вместо добавления.
+  const parsed = validate(req.body ?? {}, adminGrantBonusSchema);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'invalid input', details: parsed.errors });
     return;
   }
+  const { target_telegram_id, amount, add, description: customDescription } = parsed.data;
 
   console.log('[admin-grant-bonus] called:', { admin: verifiedTgId, target_telegram_id, amount, add });
 

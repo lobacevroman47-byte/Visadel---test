@@ -11,6 +11,7 @@ import { requireTelegramUser, AuthError } from './_lib/telegram-auth.js';
 import { setCors } from './_lib/cors.js';
 import { rateLimitByIp } from './_lib/rate-limit.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { validate, postReviewSchema } from './_lib/validators.js';
 
 const CHANNEL = '@visadel_recall';
 const STARS = ['', '⭐', '⭐⭐', '⭐⭐⭐', '⭐⭐⭐⭐', '⭐⭐⭐⭐⭐'];
@@ -34,7 +35,14 @@ async function handler(req, res) {
     return;
   }
 
-  const { rating, text, country } = req.body ?? {};
+  // Zod-валидация: rating 1-5, text 1-2000 chars, country max 64.
+  // Защита от пустых отзывов / спама длинных полотен.
+  const parsed = validate(req.body ?? {}, postReviewSchema);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'invalid input', details: parsed.errors });
+    return;
+  }
+  const { rating, text, country } = parsed.data;
   // Username из проверенного user, не из body
   const username = verified.user.username
     ? `@${verified.user.username}`

@@ -22,6 +22,7 @@
 
 import { setCors } from './_lib/cors.js';
 import { withSentry, captureException } from './_lib/sentry.js';
+import { validate, webUserUpsertSchema } from './_lib/validators.js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY  = process.env.SUPABASE_SERVICE_KEY;
@@ -97,14 +98,24 @@ async function handler(req, res) {
     return;
   }
 
-  // 2. Парсим body — pubик клиента (имя, реф-код и т.п.).
-  const body = req.body ?? {};
-  const first_name = String(body.first_name ?? '').trim() || (email ? email.split('@')[0] : 'Гость');
-  const last_name = body.last_name ? String(body.last_name).trim() : null;
-  const phone = body.phone ? String(body.phone).trim() : null;
-  const referred_by = body.referred_by ? String(body.referred_by).trim() : null;
-  const signup_source = body.signup_source && typeof body.signup_source === 'string'
-    ? body.signup_source : 'email';
+  // 2. Парсим body через Zod — отсекает HTML-инъекции в именах,
+  //    мусор в phone, fake реф-коды.
+  // first_name по schema обязательное, но если пусто — fallback на email-prefix
+  // или 'Гость'. Чтобы Zod пропустил пустое — заранее подменяем.
+  const rawBody = { ...(req.body ?? {}) };
+  if (!rawBody.first_name || typeof rawBody.first_name !== 'string' || !rawBody.first_name.trim()) {
+    rawBody.first_name = email ? email.split('@')[0].slice(0, 64) : 'Гость';
+  }
+  const parsed = validate(rawBody, webUserUpsertSchema);
+  if (!parsed.ok) {
+    res.status(400).json({ error: 'invalid input', details: parsed.errors });
+    return;
+  }
+  const first_name = parsed.data.first_name.trim();
+  const last_name = parsed.data.last_name?.trim() ?? null;
+  const phone = parsed.data.phone?.trim() ?? null;
+  const referred_by = parsed.data.referred_by ?? null;
+  const signup_source = parsed.data.signup_source ?? 'email';
 
   // 3. Ищем существующую запись по auth_id.
   const findRes = await fetch(
