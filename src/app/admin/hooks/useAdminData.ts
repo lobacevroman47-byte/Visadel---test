@@ -218,31 +218,33 @@ export async function updateApplicationStatus(
 ) {
   const dbStatus = status === 'completed' ? 'ready' : status;
   if (isSupabaseConfigured()) {
+    // P0-1: UPDATE через /api/admin-update-application (service_key + admin auth).
+    // status_log пишется на сервере (передаём from/to). Раньше — anon-key.
     const patch: Record<string, unknown> = { status: dbStatus };
     if (visaFileUrl) patch.visa_file_url = visaFileUrl;
-    await supabase.from('applications').update(patch).eq('id', id);
-
-    // Audit-trail: log only if status actually changed.
-    if (prevStatus && prevStatus !== status) {
-      const { error: logError } = await supabase.from('status_log').insert({
-        application_id: id,
-        from_status: prevStatus,
-        to_status: status,
-        changed_by_id: changedBy?.id ?? null,
-        changed_by_name: changedBy?.name ?? null,
-      });
-      if (logError) {
-        console.error('[status_log] insert failed:', logError);
-        // Раньше тут был native alert() — он зависает Telegram WebView и
-        // приводит к белому экрану (см. enterprise-аудит P0). Заменено на
-        // toast — статус-update в applications прошёл успешно, история в
-        // status_log просто не записалась (не критично для юзера, важно
-        // только для compliance).
-        toast.warning(`История изменений не сохранена: ${logError.message ?? 'RLS блок'}`);
-      }
+    const statusChanged = prevStatus && prevStatus !== status;
+    const r = await apiFetch('/api/admin-update-application', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        patch,
+        status_log: statusChanged
+          ? { from_status: prevStatus, to_status: status }
+          : undefined,
+      }),
+    });
+    if (!r.ok) {
+      const body = await r.text().catch(() => '');
+      console.error('[updateApplicationStatus] failed:', r.status, body);
+      toast.warning(`Не удалось обновить статус: ${r.status}`);
+      throw new Error(`admin-update-application failed: ${r.status}`);
     }
   }
 
+  // changedBy / country / visaType / telegramId — used by callers for the
+  // notification; больше не нужны здесь (status_log на сервере).
+  void changedBy; void country; void visaType; void telegramId;
   // Notification is sent by the caller (Applications.tsx handleSave) to avoid double-send
 }
 
@@ -251,13 +253,23 @@ export async function updateApplicationStatus(
 // dashboard will recalculate cost-of-goods using this per-app rate.
 export async function updateApplicationUsdRate(id: string, rate: number) {
   if (!isSupabaseConfigured()) return;
-  await supabase.from('applications').update({ usd_rate_rub: rate }).eq('id', id);
+  const r = await apiFetch('/api/admin-update-application', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, patch: { usd_rate_rub: rate } }),
+  });
+  if (!r.ok) throw new Error(`updateApplicationUsdRate failed: ${r.status}`);
 }
 
 // Per-application tax % (УСН/самозанятый rate may vary; used in finance reports)
 export async function updateApplicationTaxPct(id: string, pct: number) {
   if (!isSupabaseConfigured()) return;
-  await supabase.from('applications').update({ tax_pct: pct }).eq('id', id);
+  const r = await apiFetch('/api/admin-update-application', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, patch: { tax_pct: pct } }),
+  });
+  if (!r.ok) throw new Error(`updateApplicationTaxPct failed: ${r.status}`);
 }
 
 // ─── Status log (audit trail) ──────────────────────────────────────────────
