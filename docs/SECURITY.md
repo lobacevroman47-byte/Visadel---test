@@ -6,7 +6,7 @@
 
 ## Executive summary
 
-Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review API + RLS closure для reviews) → **9.3/10** (PR #6 server-side audit logs).
+Текущий security score: **4.5/10** (до начальной итерации) → **6.5/10** (PR #1 headers + audit) → **7.5/10** (PR #2 CORS + rate-limit + admin-gate) → **8.0/10** (PR #3 Sentry + error sanitization) → **8.3/10** (PR #4 bonus atomic) → **8.6/10** (PR #5 Zod + CI security checks) → **9.0/10** (PR #7 Vitest smoke tests) → **9.1/10** (PR #8 save-review + RLS reviews) → **9.3/10** (PR #6 server-side audit logs) → **9.4/10** (PR #9 TG CloudStorage proof-of-concept).
 
 Самые опасные дыры (P0) — открытые RLS policies (`USING(true)`) на `applications`, `hotel_bookings`, `flight_bookings`, `users`. Через anon-key любой может читать и менять чужие данные. Этот PR не закрывает их (требует API-refactor), но фиксирует план в `supabase/035_rls_audit_plan.sql`.
 
@@ -97,10 +97,16 @@
   - `track-click` — 30 POST + 60 GET / мин по IP
 - **Что НЕ закрыто (Sprint 5):** in-memory bucket сбрасывается на cold-start Vercel. Для полной защиты — Upstash Redis + `@upstash/ratelimit`.
 
-#### P1-5. PII в localStorage
-- **Affected:** `visa_drafts`, `hotel_booking_draft`, `flight_booking_draft`.
+#### P1-5. PII в localStorage (PARTIAL FIX — flight_booking_draft proof-of-concept)
+- **Affected (was):** `visa_drafts`, `hotel_booking_draft`, `flight_booking_draft`.
 - **Vector:** Stored XSS → exfiltration паспортов. Сейчас XSS-вектора нет (нет userland innerHTML), но layered defense.
-- **Fix:** мигрировать черновики в TG `cloudStorage` API (зашифрован TG-инфраструктурой). Для web-юзеров — оставить localStorage с warning или server-side draft через `/api/drafts`.
+- **Fix applied (PR #9):**
+  - `src/app/lib/secureStorage.ts` — wrapper с TG CloudStorage (приоритет) + localStorage (fallback)
+  - TG CloudStorage хранит данные на TG-серверах, привязано к telegram_id, не виден внешним скриптам в WebView
+  - Auto-fallback на localStorage если: нет TG (web-юзер), value > 4096 bytes, TG API ошибка
+  - `flight_booking_draft` мигрирован как proof-of-concept (FlightBookingForm.tsx)
+  - 21 unit-тест на wrapper (TG mock, byteLength UTF-8, migration helpers)
+- **Что осталось:** мигрировать `visa_drafts` (массив + individual `draft_<uuid>` keys), `hotel_booking_draft`. Pattern готов — `import { secureStorage } from './lib/secureStorage'` + replace localStorage calls.
 
 #### P1-6. Stack traces в response (FIXED)
 - **Affected:** 7 endpoints возвращали `err.message` / `String(err)` в 500 response.

@@ -8,6 +8,7 @@ import DateInput from './shared/DateInput';
 import SuccessScreen from './shared/SuccessScreen';
 import LatinNotice from './shared/LatinNotice';
 import { apiFetch } from '../lib/apiFetch';
+import { secureStorage } from '../lib/secureStorage';
 import {
   showBackButton, hideBackButton,
   enableClosingConfirmation, disableClosingConfirmation,
@@ -23,8 +24,12 @@ interface FlightBookingFormProps {
 }
 
 export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }: FlightBookingFormProps) {
-  // Restore draft on first render
-  const draft = (() => {
+  // Restore draft on first render. SYNC через localStorage (для быстрого UX —
+  // ничего не показываем пустым, потом async upgrade из TG CloudStorage если
+  // там более свежие данные).
+  // P1-5: secureStorage предпочитает TG CloudStorage — там данные не достанет
+  // Stored XSS через localStorage.getItem('flight_booking_draft').
+  const localDraft = (() => {
     try {
       const raw = localStorage.getItem('flight_booking_draft');
       return raw ? JSON.parse(raw) : null;
@@ -32,18 +37,18 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
   })();
 
   // Passenger (Latin, as in passport)
-  const [firstName, setFirstName] = useState<string>(draft?.firstName ?? '');
-  const [lastName, setLastName] = useState<string>(draft?.lastName ?? '');
+  const [firstName, setFirstName] = useState<string>(localDraft?.firstName ?? '');
+  const [lastName, setLastName] = useState<string>(localDraft?.lastName ?? '');
 
   // Trip
-  const [fromCity, setFromCity] = useState<string>(draft?.fromCity ?? '');
-  const [toCity, setToCity] = useState<string>(draft?.toCity ?? '');
-  const [bookingDate, setBookingDate] = useState<string>(draft?.bookingDate ?? '');
+  const [fromCity, setFromCity] = useState<string>(localDraft?.fromCity ?? '');
+  const [toCity, setToCity] = useState<string>(localDraft?.toCity ?? '');
+  const [bookingDate, setBookingDate] = useState<string>(localDraft?.bookingDate ?? '');
 
   // Contacts (mirror visa form)
-  const [email, setEmail] = useState<string>(draft?.email ?? '');
-  const [phone, setPhone] = useState<string>(draft?.phone ?? '');
-  const [telegramLogin, setTelegramLogin] = useState<string>(draft?.telegramLogin ?? '');
+  const [email, setEmail] = useState<string>(localDraft?.email ?? '');
+  const [phone, setPhone] = useState<string>(localDraft?.phone ?? '');
+  const [telegramLogin, setTelegramLogin] = useState<string>(localDraft?.telegramLogin ?? '');
 
   // Passport file
   const [passport, setPassport] = useState<File | null>(null);
@@ -74,6 +79,38 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
     };
   }, [onBack]);
 
+  // P1-5: на mount пробуем подтянуть свежий draft из TG CloudStorage.
+  // Если localDraft уже есть (из localStorage) — используется как initial,
+  // потом TG-версия может его перезаписать. Если TG-версия идентична — no-op.
+  // Если TG нет — fallback на localStorage уже сработал в init выше.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await secureStorage.getItem('flight_booking_draft');
+        if (cancelled || !raw) return;
+        const parsed = JSON.parse(raw);
+        // Применяем только если поля заполнены чем-то — не затираем то что юзер
+        // уже начал вводить пока шла async загрузка.
+        if (parsed.firstName && !firstName) setFirstName(parsed.firstName);
+        if (parsed.lastName && !lastName) setLastName(parsed.lastName);
+        if (parsed.fromCity && !fromCity) setFromCity(parsed.fromCity);
+        if (parsed.toCity && !toCity) setToCity(parsed.toCity);
+        if (parsed.bookingDate && !bookingDate) setBookingDate(parsed.bookingDate);
+        if (parsed.email && !email) setEmail(parsed.email);
+        if (parsed.phone && !phone) setPhone(parsed.phone);
+        if (parsed.telegramLogin && !telegramLogin) setTelegramLogin(parsed.telegramLogin);
+        if (parsed.extraValues && Object.keys(parsed.extraValues).length > 0) {
+          setExtraValues(prev => ({ ...parsed.extraValues, ...prev }));
+        }
+      } catch (e) {
+        console.warn('[flight-draft] secureStorage load failed:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-save draft to localStorage с debounce 1s + lastSavedAt трекинг.
   const [lastSavedAt, setLastSavedAt] = useState<number | null>(null);
   // Cron-напоминания расписываем один раз за сессию (как у отеля).
@@ -83,12 +120,14 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
       email || phone || telegramLogin);
     if (!anyContent) return;
     const timer = setTimeout(() => {
+      // P1-5: пишем через secureStorage (TG CloudStorage если доступен,
+      // localStorage fallback). PII не утечёт через Stored XSS на TG-клиенте.
+      void secureStorage.setItem('flight_booking_draft', JSON.stringify({
+        firstName, lastName, fromCity, toCity, bookingDate,
+        email, phone, telegramLogin, extraValues,
+        savedAt: new Date().toISOString(),
+      })).catch(e => console.warn('[flight-draft] save failed:', e));
       try {
-        localStorage.setItem('flight_booking_draft', JSON.stringify({
-          firstName, lastName, fromCity, toCity, bookingDate,
-          email, phone, telegramLogin, extraValues,
-          savedAt: new Date().toISOString(),
-        }));
         setLastSavedAt(Date.now());
         if (!remindersScheduled.current) {
           remindersScheduled.current = true;
@@ -214,7 +253,8 @@ export default function FlightBookingForm({ onBack, onComplete, onGoToProfile }:
         });
       } catch { /* no-op */ }
 
-      try { localStorage.removeItem('flight_booking_draft'); } catch { /* no-op */ }
+      // P1-5: чистим обе локации (TG CloudStorage + localStorage)
+      void secureStorage.removeItem('flight_booking_draft');
 
       // Cancel any pending cron-reminders — юзер успешно оплатил.
       apiFetch('/api/cancel-reminders', {
